@@ -166,12 +166,18 @@
     const engineeringOnly = window.PFX_CONFIG?.workflowScope === 'engineering';
     const projectCard = (id, title, description, href, icon, status, branch = false) => {
       href = window.PFX_PATHS?.moduleHref(id, href) || href;
-      if (engineeringOnly) return `
-        <a class="workflow-card workflow-project-card" data-module="${id}" data-status="ready" href="${href}">
+      if (engineeringOnly) {
+        const content = `
           <h3>${title}</h3>
           <img class="workflow-project-image" src="assets/workflow-previews/${id}.jpg" alt="${title}项目界面截图" width="1280" height="720" loading="lazy" decoding="async">
-          <p>${description}</p>
-        </a>`;
+          <p>${description}</p>`;
+        if (id === 'sophirobot') return `
+          <article class="workflow-card workflow-project-card">
+            <a class="workflow-project-main" data-module="${id}" data-status="ready" href="${href}">${content}</a>
+            <a class="workflow-related-link" href="https://sophimotion.github.io/workflow/%E5%BA%95%E7%9B%98%E6%9C%BA%E5%99%A8%E4%BA%BA/dist/index.html">打开 SkateChassis 机器人工作台<span aria-hidden="true">→</span></a>
+          </article>`;
+        return `<a class="workflow-card workflow-project-card" data-module="${id}" data-status="ready" href="${href}">${content}</a>`;
+      }
       return `
         <a class="workflow-card${branch ? ' workflow-branch' : ''}" data-module="${id}" data-status="ready" href="${href}">
           <div class="wf-icon"><span class="ms">${icon}</span></div>
