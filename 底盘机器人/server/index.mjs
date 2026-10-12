@@ -16,7 +16,7 @@ const digest=k=>crypto.createHash('sha256').update(k).digest('hex');
 const send=(res,status,value)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(value));};
 function save(id,p){const f=path.join(data,id+'.json');fs.writeFileSync(f+'.tmp',JSON.stringify(p),{mode:0o600});fs.renameSync(f+'.tmp',f);}
 async function body(req){let b='';for await(const c of req){b+=c;if(b.length>1024*1024){const e=Error('请求过大');e.status=413;throw e;}}try{return JSON.parse(b);}catch{throw Error('JSON 无效');}}
-const mime={'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.pdf':'application/pdf','.woff2':'font/woff2','.json':'application/json','.py':'text/x-python; charset=utf-8','.txt':'text/plain; charset=utf-8','.wasm':'application/wasm'};
+const mime={'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.pdf':'application/pdf','.woff2':'font/woff2','.json':'application/json','.py':'text/x-python; charset=utf-8','.txt':'text/plain; charset=utf-8','.wasm':'application/wasm','.webp':'image/webp','.jpeg':'image/jpeg','.glb':'model/gltf-binary','.gltf':'model/gltf+json','.bin':'application/octet-stream','.spz':'application/octet-stream','.ply':'application/octet-stream','.gz':'application/gzip','.zip':'application/zip','.md':'text/plain; charset=utf-8'};
 function staticFile(res,file,base){
   const full=path.resolve(base,file);if(!full.startsWith(base+path.sep)||file.split(/[\\/]/).some(x=>x.startsWith('.'))||!mime[path.extname(full)]||!fs.existsSync(full)||!fs.statSync(full).isFile())return false;
   res.writeHead(200,{'Content-Type':mime[path.extname(full)],'X-Content-Type-Options':'nosniff'});fs.createReadStream(full).pipe(res);return true;
@@ -56,7 +56,7 @@ const server=http.createServer(async(req,res)=>{try{
     }
     return send(res,405,{error:'方法不支持'});
   }
-  if(u.pathname.startsWith('/studio/')){const f=decodeURIComponent(u.pathname.slice(8))||'index.html';const allowed=f==='index.html'||['assets/','unit/css/','unit/js/','prd/','stlquote/','sophicarv2/','sophicar-formate/web/dist/','cfd/dist/','底盘机器人/dist/'].some(prefix=>f.startsWith(prefix));if(allowed&&!f.split('/').includes('..')&&staticFile(res,f,path.dirname(root)))return;res.writeHead(404);return res.end('SophiStudio 工具文件不存在');}
+  if(u.pathname.startsWith('/studio/')){const f=decodeURIComponent(u.pathname.slice(8))||'index.html';const allowed=['index.html','worldlabstest/worldlabstestv1.html','worldlabstest/worldlabstestv2.html','mooncake/mooncake/Mooncake.html','santi/santi.html','weld/weld.html'].includes(f)||['assets/','unit/css/','unit/js/','prd/','stlquote/','sophicarv2/','sophicar-formate/web/dist/','cfd/dist/','底盘机器人/dist/','worldlabstest/assets/','worldlabstest/vendor/','worldlabstest/js/','worldlabstest/data/','worldlabstest/docs/'].some(prefix=>f.startsWith(prefix));if(allowed&&!f.split('/').includes('..')&&staticFile(res,f,path.dirname(root)))return;res.writeHead(404);return res.end('SophiStudio 工具文件不存在');}
   if(vite)return vite.middlewares(req,res,()=>{res.writeHead(404);res.end();});
   const f=decodeURIComponent(u.pathname).replace(/^\//,'')||'index.html';if(staticFile(res,f,path.join(root,'dist')))return;
   if(!path.extname(f)&&staticFile(res,'index.html',path.join(root,'dist')))return;

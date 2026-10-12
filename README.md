@@ -20,6 +20,15 @@ SophiMotion 的本地工程工具集合。打开根目录 `index.html` 进入工
 | 机械臂焊接 | `weld/weld.html` |
 | 点阵飞行 | `http://127.0.0.1:4188/` |
 
+## 在线网站与本地预览
+
+- GitHub Pages：[https://sophimotion.github.io/workflow/](https://sophimotion.github.io/workflow/)
+- 本地预览：[http://127.0.0.1:4173/studio/index.html](http://127.0.0.1:4173/studio/index.html)
+
+GitHub Pages 从 `main` 分支根目录自动发布；`.nojekyll` 保留各项目现有构建文件。每次修改后先构建对应子项目，再提交并推送，GitHub 会自动更新网站。线上 11 张卡片指向仓库内的静态入口，本地打开仍连接本机服务。
+
+线上支持浏览器内的建模、仿真和文件导出。项目服务端协作、桌面 Fusion 联动及外部 API 仍需相应本机服务或用户自己的集成配置。
+
 ## 本地运行
 
 需要 Node.js 22.12+ 和 Python 3.9+。仓库保留浏览器所需的构建文件、模型、离线资源与 Fusion 插件包。各模块的开发依赖按其锁文件安装；修改源码后在对应模块执行 `npm run build`。

@@ -165,6 +165,7 @@
   function renderWorkflow() {
     const engineeringOnly = window.PFX_CONFIG?.workflowScope === 'engineering';
     const projectCard = (id, title, description, href, icon, status, branch = false) => {
+      href = window.PFX_PATHS?.moduleHref(id, href) || href;
       if (engineeringOnly) return `
         <a class="workflow-card workflow-project-card" data-module="${id}" data-status="ready" href="${href}">
           <h3>${title}</h3>

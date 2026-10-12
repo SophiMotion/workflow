@@ -28,3 +28,13 @@ test('Fusion endpoints reject requests without local-origin intent and validate 
   assert.equal((await request(endpoint,{method:'POST',headers,body:JSON.stringify({config:{length:1}})})).status,400);
   assert.equal((await request('/api/skate/fusion/status',{method:'POST',headers,body:JSON.stringify({id:'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'})})).body.state,'superseded');
 });
+test('the local workflow preview serves every static gallery entry and world assets',async()=>{
+  for(const file of ['index.html','sophicarv2/index.html','sophicar-formate/web/dist/index.html','stlquote/index.html','cfd/dist/index.html','worldlabstest/worldlabstestv2.html','worldlabstest/assets/sophistudio-logo.png','worldlabstest/js/launch-workbench.js','mooncake/mooncake/Mooncake.html','santi/santi.html','weld/weld.html']){
+    const response=await fetch(`${base}/studio/${file}`);
+    assert.equal(response.status,200,file);
+    await response.body.cancel();
+  }
+  for(const file of ['worldlabstest/.env','worldlabstest/runs/session.json','worldlabstest/tools/server.py']){
+    assert.equal((await request(`/studio/${file}`)).status,404,file);
+  }
+});

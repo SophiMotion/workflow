@@ -17,7 +17,18 @@
   // Resolve module links from this shared script, independent of the entry page.
   // 以公共脚本定位工作流目录，新旧入口共享同一套模块路径。
   const workflowRoot = new URL('../../', document.currentScript.src);
+  const staticModules = {
+    skatechassis: '底盘机器人/dist/index.html',
+    sophirobot: 'SophiStudio-SophiRobot-Website/dist/index.html',
+    'sophicar-formate': 'sophicar-formate/web/dist/index.html',
+    'drone-formation': 'drone-formation/index.html'
+  };
+  const hosted = /^https?:$/.test(workflowRoot.protocol)
+    && !['localhost', '127.0.0.1', '[::1]'].includes(workflowRoot.hostname);
   window.PFX_PATHS = {
+    moduleHref(id, localHref) {
+      return hosted && staticModules[id] ? staticModules[id] : localHref;
+    },
     resolve(relative) {
       if (/^(?:[a-z][a-z\d+.-]*:|\/\/|#|\/)/i.test(relative)) return relative;
       return new URL(relative, workflowRoot).href;
