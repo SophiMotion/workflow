@@ -1,0 +1,81 @@
+{
+  "retrieved": "2026-10-12",
+  "method": "Official default geometry baked to meters, Y up, front -Z; static parts merged by material, wheel pivots retained. No geometry decimation.",
+  "models": [
+    {
+      "id": "fusion",
+      "source": "https://www.sophicar.com/assets/Sophi-fusion-CpGJXt4L.js",
+      "meshes": 15,
+      "vertices": 4968,
+      "drawCalls": 10,
+      "wheels": 4,
+      "dimensions_m": [
+        0.3443999868631364,
+        0.22850000858306885,
+        0.5
+      ],
+      "bytes": 145788,
+      "sha256": "2ae04639b092d4b9400f6420b337b913917e8d8e5d6dd6c947fee0177db0c897"
+    },
+    {
+      "id": "nav",
+      "source": "https://www.sophicar.com/assets/NavCar-C7qoSidN.js",
+      "meshes": 39,
+      "vertices": 110988,
+      "drawCalls": 6,
+      "wheels": 2,
+      "dimensions_m": [
+        0.4650000034272671,
+        0.8022000159025192,
+        0.40310138463974
+      ],
+      "bytes": 3425488,
+      "sha256": "f8c8f731ca40380de21fffdad7103e64bcd89eddc2d3182774701552d9ab7fd6"
+    },
+    {
+      "id": "edu",
+      "source": "https://www.sophicar.com/assets/EduCar-BwgHniIQ.js",
+      "meshes": 53,
+      "vertices": 191353,
+      "drawCalls": 12,
+      "wheels": 4,
+      "dimensions_m": [
+        0.3540000023841858,
+        0.12200000107288361,
+        0.5199999809265137
+      ],
+      "bytes": 7271908,
+      "sha256": "b6d01aa4c513c5fe98095d063e185ba9a61e6af483f3d43fb68ce73dd705486e"
+    },
+    {
+      "id": "sophicore",
+      "source": "https://sophimotion.github.io/sophicore-robot-cle/model.json",
+      "meshes": 506,
+      "vertices": 839403,
+      "drawCalls": 8,
+      "wheels": 2,
+      "dimensions_m": [
+        0.8500000238418579,
+        1.875749944627285,
+        0.8999999761581421
+      ],
+      "bytes": 30669284,
+      "sha256": "d83a8d728a738c9ab34b177c4666c8f438ba6689cbed7d2c75f62de32e9d03c0"
+    },
+    {
+      "id": "reference-rover-video",
+      "source": "User supplied image + bob 2026-10-10 23.22.05.mp4",
+      "meshes": 1191,
+      "vertices": 126927,
+      "drawCalls": 29,
+      "wheels": 4,
+      "dimensions_m": [
+        2.0399999648332594,
+        2.4140000250823794,
+        3.7890000343322754
+      ],
+      "bytes": 3522972,
+      "sha256": "e88c319e05bc65d2c6a1ee08420ba74c5bccff5adcb84226c069d84a5696fa6f"
+    }
+  ]
+}

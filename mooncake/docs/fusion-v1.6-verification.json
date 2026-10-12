@@ -1,0 +1,279 @@
+{
+  "passed": true,
+  "file": "/Users/wubo/Documents/2026-2/sophistudio/mooncake/mooncake/exports/Mooncake-61mm-cd78a939.f3d",
+  "mold": {
+    "type": "hand_press",
+    "radialClearance": 0.3,
+    "wallThickness": 4,
+    "stampThickness": 6,
+    "connection": "M20x2.5",
+    "baseThickness": 6,
+    "shaftDiameter": 30,
+    "shaftLength": 40,
+    "studLength": 15,
+    "handleDiameter": 40,
+    "bossDiameter": 30,
+    "guideHeight": 6
+  },
+  "dimensions": {
+    "diameter": 61,
+    "thickness": 18,
+    "draftAngle": 5
+  },
+  "parts": [
+    {
+      "name": "01_月饼_白_61mm",
+      "solid": true,
+      "volumeCm3": 49.109403046342734,
+      "positionMm": [
+        -54.8,
+        -54.8,
+        0.0
+      ],
+      "threads": [],
+      "cylinders": []
+    },
+    {
+      "name": "02_模具外套筒",
+      "solid": true,
+      "volumeCm3": 47.8021885052921,
+      "positionMm": [
+        54.8,
+        -54.8,
+        0.0
+      ],
+      "threads": [],
+      "cylinders": [
+        {
+          "diameterMm": 30.6,
+          "zMinMm": 24.000000000000004,
+          "zMaxMm": 30.000000000000004
+        },
+        {
+          "diameterMm": 69.0,
+          "zMinMm": 0.0,
+          "zMaxMm": 30.000000000000004
+        }
+      ],
+      "upperStraightEdges": {
+        "count": 384,
+        "minLengthMm": 6.0000000000000036,
+        "maxLengthMm": 6.0000000000000036
+      },
+      "baseThicknessMm": 6.0
+    },
+    {
+      "name": "03_可换镜像凹纹压片",
+      "solid": true,
+      "volumeCm3": 22.42126223625001,
+      "positionMm": [
+        -54.8,
+        54.8,
+        18.0
+      ],
+      "threads": [
+        "M20x2.5"
+      ],
+      "cylinders": [
+        {
+          "diameterMm": 20.292500000000004,
+          "zMinMm": -18.0,
+          "zMaxMm": -2.0000000000000018
+        },
+        {
+          "diameterMm": 17.519,
+          "zMinMm": -18.0,
+          "zMaxMm": -2.0000000000000018
+        },
+        {
+          "diameterMm": 30.0,
+          "zMinMm": -18.0,
+          "zMaxMm": 0.0
+        }
+      ],
+      "socketDepthMm": 16
+    },
+    {
+      "name": "04_螺纹推杆与手柄",
+      "solid": true,
+      "volumeCm3": 41.02430764349923,
+      "positionMm": [
+        54.8,
+        54.8,
+        15.0
+      ],
+      "threads": [
+        "M20x2.5"
+      ],
+      "cylinders": [
+        {
+          "diameterMm": 40.0,
+          "zMinMm": 40.0,
+          "zMaxMm": 47.0
+        },
+        {
+          "diameterMm": 16.938,
+          "zMinMm": -14.999999999999998,
+          "zMaxMm": 0.0
+        },
+        {
+          "diameterMm": 19.7905,
+          "zMinMm": -14.999999999999998,
+          "zMaxMm": 0.0
+        },
+        {
+          "diameterMm": 30.0,
+          "zMinMm": 0.0,
+          "zMaxMm": 40.0
+        }
+      ],
+      "shaftLengthMm": 40,
+      "studLengthMm": 15,
+      "handleDiameterMm": 40
+    }
+  ],
+  "interferenceChecks": [
+    {
+      "part": "03",
+      "travelMm": 0,
+      "intersectionCm3": 0.0
+    },
+    {
+      "part": "04",
+      "travelMm": 0,
+      "intersectionCm3": 0.0
+    },
+    {
+      "part": "03",
+      "travelMm": 9.0,
+      "intersectionCm3": 0.0
+    },
+    {
+      "part": "04",
+      "travelMm": 9.0,
+      "intersectionCm3": 0.0
+    },
+    {
+      "part": "03",
+      "travelMm": 18,
+      "intersectionCm3": 0.0
+    },
+    {
+      "part": "04",
+      "travelMm": 18,
+      "intersectionCm3": 0.0
+    }
+  ],
+  "reopened": [
+    {
+      "name": "01_月饼_白_61mm",
+      "solid": true,
+      "volumeCm3": 49.109403046342734,
+      "positionMm": [
+        -54.8,
+        -54.8,
+        0.0
+      ],
+      "threads": [],
+      "cylinders": []
+    },
+    {
+      "name": "02_模具外套筒",
+      "solid": true,
+      "volumeCm3": 47.8021885052921,
+      "positionMm": [
+        54.8,
+        -54.8,
+        0.0
+      ],
+      "threads": [],
+      "cylinders": [
+        {
+          "diameterMm": 30.6,
+          "zMinMm": 24.000000000000004,
+          "zMaxMm": 30.000000000000004
+        },
+        {
+          "diameterMm": 69.0,
+          "zMinMm": 0.0,
+          "zMaxMm": 30.000000000000004
+        }
+      ],
+      "upperStraightEdges": {
+        "count": 384,
+        "minLengthMm": 6.0000000000000036,
+        "maxLengthMm": 6.0000000000000036
+      },
+      "baseThicknessMm": 6.0
+    },
+    {
+      "name": "03_可换镜像凹纹压片",
+      "solid": true,
+      "volumeCm3": 22.42126223625001,
+      "positionMm": [
+        -54.8,
+        54.8,
+        18.0
+      ],
+      "threads": [
+        "M20x2.5"
+      ],
+      "cylinders": [
+        {
+          "diameterMm": 20.292500000000004,
+          "zMinMm": -18.0,
+          "zMaxMm": -2.0000000000000018
+        },
+        {
+          "diameterMm": 17.519,
+          "zMinMm": -18.0,
+          "zMaxMm": -2.0000000000000018
+        },
+        {
+          "diameterMm": 30.0,
+          "zMinMm": -18.0,
+          "zMaxMm": 0.0
+        }
+      ],
+      "socketDepthMm": 16
+    },
+    {
+      "name": "04_螺纹推杆与手柄",
+      "solid": true,
+      "volumeCm3": 41.02430764349923,
+      "positionMm": [
+        54.8,
+        54.8,
+        15.0
+      ],
+      "threads": [
+        "M20x2.5"
+      ],
+      "cylinders": [
+        {
+          "diameterMm": 40.0,
+          "zMinMm": 40.0,
+          "zMaxMm": 47.0
+        },
+        {
+          "diameterMm": 16.938,
+          "zMinMm": -14.999999999999998,
+          "zMaxMm": 0.0
+        },
+        {
+          "diameterMm": 19.7905,
+          "zMinMm": -14.999999999999998,
+          "zMaxMm": 0.0
+        },
+        {
+          "diameterMm": 30.0,
+          "zMinMm": 0.0,
+          "zMaxMm": 40.0
+        }
+      ],
+      "shaftLengthMm": 40,
+      "studLengthMm": 15,
+      "handleDiameterMm": 40
+    }
+  ]
+}

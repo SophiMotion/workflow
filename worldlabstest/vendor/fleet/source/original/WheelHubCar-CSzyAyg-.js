@@ -1,0 +1,1 @@
+import{j as r}from"./three-DC5IPt9e.js";import"./react-DMIptofc.js";function t(e){return r.jsx("group",{children:r.jsxs("mesh",{position:[0,22,0],children:[r.jsx("boxGeometry",{args:[100,44,100]}),r.jsx("meshStandardMaterial",{color:"#ef4444"})]})})}export{t as default};

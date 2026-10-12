@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="AI 产品经理本地知识库：分类阅读、全文搜索与来源追溯。">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>AI 产品经理知识库</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="vendor/katex/katex.min.css"><link rel="stylesheet" href="vendor/highlight.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到正文</a>
+  <aside class="sidebar" id="sidebar" aria-label="知识库目录">
+    <a class="brand" href="#/"><span class="brand-mark">A<span>·</span></span><span>AI 产品经理<span class="brand-sub">本地知识库</span></span></a>
+    <div class="sidebar-head"><span>知识目录</span><span id="category-count"></span></div>
+    <nav id="navigation"><p class="loading">正在加载目录…</p></nav>
+    <div class="sidebar-footer"><span class="local-dot"></span><span>内容保存在这台电脑</span><a href="#/about" aria-label="查看收录说明">说明</a></div>
+  </aside>
+  <button class="scrim" id="scrim" aria-label="关闭目录" hidden></button>
+  <div class="workspace">
+    <header class="toolbar">
+      <button id="menu-toggle" class="icon-button mobile-only" aria-label="打开目录" aria-expanded="false" aria-controls="sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <div class="breadcrumb" id="breadcrumb">知识库 / 总览</div>
+      <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" id="search-input" aria-label="搜索标题和正文" placeholder="搜索标题和正文…" autocomplete="off"><kbd>⌘ K</kbd></div>
+      <a class="source-top" id="source-top" target="_blank" rel="noopener noreferrer">飞书原库 <span aria-hidden="true">↗</span></a>
+    </header>
+    <div class="content-layout">
+      <main id="main" tabindex="-1"><p class="loading">正在打开本地知识库…</p></main>
+      <aside class="right-rail" id="right-rail" aria-label="当前页面目录"></aside>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

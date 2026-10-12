@@ -1,0 +1,30 @@
+{
+  "name": "sophicad-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "web",
+    "mcp"
+  ],
+  "scripts": {
+    "build:fixture": "npm run typecheck && node scripts/build-four-bar-fixture.mjs",
+    "test": "vitest run && npm test --workspace web && npm test --workspace mcp",
+    "test:core": "vitest run",
+    "typecheck": "tsc -b --pretty false",
+    "verify": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.4.0",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "fast-xml-parser": "^5.11.1",
+    "fflate": "^0.8.3"
+  }
+}

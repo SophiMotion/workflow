@@ -1,0 +1,14 @@
+{
+  "name": "sophi-weld",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Robot welding strategy and simulation analysis workbench",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "python3 -m http.server 8765 --bind 127.0.0.1",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": { "three": "0.180.0", "lucide": "0.468.0" },
+  "devDependencies": { "esbuild": "0.25.10" }
+}

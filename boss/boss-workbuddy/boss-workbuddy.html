@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BOSS 招聘控制台 · WorkBuddy</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;color:#1f2937;background:#f5f6f8;font-size:15px}
+*{box-sizing:border-box}body{margin:0}
+header{background:linear-gradient(135deg,#193d33,#2a5a48);color:#fff;padding:28px max(5vw,24px)}
+header h1{margin:0 0 6px;font-size:26px;letter-spacing:-.5px}
+header p{margin:0;color:#b8d3c3;font-size:14px}
+.wrap{max-width:960px;margin:auto;padding:24px max(3vw,20px)}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:18px}
+.card h2{margin:0 0 14px;font-size:18px}
+.status-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.dot{width:10px;height:10px;border-radius:50%;background:#9ca3af;display:inline-block}
+.dot.on{background:#22c55e}.dot.off{background:#ef4444}.dot.run{background:#f59e0b;animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.3}}
+.btn{padding:12px 22px;border:0;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;transition:.15s}
+.btn-primary{background:#254e43;color:#fff}.btn-primary:hover{background:#1d3d34}
+.btn-primary:disabled{background:#9ca3af;cursor:not-allowed}
+.btn-secondary{background:#fff;color:#254e43;border:1px solid #254e43}
+.btn-group{display:flex;gap:12px;flex-wrap:wrap}
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.mode{border:1px solid #e5e7eb;border-radius:10px;padding:16px;text-align:center}
+.mode .num{font-size:28px;font-weight:700;color:#254e43}
+.mode .label{font-size:13px;color:#6b7280;margin-top:4px}
+.console{background:#111827;color:#d1d5db;border-radius:8px;padding:14px;font-family:"SF Mono",Menlo,monospace;font-size:12.5px;height:280px;overflow-y:auto;white-space:pre-wrap;line-height:1.6}
+.muted{color:#6b7280;font-size:13px;line-height:1.7}
+.tag{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;margin-right:6px}
+.tag-green{background:#dcfce7;color:#166534}.tag-red{background:#fee2e2;color:#991b1b}.tag-gray{background:#f3f4f6;color:#374151}
+</style>
+</head>
+<body>
+<header>
+  <h1>BOSS 招聘控制台</h1>
+  <p>候选人采集与执行记录 · 每岗目标阅读 100 人、核验后联系 20 人</p>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h2>执行状态</h2>
+    <div class="status-row">
+      <span class="dot" id="edgeDot"></span><span>本地独立浏览器连接</span>
+      <span class="dot" id="taskDot"></span><span>执行任务</span>
+      <span id="loginTag" class="tag tag-gray">登录状态：检查中…</span>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" id="searchBtn" onclick="startSearch()">检查邀约执行条件</button>
+      <button class="btn btn-secondary" onclick="dryRun()">试运行（不发送）</button>
+      <button class="btn btn-secondary" onclick="checkLogin()">检查登录</button>
+      <button class="btn btn-secondary" onclick="connectionHelp()">连接说明</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>三种启动方式</h2>
+    <div class="modes">
+      <div class="mode"><div class="num">①</div><div class="label">WorkBuddy 写入<br>「启动boss-workbuddy」</div></div>
+      <div class="mode"><div class="num">②</div><div class="label">定时任务<br>直接启动</div></div>
+      <div class="mode"><div class="num">③</div><div class="label">本页面<br>点击「搜索」</div></div>
+    </div>
+    <p class="muted" style="margin-top:14px">三种方式都会：启动 Edge（调试模式）→ 打开 BOSS 推荐页 → 每岗采集 100 人 → 筛选 20 人 → 发打招呼。若 Edge 未登录，会提示你手动登录。</p>
+  </div>
+
+  <div class="card">
+    <h2>执行日志</h2>
+    <div class="console" id="console">等待执行…</div>
+  </div>
+</div>
+
+<script>
+const API = location.origin;
+let lastFinishedAt = '';
+const consoleEl = document.getElementById('console');
+
+function log(msg) {
+  const t = new Date().toLocaleTimeString('zh-CN');
+  consoleEl.textContent += `[${t}] ${msg}\n`;
+  consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+
+async function refreshStatus() {
+  try {
+    const r = await fetch(`${API}/api/status`).then(r => r.json());
+    document.getElementById('edgeDot').className = 'dot ' + (r.edgeDebug ? 'on' : 'off');
+    document.getElementById('taskDot').className = 'dot ' + (r.running ? 'run' : 'off');
+    if(r.lastRun && r.lastRun.finishedAt !== lastFinishedAt){lastFinishedAt=r.lastRun.finishedAt;log('执行结束，退出码 '+r.lastRun.exitCode+'\n'+r.lastRun.output);}
+  } catch (e) {
+    document.getElementById('edgeDot').className = 'dot off';
+  }
+}
+
+async function checkLogin() {
+  log('检查 BOSS 登录状态…');
+  try {
+    const r = await fetch(`${API}/api/check-login`).then(r => r.json());
+    const tag = document.getElementById('loginTag');
+    if (r.loggedIn === true) {
+      tag.className='tag tag-green';tag.textContent='已读到招聘内容';
+    } else if (r.loggedIn === false) {
+      tag.className='tag tag-red';tag.textContent='此会话需要登录';
+    } else {
+      tag.className='tag tag-gray';tag.textContent='此连接尚未核验';
+    }
+    log(r.reason || r.error || '状态待核验');
+  } catch (e) { log('检查登录失败：' + e.message); }
+}
+
+function connectionHelp() {
+  log('优先在 Codex 内置浏览器登录 BOSS，并由 Codex 任务操作。Edge/Chrome 可通过官方浏览器扩展接入 Codex。这两种连接都不等于本控制台的独立浏览器端口；本控制台不会复制登录资料或另开前台窗口。');
+}
+
+async function startSearch() {
+  const btn = document.getElementById('searchBtn');
+  btn.disabled = true; btn.textContent = '执行中…';
+  log('检查独立邀约执行入口…');
+  try {
+    const r = await fetch(`${API}/api/run`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({}) }).then(r => r.json());
+    if (r.ok) log(r.message + '（PID ' + r.pid + '）');
+    else log('❌ ' + (r.error || '启动失败'));
+  } catch (e) { log('❌ 请求失败：' + e.message); }
+  btn.disabled = false; btn.textContent = '检查邀约执行条件';
+}
+
+async function dryRun() {
+  log('🧪 试运行（采集+筛选，不发送、不写数据）…');
+  try {
+    const r = await fetch(`${API}/api/run`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ dryRun: true }) }).then(r => r.json());
+    if (r.ok) log('✅ 试运行已启动');
+    else log('❌ ' + (r.error || '启动失败'));
+  } catch (e) { log('❌ 请求失败：' + e.message); }
+}
+
+// 初始检查
+refreshStatus();
+checkLogin();
+setInterval(refreshStatus, 5000);
+</script>
+</body>
+</html>

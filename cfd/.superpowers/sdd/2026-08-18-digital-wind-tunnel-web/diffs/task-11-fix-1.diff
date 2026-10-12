@@ -1,0 +1,1601 @@
+# Task 11 fix round 1 current-file snapshots
+
+## Files
+.gitignore
+playwright.config.ts
+e2e/csvParser.ts
+e2e/tutorial.spec.ts
+e2e/free-lab.spec.ts
+e2e/responsive.spec.ts
+src/App.tsx
+src/App.integration.test.tsx
+src/App.test.tsx
+src/features/dashboard/FieldSelector.tsx
+src/features/dashboard/Dashboard.test.tsx
+src/features/shell/AppShell.tsx
+src/features/shell/AppShell.test.tsx
+vite.config.ts
+tsconfig.json
+
+## Current contents
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..9bbb224
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,4 @@
++node_modules/
++dist/
++playwright-report/
++test-results/
+diff --git a/playwright.config.ts b/playwright.config.ts
+new file mode 100644
+index 0000000..18cf3fc
+--- /dev/null
++++ b/playwright.config.ts
+@@ -0,0 +1,19 @@
++import { defineConfig, devices } from "@playwright/test";
++
++export default defineConfig({
++  testDir: "./e2e",
++  outputDir: "test-results",
++  reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
++  use: {
++    baseURL: "http://127.0.0.1:4173",
++    screenshot: "only-on-failure",
++    trace: "retain-on-failure",
++  },
++  webServer: {
++    command: "npm run dev -- --host 127.0.0.1 --port 4173",
++    url: "http://127.0.0.1:4173",
++    reuseExistingServer: false,
++    env: { VITE_E2E_TIME_SCALE: "20" },
++  },
++  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
++});
+diff --git a/e2e/csvParser.ts b/e2e/csvParser.ts
+new file mode 100644
+index 0000000..a26e50f
+--- /dev/null
++++ b/e2e/csvParser.ts
+@@ -0,0 +1,44 @@
++export function parseCsv(csv: string): string[][] {
++  const rows: string[][] = [];
++  let row: string[] = [];
++  let cell = "";
++  let quoted = false;
++
++  for (let index = 0; index < csv.length; index += 1) {
++    const character = csv[index]!;
++    if (quoted) {
++      if (character === '"' && csv[index + 1] === '"') {
++        cell += '"';
++        index += 1;
++      } else if (character === '"') {
++        quoted = false;
++      } else {
++        cell += character;
++      }
++    } else if (character === '"') {
++      quoted = true;
++    } else if (character === ",") {
++      row.push(cell);
++      cell = "";
++    } else if (character === "\r" && csv[index + 1] === "\n") {
++      row.push(cell);
++      rows.push(row);
++      row = [];
++      cell = "";
++      index += 1;
++    } else if (character === "\n") {
++      row.push(cell);
++      rows.push(row);
++      row = [];
++      cell = "";
++    } else {
++      cell += character;
++    }
++  }
++
++  if (cell.length > 0 || row.length > 0) {
++    row.push(cell);
++    rows.push(row);
++  }
++  return rows;
++}
+diff --git a/e2e/tutorial.spec.ts b/e2e/tutorial.spec.ts
+new file mode 100644
+index 0000000..c3d6a86
+--- /dev/null
++++ b/e2e/tutorial.spec.ts
+@@ -0,0 +1,101 @@
++import { expect, test, type Page } from "@playwright/test";
++import { readFile } from "node:fs/promises";
++import { parseCsv } from "./csvParser";
++
++function collectBrowserErrors(page: Page) {
++  const errors: string[] = [];
++  page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
++  page.on("console", (message) => {
++    if (message.type() === "error") errors.push(`console: ${message.text()}`);
++  });
++  return errors;
++}
++
++test("completes the evidence-gated seven-chapter tutorial and downloads CSV", async ({ page }) => {
++  test.setTimeout(120_000);
++  const errors = collectBrowserErrors(page);
++  await page.goto("/");
++
++  await expect(page.getByText("SIMULATED / 模拟数据").first()).toBeVisible();
++  await expect(page.getByText(/二维教学近似/).first()).toBeVisible();
++
++  for (const name of ["straightener：整流段", "contraction：收缩段", "test-section：透明测试段", "model-stand：模型台", "fan：风扇段"]) {
++    await page.getByRole("button", { name }).click();
++  }
++  await page.getByRole("button", { name: "进入下一章" }).click();
++
++  await page.getByLabel("风扇功率").fill("30");
++  await page.getByRole("button", { name: "启动实验" }).click();
++  await expect(page.getByText(/稳定 \/ STABLE/).first()).toBeVisible({ timeout: 15_000 });
++  await expect(page.getByRole("button", { name: "进入下一章" })).toBeEnabled({ timeout: 15_000 });
++  await page.getByRole("button", { name: "进入下一章" }).click();
++
++  for (const name of ["查看风扇转速说明", "查看来流速度说明", "查看车底相对压力说明", "查看垂向载荷说明"]) {
++    await page.getByRole("button", { name }).click();
++  }
++  await page.getByRole("button", { name: "标记稳定窗口" }).click();
++  await expect(page.getByRole("button", { name: "进入下一章" })).toBeEnabled();
++  await page.getByRole("button", { name: "进入下一章" }).click();
++  await expect(page.getByRole("heading", { name: "第 4 章：观察 CFD 场" })).toBeVisible();
++
++  await expect(page.getByText("流场就绪 / READY")).toBeVisible({ timeout: 30_000 });
++  await expect(page.getByText(/实时场/)).toBeVisible();
++
++  for (const name of ["速度", "压力", "涡量", "流线"]) {
++    await page.getByRole("radio", { name, exact: true }).click();
++  }
++  await page.getByRole("radio", { name: /二维中心截面/ }).click();
++  await page.getByRole("button", { name: "进入下一章" }).click();
++
++  await page.getByRole("button", { name: "开始自动扫频" }).click();
++  await expect(page.getByText("30%、60%、90% 均已完成")).toBeVisible({ timeout: 30_000 });
++  for (const power of [30, 60, 90]) {
++    await expect(page.getByRole("heading", { name: `${power}%`, exact: true })).toBeVisible();
++  }
++  await page.getByRole("button", { name: "进入下一章" }).click();
++
++  const enabledResidual = page.locator('input[name="largest-residual"]:not(:disabled)');
++  await expect(enabledResidual).toHaveCount(3);
++  const residualValues = await page.locator(".comparison-panel tbody tr td:nth-child(4)").allTextContents();
++  const largestIndex = residualValues
++    .map((value) => Number(value.replace("N", "").trim()))
++    .reduce((largest, value, index, values) => value > values[largest]! ? index : largest, 0);
++  await enabledResidual.nth(largestIndex).click();
++  await expect(page.getByRole("button", { name: "进入下一章" })).toBeEnabled();
++  await page.getByRole("button", { name: "进入下一章" }).click();
++  await expect(page.getByRole("heading", { name: "第 7 章：形成报告" })).toBeVisible();
++
++  await page.getByRole("textbox", { name: "实验结论" }).fill("三档工况显示风速增加时载荷总体随动压平方趋势增长。 ");
++  await expect(page.getByText("七章教程已完成。" )).toBeVisible();
++  await expect(page.getByText("2D TEACHING CFD / 二维教学近似").last()).toBeVisible();
++  const downloadPromise = page.waitForEvent("download");
++  await page.getByRole("button", { name: "导出 CSV" }).click();
++  const download = await downloadPromise;
++  expect(download.suggestedFilename()).toMatch(/\.csv$/);
++  const downloadPath = await download.path();
++  expect(downloadPath).not.toBeNull();
++  const csv = await readFile(downloadPath!, "utf8");
++  expect(csv.charCodeAt(0)).toBe(0xfeff);
++  const rows = parseCsv(csv.slice(1));
++  const metadata = new Map(rows.slice(0, 8).map((row) => [row[0], row[1]]));
++  expect(metadata.get("disclaimer")).toContain("SIMULATED / 模拟数据");
++  expect(metadata.get("disclaimer")).toContain("2D TEACHING CFD / 二维教学近似");
++  expect(metadata.get("conclusion")).toBe("三档工况显示风速增加时载荷总体随动压平方趋势增长。 ");
++
++  const sampleHeaderIndex = rows.findIndex((row) => row[0] === "sequence");
++  expect(rows[sampleHeaderIndex]).toEqual([
++    "sequence", "simulationTimeMs", "phase", "fanPowerPct", "rpm", "windSpeedMps",
++    "underbodyPressurePa", "verticalLoadN", "quality", "provenance",
++  ]);
++  const summaryHeaderIndex = rows.findIndex((row) => row[0] === "summaryFanPowerPct");
++  const sampleRows = rows.slice(sampleHeaderIndex + 1, summaryHeaderIndex - 1);
++  for (const power of [30, 60, 90]) {
++    const powerSamples = sampleRows.filter((row) => Number(row[3]) === power);
++    expect(powerSamples.length).toBeGreaterThanOrEqual(20);
++    expect(powerSamples.every((row) => row[8] === "stable" && row[9] === "simulated")).toBe(true);
++    const summary = rows.slice(summaryHeaderIndex + 1).find((row) => Number(row[0]) === power);
++    expect(summary?.[1]).toBe("true");
++    expect(Number(summary?.[2])).toBeGreaterThanOrEqual(20);
++  }
++  expect(errors).toEqual([]);
++});
+diff --git a/e2e/free-lab.spec.ts b/e2e/free-lab.spec.ts
+new file mode 100644
+index 0000000..726df9a
+--- /dev/null
++++ b/e2e/free-lab.spec.ts
+@@ -0,0 +1,66 @@
++import { expect, test } from "@playwright/test";
++
++test("free lab supports run controls, field switching, reset, and context recovery", async ({ page }) => {
++  const errors: string[] = [];
++  page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
++  page.on("console", (message) => {
++    if (message.type() === "error") errors.push(`console: ${message.text()}`);
++  });
++
++  await page.goto("/");
++  await page.getByRole("button", { name: "自由实验" }).click();
++  await page.getByLabel("风扇功率").fill("42");
++  await page.getByRole("button", { name: "启动实验" }).click();
++  await expect(page.getByText(/升速中/)).toBeVisible();
++  await expect(page.locator(".sample-time")).not.toHaveText("T+0.00 s", { timeout: 15_000 });
++  const rpmBeforePause = Number(await page.locator(".telemetry-card").first().locator("strong").textContent());
++
++  await page.getByRole("button", { name: "暂停实验" }).click();
++  await expect(page.getByText(/已暂停/)).toBeVisible();
++  await page.getByRole("button", { name: "继续实验" }).click();
++  await expect(page.getByText(/升速中/)).toBeVisible();
++  await page.getByLabel("风扇功率").fill("65");
++  await expect(page.locator("output")).toHaveText("65%");
++  await expect.poll(async () => Number(await page.locator(".telemetry-card").first().locator("strong").textContent()))
++    .toBeGreaterThan(rpmBeforePause);
++
++  await expect(page.getByText("流场就绪 / READY")).toBeVisible({ timeout: 30_000 });
++  await expect(page.getByText(/实时场/)).toBeVisible();
++
++  const canvas = page.locator(".scene-canvas canvas");
++  await expect(canvas).toHaveCount(1);
++  const originalCanvas = await canvas.elementHandle();
++  const extensionAvailable = await canvas.evaluate((element) => {
++    const canvasElement = element as HTMLCanvasElement;
++    const context = canvasElement.getContext("webgl2") ?? canvasElement.getContext("webgl");
++    const extension = context?.getExtension("WEBGL_lose_context");
++    if (!extension) return false;
++    (window as unknown as { __sophiWebglLoss?: WEBGL_lose_context }).__sophiWebglLoss = extension;
++    extension.loseContext();
++    return true;
++  });
++  test.skip(!extensionAvailable, "Chromium did not expose WEBGL_lose_context");
++  await expect(page.getByText(/三维上下文已丢失/)).toBeVisible();
++  await page.evaluate(() => {
++    const holder = window as unknown as { __sophiWebglLoss?: WEBGL_lose_context };
++    holder.__sophiWebglLoss?.restoreContext();
++    delete holder.__sophiWebglLoss;
++  });
++  await expect(page.getByText(/三维上下文已丢失/)).toBeHidden({ timeout: 15_000 });
++  await expect(canvas).toHaveCount(1);
++  expect(await originalCanvas?.evaluate((element) => element.isConnected)).toBe(false);
++  await expect(page.getByText("流场就绪 / READY")).toBeVisible({ timeout: 30_000 });
++  await expect(page.getByText(/实时场/)).toBeVisible();
++  await page.getByRole("radio", { name: "压力", exact: true }).click();
++  await expect(page.getByRole("radio", { name: "压力", exact: true })).toHaveAttribute("aria-checked", "true");
++
++  const dialogPromise = page.waitForEvent("dialog");
++  const resetPromise = page.getByRole("button", { name: "停止并重置" }).click();
++  const dialog = await dialogPromise;
++  expect(dialog.message()).toBe("停止实验并清除当前 60 秒遥测历史？");
++  await dialog.accept();
++  await resetPromise;
++  await expect(page.getByText("待机 / IDLE")).toBeVisible();
++  await expect(page.getByLabel("风扇功率")).toHaveValue("0");
++  expect(errors).toEqual([]);
++});
+diff --git a/e2e/responsive.spec.ts b/e2e/responsive.spec.ts
+new file mode 100644
+index 0000000..7cc293b
+--- /dev/null
++++ b/e2e/responsive.spec.ts
+@@ -0,0 +1,62 @@
++import { expect, test } from "@playwright/test";
++
++const viewports = [
++  { name: "desktop", width: 1_440, height: 900 },
++  { name: "tablet", width: 1_024, height: 768 },
++  { name: "mobile", width: 390, height: 844 },
++] as const;
++
++for (const viewport of viewports) {
++  test(`${viewport.name} has no horizontal overflow and keeps controls keyboard-reachable`, async ({ page }, testInfo) => {
++    await page.setViewportSize(viewport);
++    await page.goto("/");
++
++    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
++    await expect(page.getByRole("main", { name: "数字风洞" })).toBeVisible();
++    await expect(page.getByRole("complementary", { name: "风洞模块热点" }))
++      .toBeVisible({ timeout: 15_000 });
++
++    if (viewport.width <= 1_100) {
++      const tutorial = page.getByRole("tab", { name: "教程" });
++      await tutorial.focus();
++      await page.keyboard.press("ArrowRight");
++      await expect(page.getByRole("tab", { name: "控制" })).toBeFocused();
++      await page.keyboard.press("Tab");
++      const slider = page.getByRole("slider", { name: "风扇功率" });
++      await expect(slider).toBeFocused();
++      await page.keyboard.press("ArrowRight");
++      await expect(page.locator("output")).toHaveText("1%");
++      await page.keyboard.press("Tab");
++      await expect(page.getByRole("button", { name: "启动实验" })).toBeFocused();
++      await page.keyboard.press("Enter");
++      await page.getByRole("tab", { name: "控制" }).focus();
++      await page.keyboard.press("Tab");
++      await expect(slider).toBeFocused();
++      await page.keyboard.press("Tab");
++      await expect(page.getByRole("button", { name: "暂停实验" })).toBeFocused();
++      await page.keyboard.press("Enter");
++      await page.keyboard.press("Tab");
++      await expect(page.getByRole("button", { name: "停止并重置" })).toBeFocused();
++      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
++      await page.getByRole("tab", { name: "控制" }).focus();
++      await page.keyboard.press("ArrowRight");
++      await expect(page.getByRole("tab", { name: "曲线" })).toBeFocused();
++      await expect(page.getByRole("heading", { name: "三工况实验报告" })).toBeVisible();
++      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
++    } else {
++      const slider = page.getByRole("slider", { name: "风扇功率" });
++      for (let index = 0; index < 20 && !await slider.evaluate((element) => element === document.activeElement); index += 1) {
++        await page.keyboard.press("Tab");
++      }
++      await expect(slider).toBeFocused();
++      await page.keyboard.press("ArrowRight");
++      await expect(page.locator("output")).toHaveText("1%");
++      await page.keyboard.press("Tab");
++      await expect(page.getByRole("button", { name: "启动实验" })).toBeFocused();
++      await expect(page.getByRole("heading", { name: "三工况实验报告" })).toBeVisible();
++      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
++    }
++
++    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-${viewport.width}x${viewport.height}.png`), fullPage: true });
++  });
++}
+diff --git a/src/App.tsx b/src/App.tsx
+new file mode 100644
+index 0000000..c23c7ae
+--- /dev/null
++++ b/src/App.tsx
+@@ -0,0 +1,259 @@
++import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
++import { ControlPanel } from "./features/dashboard/ControlPanel";
++import { FieldSelector, type FieldId } from "./features/dashboard/FieldSelector";
++import { TelemetryCards, type SensorId } from "./features/dashboard/TelemetryCards";
++import {
++  recordFieldInspection,
++  recordSensorInspection,
++  recordStableTelemetry,
++  recordStableWindowInspection,
++} from "./features/dashboard/evidenceRecording";
++import { createDefaultSimulationSource } from "./features/experiment/SimulationSource";
++import { labStore, useLabStore } from "./features/experiment/labStore";
++import type { TelemetrySource } from "./features/experiment/model";
++import { startSimulationRuntime } from "./features/experiment/simulationRuntime";
++import { createLbmWorker, LbmWorkerClient } from "./features/flow/LbmWorkerClient";
++import { startFlowRuntime, type FlowClientLike, type FlowRuntime } from "./features/flow/flowRuntime";
++import { ExperimentReport } from "./features/report/ExperimentReport";
++import { AppShell } from "./features/shell/AppShell";
++import { ErrorBoundary } from "./features/shell/ErrorBoundary";
++import { qualityProfile, selectQualityProfile, type QualityProfile } from "./features/shell/quality";
++import { TutorialModeToggle } from "./features/tutorial/TutorialModeToggle";
++import { TutorialRail } from "./features/tutorial/TutorialRail";
++import {
++  advanceLesson,
++  emptyEvidence,
++  recordFlowAnswer,
++  recordLargestResidualSelection,
++  recordReportConclusion,
++  recordSweepCompletion,
++} from "./features/tutorial/tutorialProgress";
++import { LESSONS, type LessonId, type TutorialMode } from "./features/tutorial/lessonDefinitions";
++
++const LazyWindTunnelScene = lazy(() => import("./features/scene/WindTunnelScene").then((module) => ({ default: module.WindTunnelScene })));
++const LazyHistoryChart = lazy(() => import("./features/dashboard/HistoryChart").then((module) => ({ default: module.HistoryChart })));
++
++export type AppFlowClient = FlowClientLike & {
++  ready(): Promise<void>;
++  dispose(): void;
++};
++
++type AppProps = {
++  flowClientFactory?(profile: QualityProfile): AppFlowClient;
++  simulationSourceFactory?(): TelemetrySource;
++  simulationRuntimeFactory?: typeof startSimulationRuntime;
++  flowRuntimeFactory?: typeof startFlowRuntime;
++};
++
++const createFlowClient = (profile: QualityProfile): AppFlowClient => new LbmWorkerClient(createLbmWorker, {
++  width: profile.grid[0],
++  height: profile.grid[1],
++  inletVelocity: 0,
++  tau: 0.62,
++});
++const createSimulationSource = (): TelemetrySource => createDefaultSimulationSource(20260818);
++
++export function App(props: AppProps) {
++  return <ErrorBoundary><Workbench {...props} /></ErrorBoundary>;
++}
++
++function Workbench({
++  flowClientFactory = createFlowClient,
++  simulationSourceFactory = createSimulationSource,
++  simulationRuntimeFactory = startSimulationRuntime,
++  flowRuntimeFactory = startFlowRuntime,
++}: AppProps) {
++  const [mode, setMode] = useState<TutorialMode>("guided");
++  const [activeLesson, setActiveLesson] = useState<LessonId>("anatomy");
++  const [evidence, setEvidence] = useState(emptyEvidence);
++  const phase = useLabStore((state) => state.phase);
++  const sweep = useLabStore((state) => state.sweep);
++  const [quality, setQuality] = useState(readEnvironmentQuality);
++  const [activeQuality, setActiveQuality] = useState(readEnvironmentQuality);
++  const [flowPaused, setFlowPaused] = useState(false);
++  const [flowEpoch, setFlowEpoch] = useState(0);
++  const flowRuntimeRef = useRef<FlowRuntime | null>(null);
++
++  useEffect(() => {
++    const source = simulationSourceFactory();
++    const stepsPerTick = import.meta.env.VITE_E2E_TIME_SCALE === "20" ? 20 : 1;
++    const stopSimulation = simulationRuntimeFactory({ source, tickMs: 50, stepsPerTick });
++    const unsubscribe = labStore.subscribe((state, previous) => {
++      if (state.phase === "idle" && state.history.length === 0
++        && (previous.phase !== "idle" || previous.history.length > 0)) {
++        source.reset();
++      }
++
++      if (state.telemetry === previous.telemetry) return;
++      setEvidence((current) => recordStableTelemetry(
++        current,
++        previous.telemetry,
++        state.telemetry,
++        state.fanPowerPct,
++      ));
++      if (state.sweep?.completedPowers !== previous.sweep?.completedPowers) {
++        setEvidence((current) => recordSweepCompletion(current, state.sweep?.completedPowers ?? []));
++      }
++    });
++
++    return () => {
++      unsubscribe();
++      stopSimulation();
++    };
++  }, [simulationRuntimeFactory, simulationSourceFactory]);
++
++  useEffect(() => {
++    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
++    const updateQuality = () => {
++      const candidate = readEnvironmentQuality();
++      setQuality((current) => isExperimentActive(phase) && isHigherQuality(candidate, current)
++        ? current
++        : candidate);
++    };
++    window.addEventListener("resize", updateQuality);
++    reducedMotion?.addEventListener("change", updateQuality);
++    updateQuality();
++    return () => {
++      window.removeEventListener("resize", updateQuality);
++      reducedMotion?.removeEventListener("change", updateQuality);
++    };
++  }, [phase]);
++
++  useEffect(() => {
++    if (flowPaused) return;
++    const client = flowClientFactory(quality);
++    const runtime = flowRuntimeFactory(client);
++    let current = true;
++    flowRuntimeRef.current = runtime;
++    const unsubscribeFailure = labStore.subscribe((state, previous) => {
++      if (state.flowStatus === previous.flowStatus && state.flowError === previous.flowError) return;
++      if (state.flowStatus !== "failed" || !state.flowError?.includes("Flow worker timed out")) return;
++      const next = quality.name === "high"
++        ? qualityProfile("medium")
++        : quality.name === "medium"
++          ? qualityProfile("low")
++          : null;
++      if (next === null) return;
++      labStore.setState((labState) => ({
++        eventLog: [
++          ...labState.eventLog,
++          `${quality.name.toUpperCase()} 超时：二维求解器受控降档至 ${next.name.toUpperCase()} 并重建。`,
++        ],
++      }));
++      setQuality(next);
++    });
++    void client.ready().then(() => {
++      if (current) setActiveQuality(quality);
++    }).catch(() => undefined);
++    return () => {
++      current = false;
++      unsubscribeFailure();
++      if (flowRuntimeRef.current === runtime) flowRuntimeRef.current = null;
++      runtime.stop();
++      client.dispose();
++    };
++  }, [flowClientFactory, flowEpoch, flowPaused, flowRuntimeFactory, quality]);
++
++  const restartFlow = useCallback(() => {
++    return flowRuntimeRef.current?.restart() ?? Promise.reject(new Error("Flow runtime is unavailable"));
++  }, []);
++  const handleQualityChange = useCallback((next: QualityProfile) => {
++    if (next.name === quality.name) return;
++    labStore.setState((state) => ({
++      eventLog: [...state.eventLog, `渲染性能持续低于 24 FPS：质量已降至 ${next.name.toUpperCase()}。`],
++    }));
++    setQuality(next);
++  }, [quality.name]);
++  const handleContextLost = useCallback(() => setFlowPaused(true), []);
++  const handleContextRestored = useCallback(() => {
++    setFlowEpoch((current) => current + 1);
++    setFlowPaused(false);
++  }, []);
++
++  const inspectSensor = (sensor: SensorId) => setEvidence((current) => recordSensorInspection(current, sensor));
++  const inspectField = (field: FieldId) => setEvidence((current) => recordFieldInspection(current, field));
++
++  return (
++    <AppShell
++      headerActions={<TutorialModeToggle mode={mode} onModeChange={setMode} />}
++      left={<TutorialRail
++        activeLesson={activeLesson}
++        evidence={evidence}
++        mode={mode}
++        onLessonChange={setActiveLesson}
++        onFlowAnswer={(correct) => setEvidence((current) => recordFlowAnswer(current, correct))}
++        onAdvance={() => setActiveLesson((currentLesson) => {
++          if (mode === "guided") return advanceLesson(currentLesson, evidence);
++          const currentIndex = LESSONS.findIndex((lesson) => lesson.id === currentLesson);
++          return LESSONS[Math.min(currentIndex + 1, LESSONS.length - 1)]!.id;
++        })}
++      />}
++      scene={
++        <Suspense fallback={<p className="scene-loading">正在初始化数字风洞…</p>}>
++          <LazyWindTunnelScene
++            quality={quality}
++            onQualityChange={handleQualityChange}
++            onContextLost={handleContextLost}
++            onContextRestored={handleContextRestored}
++            onHotspot={(id) => setEvidence((current) => current.viewedHotspots.includes(id)
++              ? current
++              : { ...current, viewedHotspots: [...current.viewedHotspots, id] })}
++          />
++        </Suspense>
++      }
++      right={(
++        <div className="dashboard-sidebar">
++          <ControlPanel onRestartFlow={restartFlow} />
++          <FieldSelector onInspect={inspectField} quality={activeQuality} />
++          <TelemetryCards onInspect={inspectSensor} />
++        </div>
++      )}
++      bottom={(
++        <div className="experiment-lower-deck">
++          <Suspense fallback={<p className="chart-empty">正在准备实验曲线…</p>}>
++            <LazyHistoryChart
++              refreshHz={quality.chartRefreshHz}
++              onInspectStableWindow={() => setEvidence(recordStableWindowInspection)}
++            />
++          </Suspense>
++          <ExperimentReport
++            sweep={sweep}
++            conclusion={evidence.reportConclusion}
++            onConclusionChange={(conclusion) => setEvidence((current) => recordReportConclusion(current, conclusion))}
++            onSelectLargestResidual={(power, largestPower) => setEvidence((current) => (
++              recordLargestResidualSelection(current, power, largestPower)
++            ))}
++            onStartSweep={() => {
++              setEvidence((current) => ({
++                ...recordSweepCompletion(current, []),
++                selectedLargestResidual: false,
++                reportConclusion: "",
++              }));
++              labStore.getState().startSweep();
++            }}
++            onCancelSweep={() => labStore.getState().cancelSweep()}
++            onRetrySweep={() => labStore.getState().retrySweep()}
++          />
++        </div>
++      )}
++    />
++  );
++}
++
++function readEnvironmentQuality(): QualityProfile {
++  return selectQualityProfile({
++    viewportWidth: typeof window === "undefined" ? 1_024 : window.innerWidth,
++    hardwareConcurrency: typeof navigator === "undefined" ? 4 : navigator.hardwareConcurrency || 4,
++    reducedMotion: typeof window !== "undefined"
++      && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true,
++  });
++}
++
++function isExperimentActive(runPhase: ReturnType<typeof labStore.getState>["phase"]): boolean {
++  return runPhase === "ramping" || runPhase === "stabilizing" || runPhase === "sampling" || runPhase === "paused";
++}
++
++function isHigherQuality(candidate: QualityProfile, current: QualityProfile): boolean {
++  const rank: Record<QualityProfile["name"], number> = { reduced: 0, low: 1, medium: 2, high: 3 };
++  return rank[candidate.name] > rank[current.name];
++}
+diff --git a/src/App.integration.test.tsx b/src/App.integration.test.tsx
+new file mode 100644
+index 0000000..0c294a1
+--- /dev/null
++++ b/src/App.integration.test.tsx
+@@ -0,0 +1,101 @@
++import { act, fireEvent, render, screen } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { afterEach, beforeEach, vi } from "vitest";
++import { App, type AppFlowClient } from "./App";
++import { labStore } from "./features/experiment/labStore";
++import type { TelemetryFrame, TelemetrySource } from "./features/experiment/model";
++import { startSimulationRuntime } from "./features/experiment/simulationRuntime";
++import type { FlowFieldFrame } from "./features/flow/types";
++
++beforeEach(() => labStore.getState().resetLab());
++afterEach(() => vi.useRealTimers());
++
++function telemetry(sequence: number): TelemetryFrame {
++  return {
++    sequence,
++    simulationTimeMs: (sequence + 1) * 50,
++    phase: "ramping",
++    fanPowerPct: 30,
++    rpm: 1_800 + sequence,
++    windSpeedMps: 3.5,
++    underbodyPressurePa: -5,
++    verticalLoadN: 0.05,
++    quality: "transient",
++    provenance: "simulated",
++  };
++}
++
++it("starts a virtual run and keeps provenance visible", async () => {
++  const user = userEvent.setup();
++  render(<App />);
++
++  await user.click(screen.getByRole("button", { name: "启动实验" }));
++
++  expect(screen.getByText(/升速中/)).toBeInTheDocument();
++  expect(screen.getAllByText(/SIMULATED/).length).toBeGreaterThanOrEqual(4);
++  expect(screen.getAllByText(/二维教学近似/).length).toBeGreaterThanOrEqual(1);
++});
++
++it("offers a real answer action for the flow-field lesson", async () => {
++  const user = userEvent.setup();
++  render(<App />);
++
++  await user.click(screen.getByRole("button", { name: "自由实验" }));
++  await user.click(screen.getByRole("button", { name: /第 4 章.*观察 CFD 场/ }));
++
++  expect(screen.getByRole("group", { name: "流场判断题" })).toBeInTheDocument();
++  await user.click(screen.getByRole("radio", { name: /二维中心截面/ }));
++  expect(screen.getByText("回答正确，二维教学场用于观察趋势。"))
++    .toBeInTheDocument();
++});
++
++it("owns exactly one simulation and flow runtime and releases every owner on unmount", () => {
++  vi.useFakeTimers();
++  let sequence = 0;
++  const source: TelemetrySource = {
++    setFanPower: vi.fn(),
++    setPhase: vi.fn(),
++    step: vi.fn(() => telemetry(sequence++)),
++    reset: vi.fn(() => telemetry(-1)),
++  };
++  const simulationSourceFactory = vi.fn(() => source);
++  const stopSimulation = vi.fn();
++  const simulationRuntimeFactory = vi.fn((options: Parameters<typeof startSimulationRuntime>[0]) => {
++    const stop = startSimulationRuntime(options);
++    return () => {
++      stop();
++      stopSimulation();
++    };
++  });
++  const flowClient = {
++    ready: vi.fn(async () => undefined),
++    requestFrame: vi.fn<(inletVelocity: number, iterations?: number) => Promise<FlowFieldFrame>>(
++      () => new Promise<FlowFieldFrame>(() => undefined),
++    ),
++    restart: vi.fn(async () => undefined),
++    dispose: vi.fn(),
++  } satisfies AppFlowClient;
++  const stopFlow = vi.fn();
++  const flowRuntimeFactory = vi.fn(() => ({ stop: stopFlow, restart: flowClient.restart }));
++
++  const { unmount } = render(<App
++    simulationSourceFactory={simulationSourceFactory}
++    simulationRuntimeFactory={simulationRuntimeFactory}
++    flowClientFactory={() => flowClient}
++    flowRuntimeFactory={flowRuntimeFactory}
++  />);
++  fireEvent.click(screen.getByRole("button", { name: "启动实验" }));
++  act(() => vi.advanceTimersByTime(50));
++
++  expect(simulationSourceFactory).toHaveBeenCalledOnce();
++  expect(simulationRuntimeFactory).toHaveBeenCalledOnce();
++  expect(flowRuntimeFactory).toHaveBeenCalledOnce();
++  expect(labStore.getState().history).toHaveLength(1);
++  expect(labStore.getState().telemetry.simulationTimeMs).toBe(50);
++
++  unmount();
++  expect(stopSimulation).toHaveBeenCalledOnce();
++  expect(stopFlow).toHaveBeenCalledOnce();
++  expect(flowClient.dispose).toHaveBeenCalledOnce();
++  expect(vi.getTimerCount()).toBe(0);
++});
+diff --git a/src/App.test.tsx b/src/App.test.tsx
+new file mode 100644
+index 0000000..4c53928
+--- /dev/null
++++ b/src/App.test.tsx
+@@ -0,0 +1,187 @@
++import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
++import "@testing-library/jest-dom/vitest";
++import userEvent from "@testing-library/user-event";
++import { afterEach, beforeEach, vi } from "vitest";
++import { App, type AppFlowClient } from "./App";
++import { labStore } from "./features/experiment/labStore";
++import type { FlowFieldFrame } from "./features/flow/types";
++import type { QualityProfile } from "./features/shell/quality";
++
++beforeEach(() => labStore.getState().resetLab());
++afterEach(() => {
++  vi.restoreAllMocks();
++  vi.useRealTimers();
++});
++
++function createFakeFlowClient() {
++  return {
++    ready: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
++    requestFrame: vi.fn<(inletVelocity: number, iterations?: number) => Promise<FlowFieldFrame>>(
++      () => new Promise<FlowFieldFrame>(() => undefined),
++    ),
++    restart: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
++    dispose: vi.fn<() => void>(),
++  } satisfies AppFlowClient;
++}
++
++it("renders the five digital wind-tunnel workbench regions", () => {
++  render(<App />);
++  expect(screen.getByRole("banner")).toHaveTextContent("SophiFlow Lab");
++  expect(screen.getByRole("navigation", { name: "教学章节" })).toBeInTheDocument();
++  expect(screen.getByRole("main", { name: "数字风洞" })).toBeInTheDocument();
++  expect(screen.getByRole("complementary", { name: "实验控制" })).toBeInTheDocument();
++  expect(screen.getByRole("region", { name: "实验曲线" })).toBeInTheDocument();
++});
++
++it("identifies the CFD model as a two-dimensional teaching approximation", () => {
++  render(<App />);
++  expect(screen.getAllByText("2D TEACHING CFD / 二维教学近似")).toHaveLength(2);
++});
++
++it("keeps live announcements limited to phase and fault changes", async () => {
++  const client = createFakeFlowClient();
++  const { container } = render(<App flowClientFactory={() => client} />);
++  await screen.findByRole("heading", { name: "实验曲线" });
++  await screen.findByRole("button", { name: /straightener：整流段/ });
++
++  const liveRegions = Array.from(container.querySelectorAll("[aria-live], [role='status']"));
++  expect(liveRegions).toEqual([screen.getByText("待机 / IDLE")]);
++});
++
++it("advances freely without evidence and restores the chosen lesson in guided mode", async () => {
++  const user = userEvent.setup();
++  render(<App />);
++
++  await user.click(screen.getByRole("button", { name: "自由实验" }));
++  await user.click(screen.getByRole("button", { name: "进入下一章" }));
++  expect(screen.getByRole("heading", { name: "第 2 章：启动虚拟风扇" })).toBeInTheDocument();
++
++  await user.click(screen.getByRole("button", { name: "教学模式" }));
++  expect(screen.getByRole("heading", { name: "第 2 章：启动虚拟风扇" })).toBeInTheDocument();
++  expect(screen.getByRole("button", { name: /第 1 章.*认识风洞/ })).toHaveClass("lesson-available");
++});
++
++it("assembles the automatic sweep report and starts the fixed sequence", async () => {
++  const user = userEvent.setup();
++  labStore.getState().resetLab();
++  render(<App />);
++
++  expect(screen.getByRole("heading", { name: "三工况实验报告" })).toBeVisible();
++  await user.click(screen.getByRole("button", { name: "开始自动扫频" }));
++  expect(labStore.getState().fanPowerPct).toBe(30);
++  expect(["ramping", "stabilizing"]).toContain(labStore.getState().phase);
++  expect(labStore.getState().sweep?.commandedPowerPct).toBe(30);
++});
++
++it("wires the flow failure recovery button to the mounted runtime", async () => {
++  const user = userEvent.setup();
++  const client = createFakeFlowClient();
++  render(<App flowClientFactory={() => client} />);
++  act(() => labStore.setState({ flowStatus: "failed", flowError: "worker stopped" }));
++
++  await user.click(screen.getByRole("button", { name: "重新启动求解器" }));
++  expect(client.restart).toHaveBeenCalledOnce();
++});
++
++it("rebuilds the worker for a new grid without clearing telemetry, tutorial, or the last field", async () => {
++  const user = userEvent.setup();
++  const width = vi.spyOn(window, "innerWidth", "get").mockReturnValue(1_024);
++  vi.spyOn(navigator, "hardwareConcurrency", "get").mockReturnValue(12);
++  const clients: ReturnType<typeof createFakeFlowClient>[] = [];
++  const factory = vi.fn((profile: QualityProfile) => {
++    void profile;
++    const client = createFakeFlowClient();
++    clients.push(client);
++    return client;
++  });
++  render(<App flowClientFactory={factory} />);
++  await user.click(screen.getByRole("button", { name: "自由实验" }));
++  await user.click(screen.getByRole("button", { name: "进入下一章" }));
++  const telemetry = labStore.getState().telemetry;
++  const lastField: FlowFieldFrame = {
++    width: 240,
++    height: 96,
++    speed: new Float32Array(1),
++    pressure: new Float32Array(1),
++    vorticity: new Float32Array(1),
++    velocityX: new Float32Array(1),
++    velocityY: new Float32Array(1),
++    provenance: "2d-teaching-cfd",
++  };
++  act(() => labStore.setState({ flowField: lastField }));
++
++  width.mockReturnValue(1_440);
++  act(() => window.dispatchEvent(new Event("resize")));
++
++  await waitFor(() => expect(factory).toHaveBeenCalledTimes(2));
++  expect(factory.mock.calls.map(([profile]) => profile.name)).toEqual(["medium", "high"]);
++  expect(clients[0]!.dispose).toHaveBeenCalledOnce();
++  expect(labStore.getState().telemetry).toBe(telemetry);
++  expect(labStore.getState().flowField).toBe(lastField);
++  expect(screen.getByRole("heading", { name: "第 2 章：启动虚拟风扇" })).toBeVisible();
++});
++
++it("downgrades timed-out HIGH and MEDIUM workers until LOW reaches a real field without clearing lab state", async () => {
++  vi.useFakeTimers();
++  vi.spyOn(window, "innerWidth", "get").mockReturnValue(1_440);
++  vi.spyOn(navigator, "hardwareConcurrency", "get").mockReturnValue(12);
++  const realFrame: FlowFieldFrame = {
++    width: 240,
++    height: 96,
++    speed: new Float32Array([1]),
++    pressure: new Float32Array([2]),
++    vorticity: new Float32Array([3]),
++    velocityX: new Float32Array([4]),
++    velocityY: new Float32Array([5]),
++    provenance: "2d-teaching-cfd",
++  };
++  const timedOut = {
++    ...createFakeFlowClient(),
++    requestFrame: vi.fn(async () => { throw new Error("Flow worker timed out"); }),
++  };
++  const mediumTimedOut = {
++    ...createFakeFlowClient(),
++    requestFrame: vi.fn(async () => { throw new Error("Flow worker timed out"); }),
++  };
++  const recovered = {
++    ...createFakeFlowClient(),
++    requestFrame: vi.fn(async () => realFrame),
++  };
++  const clients = [timedOut, mediumTimedOut, recovered];
++  const factory = vi.fn((profile: QualityProfile) => {
++    void profile;
++    return clients.shift()!;
++  });
++  const telemetry = labStore.getState().telemetry;
++  render(<App
++    flowClientFactory={factory}
++    simulationRuntimeFactory={() => vi.fn()}
++  />);
++  fireEvent.click(screen.getByRole("button", { name: "自由实验" }));
++  fireEvent.click(screen.getByRole("button", { name: "进入下一章" }));
++
++  await act(async () => {
++    await vi.advanceTimersByTimeAsync(100);
++    await Promise.resolve();
++  });
++  await act(async () => {
++    await vi.advanceTimersByTimeAsync(100);
++    await Promise.resolve();
++  });
++  await act(async () => {
++    await vi.advanceTimersByTimeAsync(100);
++    await Promise.resolve();
++  });
++
++  expect(factory.mock.calls.map(([profile]) => profile.name)).toEqual(["high", "medium", "low"]);
++  expect(timedOut.dispose).toHaveBeenCalledOnce();
++  expect(mediumTimedOut.dispose).toHaveBeenCalledOnce();
++  expect(labStore.getState().flowStatus).toBe("ready");
++  expect(labStore.getState().flowField).toBe(realFrame);
++  expect(labStore.getState().telemetry).toBe(telemetry);
++  expect(labStore.getState().eventLog).toEqual(expect.arrayContaining([
++    expect.stringContaining("HIGH 超时"),
++    expect.stringContaining("MEDIUM 超时"),
++  ]));
++  expect(screen.getByRole("heading", { name: "第 2 章：启动虚拟风扇" })).toBeVisible();
++});
+diff --git a/src/features/dashboard/FieldSelector.tsx b/src/features/dashboard/FieldSelector.tsx
+new file mode 100644
+index 0000000..efd9d17
+--- /dev/null
++++ b/src/features/dashboard/FieldSelector.tsx
+@@ -0,0 +1,98 @@
++import type { KeyboardEvent as ReactKeyboardEvent } from "react";
++import { useLabStore, type LabState } from "../experiment/labStore";
++import { mapWindToLatticeVelocity } from "../flow/flowRuntime";
++import { qualityProfile, type QualityProfile } from "../shell/quality";
++
++export type FieldId = LabState["selectedField"];
++
++type FieldSelectorProps = {
++  onInspect(field: FieldId): void;
++  quality?: QualityProfile;
++};
++
++const FIELDS: readonly { id: FieldId; label: string; english: string }[] = [
++  { id: "speed", label: "速度", english: "VELOCITY" },
++  { id: "pressure", label: "压力", english: "PRESSURE" },
++  { id: "vorticity", label: "涡量", english: "VORTICITY" },
++  { id: "streamlines", label: "流线", english: "STREAMLINES" },
++];
++
++const FLOW_STATUS: Record<LabState["flowStatus"], string> = {
++  idle: "待机 / IDLE",
++  loading: "求解中 / SOLVING",
++  ready: "流场就绪 / READY",
++  failed: "求解失败 / FAILED",
++};
++
++export function FieldSelector({ onInspect, quality = qualityProfile("medium") }: FieldSelectorProps) {
++  const selectedField = useLabStore((state) => state.selectedField);
++  const selectField = useLabStore((state) => state.selectField);
++  const flowStatus = useLabStore((state) => state.flowStatus);
++  const flowField = useLabStore((state) => state.flowField);
++  const windSpeedMps = useLabStore((state) => state.telemetry.windSpeedMps);
++  const fieldReady = flowStatus === "ready" && flowField !== null;
++
++  const select = (field: FieldId) => {
++    if (!fieldReady) return;
++    selectField(field);
++    onInspect(field);
++  };
++
++  const moveSelection = (event: ReactKeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
++    let nextIndex: number | undefined;
++    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
++      nextIndex = (currentIndex + 1) % FIELDS.length;
++    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
++      nextIndex = (currentIndex - 1 + FIELDS.length) % FIELDS.length;
++    } else if (event.key === "Home") {
++      nextIndex = 0;
++    } else if (event.key === "End") {
++      nextIndex = FIELDS.length - 1;
++    }
++    if (nextIndex === undefined) return;
++
++    event.preventDefault();
++    const buttons = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("[role='radio']");
++    buttons?.[nextIndex]?.focus();
++    select(FIELDS[nextIndex]!.id);
++  };
++
++  return (
++    <section className="dashboard-section field-section" aria-labelledby="field-selector-title">
++      <div className="dashboard-section-heading">
++        <div>
++          <p className="section-kicker">FIELD SELECTOR</p>
++          <h2 id="field-selector-title">场变量选择</h2>
++        </div>
++      </div>
++      <div className="field-options" role="radiogroup" aria-label="场变量选择">
++        {FIELDS.map((field, index) => (
++          <button
++            type="button"
++            role="radio"
++            aria-label={field.label}
++            aria-checked={selectedField === field.id}
++            disabled={!fieldReady}
++            tabIndex={selectedField === field.id ? 0 : -1}
++            className={selectedField === field.id ? "field-selected" : undefined}
++            key={field.id}
++            onClick={() => select(field.id)}
++            onKeyDown={(event) => moveSelection(event, index)}
++          >
++            <span>{field.label}</span>
++            <small>{field.english}</small>
++          </button>
++        ))}
++      </div>
++      {!fieldReady && <p className="field-evidence-notice">等待真实二维流场后可记录观察证据。</p>}
++      <dl className="solver-status" aria-label="二维求解器状态">
++        <div><dt>求解器</dt><dd>D2Q9 BGK</dd></div>
++        <div><dt>活动质量</dt><dd>{quality.name.toUpperCase()}</dd></div>
++        <div><dt>活动网格</dt><dd>{quality.grid[0]} × {quality.grid[1]}</dd></div>
++        <div><dt>格点入口速度</dt><dd>{mapWindToLatticeVelocity(windSpeedMps).toFixed(4)} lu</dd></div>
++        <div><dt>流场状态</dt><dd>{FLOW_STATUS[flowStatus]}</dd></div>
++        <div><dt>模型范围</dt><dd>二维教学近似</dd></div>
++      </dl>
++    </section>
++  );
++}
+diff --git a/src/features/dashboard/Dashboard.test.tsx b/src/features/dashboard/Dashboard.test.tsx
+new file mode 100644
+index 0000000..e789ab6
+--- /dev/null
++++ b/src/features/dashboard/Dashboard.test.tsx
+@@ -0,0 +1,306 @@
++import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { beforeEach, expect, it, vi } from "vitest";
++import { labStore } from "../experiment/labStore";
++import type { TelemetryFrame } from "../experiment/model";
++import type { FlowFieldFrame } from "../flow/types";
++import { ControlPanel } from "./ControlPanel";
++import { FieldSelector } from "./FieldSelector";
++import { HistoryChart } from "./HistoryChart";
++import { TelemetryCards } from "./TelemetryCards";
++import { mapHistoryToChartData } from "./historyMapping";
++import {
++  recordFieldInspection,
++  recordSensorInspection,
++  recordStableTelemetry,
++  recordStableWindowInspection,
++} from "./evidenceRecording";
++import { emptyEvidence } from "../tutorial/tutorialProgress";
++import { qualityProfile } from "../shell/quality";
++
++function frame(overrides: Partial<TelemetryFrame> = {}): TelemetryFrame {
++  return {
++    sequence: 1,
++    simulationTimeMs: 50,
++    phase: "sampling",
++    fanPowerPct: 30,
++    rpm: 4380.4,
++    windSpeedMps: 8.456,
++    underbodyPressurePa: -32.44,
++    verticalLoadN: 0.1849,
++    quality: "stable",
++    provenance: "simulated",
++    ...overrides,
++  };
++}
++
++function flowFrame(): FlowFieldFrame {
++  return {
++    width: 2,
++    height: 1,
++    speed: new Float32Array(2),
++    pressure: new Float32Array(2),
++    vorticity: new Float32Array(2),
++    velocityX: new Float32Array(2),
++    velocityY: new Float32Array(2),
++    provenance: "2d-teaching-cfd",
++  };
++}
++
++beforeEach(() => labStore.getState().resetLab());
++
++it("commands fan power and supports run, pause, resume, and reset", async () => {
++  const user = userEvent.setup();
++  const confirmReset = vi.spyOn(window, "confirm").mockReturnValue(true);
++  render(<ControlPanel />);
++
++  const slider = screen.getByRole("slider", { name: "风扇功率" });
++  fireEvent.change(slider, { target: { value: "100" } });
++  expect(labStore.getState().fanPowerPct).toBe(100);
++  expect(screen.getByText("100%", { selector: "output" })).toBeVisible();
++
++  await user.click(screen.getByRole("button", { name: "启动实验" }));
++  expect(labStore.getState().phase).toBe("ramping");
++  await user.click(screen.getByRole("button", { name: "暂停实验" }));
++  expect(labStore.getState().phase).toBe("paused");
++  await user.click(screen.getByRole("button", { name: "继续实验" }));
++  expect(labStore.getState().phase).toBe("ramping");
++
++  labStore.getState().acceptFrame(frame());
++  await user.click(screen.getByRole("button", { name: "停止并重置" }));
++  expect(confirmReset).toHaveBeenCalledOnce();
++  expect(labStore.getState()).toMatchObject({ phase: "idle", history: [] });
++  confirmReset.mockRestore();
++});
++
++it("gives the primary fan range a dedicated touch hit area", () => {
++  render(<ControlPanel />);
++  const slider = screen.getByRole("slider", { name: "风扇功率" });
++
++  expect(slider.parentElement).toHaveClass("fan-slider-hit-area");
++});
++
++it("locks manual fan and pause controls while the fixed sweep owns the command", () => {
++  labStore.getState().startSweep();
++  render(<ControlPanel />);
++
++  expect(screen.getByRole("slider", { name: "风扇功率" })).toBeDisabled();
++  expect(screen.getByRole("button", { name: "暂停实验" })).toBeDisabled();
++});
++
++it("keeps controls and teaching data visible while offering solver recovery", async () => {
++  const user = userEvent.setup();
++  const restartFlow = vi.fn().mockResolvedValue(undefined);
++  labStore.setState({ flowStatus: "failed", flowError: "worker crashed" });
++  render(<ControlPanel onRestartFlow={restartFlow} />);
++
++  expect(screen.getByRole("alert")).toHaveTextContent("worker crashed");
++  expect(screen.getByRole("slider", { name: "风扇功率" })).toBeVisible();
++  await user.click(screen.getByRole("button", { name: "重新启动求解器" }));
++  expect(restartFlow).toHaveBeenCalledOnce();
++});
++
++it("consumes an expected restart rejection, re-enables recovery, and allows retry", async () => {
++  const user = userEvent.setup();
++  const restartFlow = vi.fn()
++    .mockRejectedValueOnce(new Error("replacement init failed"))
++    .mockResolvedValueOnce(undefined);
++  const unhandled = vi.fn();
++  const onUnhandled = (event: PromiseRejectionEvent) => {
++    event.preventDefault();
++    unhandled(event.reason);
++  };
++  window.addEventListener("unhandledrejection", onUnhandled);
++  labStore.setState({ flowStatus: "failed", flowError: "replacement init failed" });
++  render(<ControlPanel onRestartFlow={restartFlow} />);
++
++  try {
++    await user.click(screen.getByRole("button", { name: "重新启动求解器" }));
++    await waitFor(() => expect(screen.getByRole("button", { name: "重新启动求解器" })).toBeEnabled());
++    expect(labStore.getState()).toMatchObject({
++      flowStatus: "failed",
++      flowError: "replacement init failed",
++    });
++    expect(unhandled).not.toHaveBeenCalled();
++
++    await user.click(screen.getByRole("button", { name: "重新启动求解器" }));
++    expect(restartFlow).toHaveBeenCalledTimes(2);
++  } finally {
++    window.removeEventListener("unhandledrejection", onUnhandled);
++  }
++});
++
++it("checks current history at reset activation time", () => {
++  const confirmReset = vi.spyOn(window, "confirm").mockReturnValue(true);
++  render(<ControlPanel />);
++  const resetButton = screen.getByRole("button", { name: "停止并重置" });
++
++  act(() => {
++    labStore.getState().acceptFrame(frame());
++    resetButton.click();
++  });
++
++  expect(confirmReset).toHaveBeenCalledOnce();
++  expect(labStore.getState().history).toHaveLength(0);
++  confirmReset.mockRestore();
++});
++
++it("shows exact telemetry formats, units, quality, and simulated provenance", () => {
++  labStore.setState({ telemetry: frame() });
++  render(<TelemetryCards onInspect={() => undefined} />);
++
++  expect(screen.getByText("4380")).toBeVisible();
++  expect(screen.getByText("8.46")).toBeVisible();
++  expect(screen.getByText("-32.4")).toBeVisible();
++  expect(screen.getByText("0.185")).toBeVisible();
++  expect(screen.getByText("车底相对压力")).toBeVisible();
++  for (const unit of ["RPM", "m/s", "Pa", "N"]) {
++    expect(screen.getByText(unit)).toBeVisible();
++  }
++  expect(screen.getAllByText("SIMULATED")).toHaveLength(4);
++  expect(screen.getAllByText("稳定 / STABLE")).toHaveLength(4);
++});
++
++it("reports each inspected sensor as tutorial evidence", async () => {
++  const user = userEvent.setup();
++  const onInspect = vi.fn();
++  render(<TelemetryCards onInspect={onInspect} />);
++
++  for (const name of ["查看风扇转速说明", "查看来流速度说明", "查看车底相对压力说明", "查看垂向载荷说明"]) {
++    await user.click(screen.getByRole("button", { name }));
++  }
++  expect(onInspect.mock.calls.map(([sensor]) => sensor)).toEqual(["rpm", "wind", "pressure", "load"]);
++});
++
++it("selects and reports all four teaching field views", async () => {
++  const user = userEvent.setup();
++  const onInspect = vi.fn();
++  labStore.setState({ flowStatus: "ready", flowField: flowFrame() });
++  render(<FieldSelector onInspect={onInspect} />);
++
++  for (const name of ["压力", "涡量", "流线", "速度"]) {
++    await user.click(screen.getByRole("radio", { name }));
++  }
++  expect(labStore.getState().selectedField).toBe("speed");
++  expect(onInspect.mock.calls.map(([field]) => field)).toEqual(["pressure", "vorticity", "streamlines", "speed"]);
++  expect(screen.getByText("D2Q9 BGK")).toBeVisible();
++  expect(screen.getByText("240 × 96")).toBeVisible();
++  expect(screen.getByText("二维教学近似")).toBeVisible();
++});
++
++it("does not record field evidence until a real worker field is ready", async () => {
++  const user = userEvent.setup();
++  const onInspect = vi.fn();
++  const { rerender } = render(<FieldSelector onInspect={onInspect} />);
++
++  for (const radio of screen.getAllByRole("radio")) expect(radio).toBeDisabled();
++  expect(screen.getByText("等待真实二维流场后可记录观察证据。" )).toBeVisible();
++
++  act(() => labStore.setState({ flowStatus: "ready", flowField: flowFrame() }));
++  rerender(<FieldSelector onInspect={onInspect} />);
++  await user.click(screen.getByRole("radio", { name: "压力" }));
++  expect(onInspect).toHaveBeenCalledWith("pressure");
++});
++
++it("shows the active quality name and exact solver grid", () => {
++  render(<FieldSelector onInspect={() => undefined} quality={qualityProfile("high")} />);
++
++  expect(screen.getByText("HIGH")).toBeVisible();
++  expect(screen.getByText("320 × 128")).toBeVisible();
++});
++
++it("uses roving tab focus and all arrow keys to select fields cyclically", async () => {
++  const user = userEvent.setup();
++  const onInspect = vi.fn();
++  labStore.setState({ flowStatus: "ready", flowField: flowFrame() });
++  render(<FieldSelector onInspect={onInspect} />);
++  const radios = screen.getAllByRole("radio");
++
++  expect(radios.map((radio) => radio.tabIndex)).toEqual([0, -1, -1, -1]);
++  radios[0]!.focus();
++  await user.keyboard("{ArrowRight}{ArrowDown}{ArrowLeft}{ArrowUp}{ArrowLeft}");
++
++  expect(screen.getByRole("radio", { name: "流线" })).toHaveFocus();
++  expect(labStore.getState().selectedField).toBe("streamlines");
++  expect(onInspect.mock.calls.map(([field]) => field)).toEqual([
++    "pressure",
++    "vorticity",
++    "pressure",
++    "speed",
++    "streamlines",
++  ]);
++  expect(screen.getAllByRole("radio").map((radio) => radio.tabIndex)).toEqual([-1, -1, -1, 0]);
++});
++
++it("maps only the latest sixty seconds and never more than 1,200 points", () => {
++  const history = Array.from({ length: 1_300 }, (_, sequence) => frame({
++    sequence,
++    simulationTimeMs: sequence * 50,
++  }));
++
++  const mapped = mapHistoryToChartData(history);
++  expect(mapped).toHaveLength(1_200);
++  expect(mapped[0]).toMatchObject({ timeSeconds: 5, rpm: 4380.4, pressurePa: -32.44 });
++  expect(mapped.at(-1)?.timeSeconds).toBe(64.95);
++});
++
++it("marks a stable chart window without changing telemetry history", async () => {
++  const user = userEvent.setup();
++  const history = [
++    frame({ sequence: 1, simulationTimeMs: 50, quality: "transient" }),
++    frame({ sequence: 2, simulationTimeMs: 100, quality: "stable" }),
++    frame({ sequence: 3, simulationTimeMs: 150, quality: "stable" }),
++  ];
++  labStore.setState({ history });
++  const onInspectStableWindow = vi.fn();
++  render(<HistoryChart onInspectStableWindow={onInspectStableWindow} />);
++
++  await user.click(screen.getByRole("button", { name: "标记稳定窗口" }));
++  expect(onInspectStableWindow).toHaveBeenCalledOnce();
++  expect(labStore.getState().history).toBe(history);
++});
++
++it("renders four visible, separately positioned unit axes", () => {
++  labStore.setState({ history: [
++    frame({ sequence: 1, simulationTimeMs: 100, quality: "transient" }),
++    frame({ sequence: 2, simulationTimeMs: 150, quality: "transient" }),
++  ] });
++  render(<HistoryChart onInspectStableWindow={() => undefined} />);
++  const plot = screen.getByLabelText("最近 60 秒遥测曲线");
++  const axes = plot.querySelectorAll(".recharts-yAxis");
++  const axisLines = plot.querySelectorAll<SVGLineElement>(".recharts-yAxis .recharts-cartesian-axis-line");
++
++  expect(axes).toHaveLength(4);
++  for (const unit of ["m/s", "RPM", "Pa", "N"]) {
++    expect(within(plot).getByText(unit)).toBeVisible();
++  }
++  expect(new Set(Array.from(axisLines, (line) => line.getAttribute("x1"))).size).toBe(4);
++});
++
++it("does not expose a zero-duration stable window from one sample", () => {
++  labStore.setState({ history: [frame({ sequence: 1, simulationTimeMs: 100, quality: "stable" })] });
++  render(<HistoryChart onInspectStableWindow={() => undefined} />);
++
++  expect(screen.queryByRole("button", { name: "标记稳定窗口" })).not.toBeInTheDocument();
++});
++
++it("accrues stable evidence only from physical stable quality at exactly 30 percent", () => {
++  const previous = frame({ simulationTimeMs: 1_000, quality: "transient" });
++  const stable = frame({ simulationTimeMs: 3_000, fanPowerPct: 30, quality: "stable", rpm: 99_999 });
++
++  expect(recordStableTelemetry(emptyEvidence, previous, stable, 30).stableSeconds).toBe(2);
++  expect(recordStableTelemetry(emptyEvidence, previous, stable, 31).stableSeconds).toBe(0);
++  expect(recordStableTelemetry(emptyEvidence, previous, { ...stable, quality: "transient" }, 30).stableSeconds).toBe(0);
++});
++
++it("records sensor, field, and stable-window evidence without duplicate identifiers", () => {
++  const withSensor = recordSensorInspection(recordSensorInspection(emptyEvidence, "rpm"), "rpm");
++  const withField = recordFieldInspection(recordFieldInspection(withSensor, "pressure"), "pressure");
++  const complete = recordStableWindowInspection(withField);
++
++  expect(complete).toMatchObject({
++    viewedSensors: ["rpm"],
++    viewedFields: ["pressure"],
++    inspectedStableWindow: true,
++  });
++});
+diff --git a/src/features/shell/AppShell.tsx b/src/features/shell/AppShell.tsx
+new file mode 100644
+index 0000000..cd7593b
+--- /dev/null
++++ b/src/features/shell/AppShell.tsx
+@@ -0,0 +1,129 @@
++import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
++
++export type AppShellProps = {
++  left: ReactNode;
++  scene: ReactNode;
++  right: ReactNode;
++  bottom: ReactNode;
++  headerActions?: ReactNode;
++};
++
++type CompactPanel = "tutorial" | "controls" | "charts";
++
++const COMPACT_PANELS: readonly { id: CompactPanel; label: string }[] = [
++  { id: "tutorial", label: "教程" },
++  { id: "controls", label: "控制" },
++  { id: "charts", label: "曲线" },
++];
++
++export function AppShell({ left, scene, right, bottom, headerActions }: AppShellProps) {
++  const [compactPanel, setCompactPanel] = useState<CompactPanel>("tutorial");
++  const [compactLayout, setCompactLayout] = useState(() => (
++    typeof window !== "undefined" && window.matchMedia?.("(max-width: 1100px)").matches === true
++  ));
++  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
++  useEffect(() => {
++    const query = window.matchMedia?.("(max-width: 1100px)");
++    if (!query) return;
++    const update = () => setCompactLayout(query.matches);
++    query.addEventListener("change", update);
++    return () => query.removeEventListener("change", update);
++  }, []);
++  const selectAdjacentTab = (event: ReactKeyboardEvent<HTMLButtonElement>, index: number) => {
++    let nextIndex: number | undefined;
++    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
++      nextIndex = (index + 1) % COMPACT_PANELS.length;
++    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
++      nextIndex = (index - 1 + COMPACT_PANELS.length) % COMPACT_PANELS.length;
++    } else if (event.key === "Home") {
++      nextIndex = 0;
++    } else if (event.key === "End") {
++      nextIndex = COMPACT_PANELS.length - 1;
++    }
++    if (nextIndex === undefined) return;
++    event.preventDefault();
++    const nextPanel = COMPACT_PANELS[nextIndex]!;
++    setCompactPanel(nextPanel.id);
++    tabRefs.current[nextIndex]?.focus();
++  };
++  const enterActivePanel = (event: ReactKeyboardEvent<HTMLButtonElement>, panel: CompactPanel) => {
++    if (event.key !== "Tab" || event.shiftKey || !compactLayout || compactPanel !== panel) return;
++    const target = document.getElementById(`compact-panel-${panel}`)?.querySelector<HTMLElement>(
++      "input:not(:disabled), button:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex='-1'])",
++    );
++    if (!target) return;
++    event.preventDefault();
++    target.focus();
++  };
++
++  return (
++    <div className="app-shell">
++      <header className="topbar" role="banner">
++        <div>
++          <span className="eyebrow">CFD TEACHING CONSOLE</span>
++          <h1>SophiFlow Lab</h1>
++        </div>
++        <div className="topbar-actions">
++          {headerActions}
++          <span className="model-scope-badge">2D TEACHING CFD / 二维教学近似</span>
++          <span className="provenance-badge">SIMULATED / 模拟数据</span>
++        </div>
++      </header>
++      <div className="compact-panel-tabs" role="tablist" aria-label="窄屏实验面板">
++        {COMPACT_PANELS.map((panel, index) => (
++          <button
++            type="button"
++            role="tab"
++            aria-controls={`compact-panel-${panel.id}`}
++            aria-selected={compactPanel === panel.id}
++            id={`compact-tab-${panel.id}`}
++            key={panel.id}
++            ref={(element) => { tabRefs.current[index] = element; }}
++            tabIndex={compactPanel === panel.id ? 0 : -1}
++            onClick={() => setCompactPanel(panel.id)}
++            onKeyDown={(event) => {
++              selectAdjacentTab(event, index);
++              enterActivePanel(event, panel.id);
++            }}
++          >
++            {panel.label}
++          </button>
++        ))}
++      </div>
++      <nav
++        className="tutorial-rail"
++        aria-label="教学章节"
++        data-compact-active={compactPanel === "tutorial"}
++      ><div
++        aria-labelledby={compactLayout ? "compact-tab-tutorial" : undefined}
++        hidden={compactLayout && compactPanel !== "tutorial"}
++        id="compact-panel-tutorial"
++        inert={compactLayout && compactPanel !== "tutorial" ? true : undefined}
++        role={compactLayout ? "tabpanel" : undefined}
++      >{left}</div></nav>
++      <main className="scene-panel" aria-label="数字风洞">{scene}</main>
++      <aside
++        className="control-panel"
++        aria-label="实验控制"
++        data-compact-active={compactPanel === "controls"}
++      ><div
++        aria-labelledby={compactLayout ? "compact-tab-controls" : undefined}
++        hidden={compactLayout && compactPanel !== "controls"}
++        id="compact-panel-controls"
++        inert={compactLayout && compactPanel !== "controls" ? true : undefined}
++        role={compactLayout ? "tabpanel" : undefined}
++      >{right}</div></aside>
++      <section
++        className="chart-drawer"
++        aria-label="实验曲线"
++        data-compact-active={compactPanel === "charts"}
++      ><div
++        aria-labelledby={compactLayout ? "compact-tab-charts" : undefined}
++        hidden={compactLayout && compactPanel !== "charts"}
++        id="compact-panel-charts"
++        inert={compactLayout && compactPanel !== "charts" ? true : undefined}
++        role={compactLayout ? "tabpanel" : undefined}
++      >{bottom}</div></section>
++    </div>
++  );
++}
+diff --git a/src/features/shell/AppShell.test.tsx b/src/features/shell/AppShell.test.tsx
+new file mode 100644
+index 0000000..a612882
+--- /dev/null
++++ b/src/features/shell/AppShell.test.tsx
+@@ -0,0 +1,81 @@
++import { render, screen } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { afterEach, expect, it, vi } from "vitest";
++import { AppShell } from "./AppShell";
++
++afterEach(() => vi.unstubAllGlobals());
++
++function useCompactViewport() {
++  vi.stubGlobal("matchMedia", vi.fn(() => ({
++    matches: true,
++    media: "(max-width: 1100px)",
++    onchange: null,
++    addEventListener: vi.fn(),
++    removeEventListener: vi.fn(),
++    addListener: vi.fn(),
++    removeListener: vi.fn(),
++    dispatchEvent: vi.fn(),
++  })));
++}
++
++it("provides a keyboard-operable three-tab compact panel affordance", async () => {
++  useCompactViewport();
++  const user = userEvent.setup();
++  render(
++    <AppShell
++      left={<p>教程内容</p>}
++      scene={<p>场景内容</p>}
++      right={<p>控制内容</p>}
++      bottom={<p>曲线内容</p>}
++    />,
++  );
++
++  expect(screen.getByRole("tablist", { name: "窄屏实验面板" })).toBeInTheDocument();
++  const tutorialTab = screen.getByRole("tab", { name: "教程" });
++  const controlTab = screen.getByRole("tab", { name: "控制" });
++  const chartTab = screen.getByRole("tab", { name: "曲线" });
++  expect(tutorialTab).toHaveAttribute("aria-selected", "true");
++  const panels = screen.getAllByRole("tabpanel", { hidden: true });
++  expect(panels).toHaveLength(3);
++  for (const tab of [tutorialTab, controlTab, chartTab]) {
++    const panel = document.getElementById(tab.getAttribute("aria-controls")!);
++    expect(panel).toHaveAttribute("role", "tabpanel");
++    expect(panel).toHaveAttribute("aria-labelledby", tab.id);
++  }
++  expect(document.getElementById("compact-panel-tutorial")).not.toHaveAttribute("hidden");
++  expect(document.getElementById("compact-panel-controls")).toHaveAttribute("hidden");
++  expect(document.getElementById("compact-panel-charts")).toHaveAttribute("hidden");
++
++  await user.click(controlTab);
++  expect(controlTab).toHaveAttribute("aria-selected", "true");
++  expect(document.getElementById("compact-panel-tutorial")).toHaveAttribute("hidden");
++  expect(document.getElementById("compact-panel-controls")).not.toHaveAttribute("hidden");
++
++  chartTab.focus();
++  await user.keyboard("{ArrowLeft}");
++  expect(controlTab).toHaveFocus();
++  expect(controlTab).toHaveAttribute("aria-selected", "true");
++});
++
++it("moves Tab from an active compact tab into that panel instead of the intervening scene", async () => {
++  useCompactViewport();
++  const user = userEvent.setup();
++  render(
++    <AppShell
++      left={<button type="button">教程动作</button>}
++      scene={<button type="button">场景动作</button>}
++      right={<><input aria-label="功率" type="range" /><button type="button">启动</button></>}
++      bottom={<button type="button">图表动作</button>}
++    />,
++  );
++
++  const controlTab = screen.getByRole("tab", { name: "控制" });
++  await user.click(controlTab);
++  await user.tab();
++  expect(screen.getByRole("slider", { name: "功率" })).toHaveFocus();
++
++  const chartTab = screen.getByRole("tab", { name: "曲线" });
++  await user.click(chartTab);
++  await user.tab();
++  expect(screen.getByRole("button", { name: "图表动作" })).toHaveFocus();
++});
+diff --git a/vite.config.ts b/vite.config.ts
+new file mode 100644
+index 0000000..c29f315
+--- /dev/null
++++ b/vite.config.ts
+@@ -0,0 +1,13 @@
++import { configDefaults, defineConfig } from "vitest/config";
++import react from "@vitejs/plugin-react";
++
++export default defineConfig({
++  plugins: [react()],
++  test: {
++    environment: "jsdom",
++    setupFiles: ["./src/test/setup.ts"],
++    css: true,
++    globals: true,
++    exclude: [...configDefaults.exclude, "e2e/**"],
++  },
++});
+diff --git a/tsconfig.json b/tsconfig.json
+new file mode 100644
+index 0000000..a53d667
+--- /dev/null
++++ b/tsconfig.json
+@@ -0,0 +1,21 @@
++{
++  "compilerOptions": {
++    "target": "ES2022",
++    "useDefineForClassFields": true,
++    "lib": ["ES2022", "DOM", "DOM.Iterable"],
++    "allowJs": false,
++    "skipLibCheck": true,
++    "esModuleInterop": true,
++    "allowSyntheticDefaultImports": true,
++    "strict": true,
++    "noUncheckedIndexedAccess": true,
++    "module": "ESNext",
++    "moduleResolution": "Bundler",
++    "resolveJsonModule": true,
++    "isolatedModules": true,
++    "noEmit": true,
++    "jsx": "react-jsx",
++    "types": ["vite/client", "vitest/globals", "node"]
++  },
++  "include": ["src", "e2e", "vite.config.ts", "playwright.config.ts"]
++}

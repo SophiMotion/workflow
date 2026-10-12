@@ -1,0 +1,9 @@
+node_modules/
+packages/*/dist/
+mcp/dist/
+playwright-report/
+test-results/
+*.tsbuildinfo
+.DS_Store
+
+# Browser-ready output is versioned in the workflow collection.

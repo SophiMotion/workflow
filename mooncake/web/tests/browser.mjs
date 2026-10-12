@@ -1,0 +1,106 @@
+import { chromium } from 'playwright';
+import { expect } from '@playwright/test';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import assert from 'node:assert/strict';
+const root = fileURLToPath(new URL('../../', import.meta.url));
+const qa = '/private/tmp/mooncake-qa'; await mkdir(qa, { recursive: true });
+const browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true, args: ['--enable-webgl', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+try {
+ const context = await browser.newContext({ viewport: { width: 1536, height: 1024 }, acceptDownloads: true });
+ const page = await context.newPage(), errors=[];
+ page.on('pageerror',error=>errors.push(error.message));
+ await page.goto(process.env.MOONCAKE_URL || 'http://127.0.0.1:5173/');
+ await page.locator('.canvas canvas').waitFor();
+ await page.screenshot({path:qa+'/desktop-preview.png'});
+ const shotCheck=await page.locator('.purchase-button').boundingBox(); assert.ok(shotCheck.y+shotCheck.height <1024,'Desktop purchase button stays in viewport');
+ await page.getByLabel('直径数值',{exact:true}).fill('50'); await page.getByLabel('直径数值',{exact:true}).press('Tab');
+ await page.getByRole('tab',{name:'正面',exact:true}).click(); assert.equal(await page.getByLabel('花纹直径数值',{exact:true}).inputValue(),'39.6');
+ const patternNames=['花好月圆','莲珠团花','重瓣莲华','繁花簇锦','菱锦团圆','八芒锦星','折扇流光','弦月花环','星月相映','涟漪团圆'];
+ assert.equal(await page.locator('.front-choices .choice').count(),10);
+ for(const name of patternNames) { await page.getByRole('button',{name,exact:true}).click(); await expect(page.getByRole('button',{name,exact:true})).toHaveAttribute('aria-pressed','true'); }
+ await page.getByRole('button',{name:'莲珠团花',exact:true}).click();
+ await page.screenshot({path:qa+'/ten-patterns-desktop.png'});
+ await page.getByRole('button',{name:'星月相映',exact:true}).click();
+ await page.getByRole('button',{name:'涟漪团圆',exact:true}).click();
+ await page.getByRole('tab',{name:'文字',exact:true}).click();
+ await page.getByLabel('内部文字',{exact:true}).fill('团圆福'); assert.equal(await page.locator('.purchase-button').isDisabled(),true);
+ await page.getByRole('button',{name:'囍',exact:true}).click(); assert.equal(await page.locator('.purchase-button').isEnabled(),true);
+ await page.getByRole('button',{name:'管理员',exact:true}).click();
+ let wait=page.waitForEvent('download'); await page.getByRole('button',{name:'导出设计 JSON 包含尺寸、花纹、文字与实体轮廓'}).click();
+ let downloaded=await wait; await downloaded.saveAs(root+'mooncake/examples/character-double-happiness.json');
+ const glyph=JSON.parse(await readFile(root+'mooncake/examples/character-double-happiness.json','utf8'));
+ assert.equal(glyph.text.character,'囍'); assert.equal(glyph.dimensions.diameter,50); assert.ok(glyph.geometry.reliefs.some(r=>r.label==='文字'&&r.holes.length>0));
+ // 导入真实导出文件 / Round trip the actual exported file.
+ await page.getByLabel('导入设计文件',{exact:true}).setInputFiles(root+'mooncake/examples/character-double-happiness.json');
+ await page.route('http://127.0.0.1:19876/**', async route => {
+   const req=route.request(); let reply={ok:true};
+   if(req.url().endsWith('/session')) reply={ok:true,service:'mooncake.fusion',version:1,token:'test',pluginPath:root+'mooncake'};
+   else if(req.method()==='POST') { const data=JSON.parse(req.postData()); await writeFile(qa+'/mold-design.json',JSON.stringify(data)); reply={ok:true,jobId:req.headers()['x-mooncake-job'],state:'queued',message:'已连接测试插件'}; }
+   else reply={ok:true,state:'complete',message:'月饼与三件模具已创建'};
+   await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(reply),headers:{'Access-Control-Allow-Origin':'*'}});
+ });
+ await page.getByRole('button',{name:'管理员',exact:true}).click();
+ await page.getByRole('button',{name:'导入 Fusion',exact:false}).click();
+ await page.getByLabel('径向间隙',{exact:true}).fill('0.45'); await page.getByLabel('径向间隙',{exact:true}).press('Tab');
+ await page.getByRole('button',{name:'确认并导入 Fusion',exact:true}).click(); await expect(page.locator('.fusion-progress')).toContainText('F3D 已保存');
+ const moldDoc=JSON.parse(await readFile(qa+'/mold-design.json','utf8')); assert.equal(moldDoc.mold.radialClearance,.45); assert.equal(moldDoc.mold.connection,'M20x2.5'); assert.equal(moldDoc.mold.bossDiameter,30); assert.equal(moldDoc.mold.guideHeight,6);
+ await page.getByRole('button',{name:'完成设计 · 去购买',exact:true}).click();
+ await page.getByRole('button',{name:'增加数量',exact:true}).click();
+ await page.getByPlaceholder('写下你的包装、数量或制作需求…').fill('独立包装');
+ wait=page.waitForEvent('download'); await page.getByRole('button',{name:'保存定制订单',exact:true}).click(); downloaded=await wait; await downloaded.saveAs(qa+'/order.json');
+ const order=JSON.parse(await readFile(qa+'/order.json','utf8')); assert.equal(order.quantity,2); assert.equal(order.paymentStatus,'unpaid'); assert.equal(order.note,'独立包装');
+ await page.screenshot({path:qa+'/order-preview.png'});
+ await page.getByRole('button',{name:'关闭弹窗',exact:true}).click();
+ // 用本地生成的灰度图验证三层浮雕 / Synthetic image fixture for relief conversion.
+ const png=await page.evaluate(()=>{const canvas=document.createElement('canvas'); canvas.width=canvas.height=256;const ctx=canvas.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,256,256);for(let i=0;i<8;i++){const a=i/8*Math.PI*2;ctx.fillStyle=['#111','#555','#999'][i%3];ctx.beginPath();ctx.arc(128+75*Math.cos(a),128+75*Math.sin(a),20,0,Math.PI*2);ctx.fill();}return canvas.toDataURL('image/png').split(',')[1];});
+ await writeFile(qa+'/reference.png',Buffer.from(png,'base64'));
+ await page.getByRole('tab',{name:'正面',exact:true}).click(); await page.getByRole('button',{name:'参考图案',exact:true}).click();
+ assert.equal(await page.locator('.purchase-button').isDisabled(),true);
+ await page.getByLabel('上传参考图案',{exact:true}).setInputFiles(qa+'/reference.png'); await page.getByText('reference.png',{exact:true}).waitFor();
+ assert.equal(await page.locator('.purchase-button').isEnabled(),true);
+ await page.getByLabel('反转深浅',{exact:true}).check(); await page.getByLabel('反转深浅',{exact:true}).uncheck();
+ await page.screenshot({path:qa+'/image-preview.png'});
+ await page.getByRole('button',{name:'管理员',exact:true}).click(); wait=page.waitForEvent('download'); await page.getByRole('button',{name:'导出设计 JSON 包含尺寸、花纹、文字与实体轮廓'}).click(); downloaded=await wait; await downloaded.saveAs(root+'mooncake/examples/uploaded-relief.json');
+ const imageDesign=JSON.parse(await readFile(root+'mooncake/examples/uploaded-relief.json','utf8')); assert.equal(imageDesign.front.image.values.length,4096); assert.ok(new Set(imageDesign.geometry.reliefs.filter(r=>r.label==='图片浮雕').map(r=>r.height)).size>=2);
+ await page.getByRole('button',{name:'关闭弹窗',exact:true}).click();
+ await page.reload(); await page.getByRole('tab',{name:'正面',exact:true}).click(); assert.ok(await page.getByText('reference.png',{exact:true}).isVisible());
+ await page.getByRole('button',{name:'重新设计',exact:true}).click(); await page.getByRole('dialog').getByRole('button',{name:'重新设计',exact:true}).click();
+ await page.setViewportSize({width:390,height:844}); await page.screenshot({path:qa+'/mobile-preview.png',fullPage:true});
+ await page.getByRole('tab',{name:'正面',exact:true}).click(); await page.screenshot({path:qa+'/ten-patterns-mobile.png',fullPage:true});
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth));
+ await page.getByRole('button',{name:'完成设计 · 去购买',exact:true}).click(); assert.ok(await page.getByRole('dialog').isVisible());
+ assert.deepEqual(errors,[],'No uncaught browser errors');
+ console.log('PASS browser workflows; closing context');
+ await context.close();
+ console.log('Starting offline file test');
+ // 单文件离线交付：禁止任何 HTTP 请求 / Offline distribution with all network requests blocked.
+ const offline=await browser.newContext({viewport:{width:1536,height:1024}}); const offlinePage=await offline.newPage(); const requests=[];
+ offlinePage.on('request',r=>{if(r.url().startsWith('http')) requests.push(r.url());});
+ await offline.route(/^https?:/,route=>route.abort());
+ offlinePage.on('pageerror',e=>console.log('OFFLINE ERROR',e.message));
+ offlinePage.setDefaultTimeout(15000);
+ console.log('Opening offline HTML');
+ await offlinePage.goto('file://'+root+'mooncake/Mooncake.html'); console.log('Offline loaded'); await offlinePage.locator('.canvas canvas').waitFor();
+ assert.equal(await offlinePage.locator('.webgl-error').count(),0); await offlinePage.getByRole('tab',{name:'文字',exact:true}).click(); await offlinePage.getByRole('button',{name:'福',exact:true}).click();
+ await offlinePage.getByRole('button',{name:'管理员',exact:true}).click(); wait=offlinePage.waitForEvent('download'); await offlinePage.getByRole('button',{name:'导出设计 JSON 包含尺寸、花纹、文字与实体轮廓'}).click(); downloaded=await wait; await downloaded.saveAs(root+'mooncake/examples/default-fu.json');
+ assert.deepEqual(requests,[]); await offline.close();
+ // 模拟宿主队列及回调 / Verify queued Fusion bridge completion.
+ const embedded = await browser.newContext({viewport:{width:1220,height:920}});
+ await embedded.addInitScript(() => { window.testBuilds=[]; window.adsk = { fusionSendData: async (action,data) => { window.testBuilds.push({action,data:JSON.parse(data)}); return JSON.stringify({ok:true,pending:true,message:'正在建模'}); } }; });
+ const host = await embedded.newPage(); await host.goto('file://'+root+'mooncake/Mooncake.html');
+ await host.getByRole('button',{name:'管理员',exact:true}).click(); await host.getByRole('button',{name:'导入 Fusion',exact:false}).click();
+ assert.equal(await host.evaluate(()=>window.testBuilds.length),0);
+ await host.getByRole('button',{name:'关闭弹窗',exact:true}).click();
+ assert.equal(await host.evaluate(()=>window.testBuilds.length),0);
+ await host.getByRole('button',{name:'管理员',exact:true}).click(); await host.getByRole('button',{name:'导入 Fusion',exact:false}).click();
+ await host.getByRole('button',{name:'确认并导入 Fusion',exact:true}).click();
+ assert.equal(await host.evaluate(()=>window.testBuilds[0].action),'buildDesign');
+ assert.equal(await host.evaluate(()=>window.testBuilds[0].data.mold.type),'hand_press');
+ await host.getByRole('button',{name:'管理员',exact:true}).click(); assert.equal(await host.getByRole('button',{name:'正在创建实体…',exact:false}).isDisabled(),true);
+ await host.evaluate(() => window.fusionJavaScriptHandler.handle('buildFinished', JSON.stringify({ok:true,message:'测试实体已创建'})));
+ await expect(host.getByRole('button',{name:'导入 Fusion',exact:false})).toBeEnabled();
+ await embedded.close();
+ console.log('PASS: desktop, responsive, dimensions, patterns, Han validation, holes, image relief, persistence, JSON round-trip, order download, offline HTML.');
+ await writeFile(qa+'/browser-results.json',JSON.stringify({passed:true,uncaughtErrors:errors,offlineRequests:requests},null,2));
+} finally { await browser.close(); }

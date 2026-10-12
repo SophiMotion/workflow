@@ -1,0 +1,8 @@
+node_modules/
+.pnpm-store/
+*.zip
+.qa/
+
+# Browser-ready output is versioned in the workflow collection.
+!public/fusion/SophiRobot-Fusion-Export.zip
+!dist/fusion/SophiRobot-Fusion-Export.zip

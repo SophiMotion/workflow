@@ -1,0 +1,18 @@
+{
+  "name": "sophistudio-feishu-knowledge",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-llm": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-llm-deepseek": "0.1.5-rc.2",
+    "dompurify": "3.4.15",
+    "marked": "18.0.12"
+  },
+  "engines": {
+    "node": ">=22.21.0"
+  },
+  "scripts": {
+    "test": "node --test tests/harness.test.mjs"
+  }
+}

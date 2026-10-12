@@ -1,0 +1,2629 @@
+# Task 10 fix round 1 current-file snapshots
+
+## Files
+src/features/dashboard/ControlPanel.tsx
+src/features/dashboard/Dashboard.test.tsx
+src/features/shell/AppShell.tsx
+src/features/shell/AppShell.test.tsx
+src/features/scene/CameraControlBar.tsx
+src/features/scene/cameraCommands.ts
+src/features/scene/CameraControls.test.tsx
+src/features/scene/WindTunnelScene.tsx
+src/features/scene/Hotspots.tsx
+src/features/tutorial/TutorialRail.tsx
+src/features/report/ExperimentReport.tsx
+src/App.test.tsx
+src/styles/global.css
+
+## Current contents
+diff --git a/src/features/dashboard/ControlPanel.tsx b/src/features/dashboard/ControlPanel.tsx
+new file mode 100644
+index 0000000..4d978d0
+--- /dev/null
++++ b/src/features/dashboard/ControlPanel.tsx
+@@ -0,0 +1,105 @@
++import { useId, useState } from "react";
++import { labStore, useLabStore } from "../experiment/labStore";
++import type { RunPhase } from "../experiment/model";
++
++const PHASE_LABELS: Record<RunPhase, string> = {
++  idle: "待机 / IDLE",
++  ramping: "加速 / RAMPING",
++  stabilizing: "稳定中 / STABILIZING",
++  sampling: "采样 / SAMPLING",
++  paused: "已暂停 / PAUSED",
++  completed: "已完成 / COMPLETED",
++};
++
++const ACTIVE_PHASES: readonly RunPhase[] = ["ramping", "stabilizing", "sampling"];
++
++type ControlPanelProps = {
++  onRestartFlow?(): Promise<void> | void;
++};
++
++export function ControlPanel({ onRestartFlow }: ControlPanelProps = {}) {
++  const inputId = useId();
++  const phase = useLabStore((state) => state.phase);
++  const fanPowerPct = useLabStore((state) => state.fanPowerPct);
++  const sweepStatus = useLabStore((state) => state.sweep?.status);
++  const flowStatus = useLabStore((state) => state.flowStatus);
++  const flowError = useLabStore((state) => state.flowError);
++  const [restartingFlow, setRestartingFlow] = useState(false);
++  const active = ACTIVE_PHASES.includes(phase);
++  const sweepActive = sweepStatus === "ramping" || sweepStatus === "stabilizing" || sweepStatus === "sampling";
++
++  const startOrResume = () => {
++    if (phase === "paused") {
++      labStore.getState().resumeRun();
++      return;
++    }
++    labStore.getState().startRun();
++  };
++
++  const reset = () => {
++    if (labStore.getState().history.length > 0
++      && !window.confirm("停止实验并清除当前 60 秒遥测历史？")) return;
++    labStore.getState().resetLab();
++  };
++
++  const restartFlow = async () => {
++    if (!onRestartFlow || restartingFlow) return;
++    setRestartingFlow(true);
++    try {
++      await onRestartFlow();
++    } catch {
++      // The flow store remains the single visible source for restart failures.
++    } finally {
++      setRestartingFlow(false);
++    }
++  };
++
++  return (
++    <section className="dashboard-section fan-controls" aria-labelledby="fan-control-title">
++      <div className="dashboard-section-heading">
++        <div>
++          <p className="section-kicker">FAN CONTROL</p>
++          <h2 id="fan-control-title">风扇控制</h2>
++        </div>
++        <span className={`phase-badge phase-${phase}`} aria-live="polite">{PHASE_LABELS[phase]}</span>
++      </div>
++
++      {flowStatus === "failed" && (
++        <div className="flow-failure-alert" role="alert" aria-live="polite">
++          <strong>二维求解器暂时不可用</strong>
++          <span>{flowError ?? "Flow worker failure"}</span>
++          <button type="button" disabled={!onRestartFlow || restartingFlow} onClick={() => void restartFlow()}>
++            {restartingFlow ? "正在重新启动…" : "重新启动求解器"}
++          </button>
++        </div>
++      )}
++
++      <div className="fan-power-row">
++        <label htmlFor={inputId}>风扇功率</label>
++        <output htmlFor={inputId}>{fanPowerPct}%</output>
++      </div>
++      <label className="fan-slider-hit-area" htmlFor={inputId}>
++        <input
++          id={inputId}
++          className="fan-slider"
++          type="range"
++          min="0"
++          max="100"
++          step="1"
++          value={fanPowerPct}
++          disabled={sweepActive}
++          onChange={(event) => labStore.getState().setFanPower(event.currentTarget.valueAsNumber)}
++        />
++      </label>
++      <div className="slider-scale" aria-hidden="true"><span>0</span><span>50</span><span>100</span></div>
++
++      <div className="experiment-actions">
++        <button type="button" className="action-primary" disabled={active || sweepActive} onClick={startOrResume}>
++          {phase === "paused" ? "继续实验" : "启动实验"}
++        </button>
++        <button type="button" disabled={!active || sweepActive} onClick={() => labStore.getState().pauseRun()}>暂停实验</button>
++        <button type="button" onClick={reset}>停止并重置</button>
++      </div>
++    </section>
++  );
++}
+diff --git a/src/features/dashboard/Dashboard.test.tsx b/src/features/dashboard/Dashboard.test.tsx
+new file mode 100644
+index 0000000..64cafd0
+--- /dev/null
++++ b/src/features/dashboard/Dashboard.test.tsx
+@@ -0,0 +1,276 @@
++import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { beforeEach, expect, it, vi } from "vitest";
++import { labStore } from "../experiment/labStore";
++import type { TelemetryFrame } from "../experiment/model";
++import { ControlPanel } from "./ControlPanel";
++import { FieldSelector } from "./FieldSelector";
++import { HistoryChart } from "./HistoryChart";
++import { TelemetryCards } from "./TelemetryCards";
++import { mapHistoryToChartData } from "./historyMapping";
++import {
++  recordFieldInspection,
++  recordSensorInspection,
++  recordStableTelemetry,
++  recordStableWindowInspection,
++} from "./evidenceRecording";
++import { emptyEvidence } from "../tutorial/tutorialProgress";
++import { qualityProfile } from "../shell/quality";
++
++function frame(overrides: Partial<TelemetryFrame> = {}): TelemetryFrame {
++  return {
++    sequence: 1,
++    simulationTimeMs: 50,
++    phase: "sampling",
++    fanPowerPct: 30,
++    rpm: 4380.4,
++    windSpeedMps: 8.456,
++    underbodyPressurePa: -32.44,
++    verticalLoadN: 0.1849,
++    quality: "stable",
++    provenance: "simulated",
++    ...overrides,
++  };
++}
++
++beforeEach(() => labStore.getState().resetLab());
++
++it("commands fan power and supports run, pause, resume, and reset", async () => {
++  const user = userEvent.setup();
++  const confirmReset = vi.spyOn(window, "confirm").mockReturnValue(true);
++  render(<ControlPanel />);
++
++  const slider = screen.getByRole("slider", { name: "风扇功率" });
++  fireEvent.change(slider, { target: { value: "100" } });
++  expect(labStore.getState().fanPowerPct).toBe(100);
++  expect(screen.getByText("100%", { selector: "output" })).toBeVisible();
++
++  await user.click(screen.getByRole("button", { name: "启动实验" }));
++  expect(labStore.getState().phase).toBe("ramping");
++  await user.click(screen.getByRole("button", { name: "暂停实验" }));
++  expect(labStore.getState().phase).toBe("paused");
++  await user.click(screen.getByRole("button", { name: "继续实验" }));
++  expect(labStore.getState().phase).toBe("ramping");
++
++  labStore.getState().acceptFrame(frame());
++  await user.click(screen.getByRole("button", { name: "停止并重置" }));
++  expect(confirmReset).toHaveBeenCalledOnce();
++  expect(labStore.getState()).toMatchObject({ phase: "idle", history: [] });
++  confirmReset.mockRestore();
++});
++
++it("gives the primary fan range a dedicated touch hit area", () => {
++  render(<ControlPanel />);
++  const slider = screen.getByRole("slider", { name: "风扇功率" });
++
++  expect(slider.parentElement).toHaveClass("fan-slider-hit-area");
++});
++
++it("locks manual fan and pause controls while the fixed sweep owns the command", () => {
++  labStore.getState().startSweep();
++  render(<ControlPanel />);
++
++  expect(screen.getByRole("slider", { name: "风扇功率" })).toBeDisabled();
++  expect(screen.getByRole("button", { name: "暂停实验" })).toBeDisabled();
++});
++
++it("keeps controls and teaching data visible while offering solver recovery", async () => {
++  const user = userEvent.setup();
++  const restartFlow = vi.fn().mockResolvedValue(undefined);
++  labStore.setState({ flowStatus: "failed", flowError: "worker crashed" });
++  render(<ControlPanel onRestartFlow={restartFlow} />);
++
++  expect(screen.getByRole("alert")).toHaveTextContent("worker crashed");
++  expect(screen.getByRole("slider", { name: "风扇功率" })).toBeVisible();
++  await user.click(screen.getByRole("button", { name: "重新启动求解器" }));
++  expect(restartFlow).toHaveBeenCalledOnce();
++});
++
++it("consumes an expected restart rejection, re-enables recovery, and allows retry", async () => {
++  const user = userEvent.setup();
++  const restartFlow = vi.fn()
++    .mockRejectedValueOnce(new Error("replacement init failed"))
++    .mockResolvedValueOnce(undefined);
++  const unhandled = vi.fn();
++  const onUnhandled = (event: PromiseRejectionEvent) => {
++    event.preventDefault();
++    unhandled(event.reason);
++  };
++  window.addEventListener("unhandledrejection", onUnhandled);
++  labStore.setState({ flowStatus: "failed", flowError: "replacement init failed" });
++  render(<ControlPanel onRestartFlow={restartFlow} />);
++
++  try {
++    await user.click(screen.getByRole("button", { name: "重新启动求解器" }));
++    await waitFor(() => expect(screen.getByRole("button", { name: "重新启动求解器" })).toBeEnabled());
++    expect(labStore.getState()).toMatchObject({
++      flowStatus: "failed",
++      flowError: "replacement init failed",
++    });
++    expect(unhandled).not.toHaveBeenCalled();
++
++    await user.click(screen.getByRole("button", { name: "重新启动求解器" }));
++    expect(restartFlow).toHaveBeenCalledTimes(2);
++  } finally {
++    window.removeEventListener("unhandledrejection", onUnhandled);
++  }
++});
++
++it("checks current history at reset activation time", () => {
++  const confirmReset = vi.spyOn(window, "confirm").mockReturnValue(true);
++  render(<ControlPanel />);
++  const resetButton = screen.getByRole("button", { name: "停止并重置" });
++
++  act(() => {
++    labStore.getState().acceptFrame(frame());
++    resetButton.click();
++  });
++
++  expect(confirmReset).toHaveBeenCalledOnce();
++  expect(labStore.getState().history).toHaveLength(0);
++  confirmReset.mockRestore();
++});
++
++it("shows exact telemetry formats, units, quality, and simulated provenance", () => {
++  labStore.setState({ telemetry: frame() });
++  render(<TelemetryCards onInspect={() => undefined} />);
++
++  expect(screen.getByText("4380")).toBeVisible();
++  expect(screen.getByText("8.46")).toBeVisible();
++  expect(screen.getByText("-32.4")).toBeVisible();
++  expect(screen.getByText("0.185")).toBeVisible();
++  expect(screen.getByText("车底相对压力")).toBeVisible();
++  for (const unit of ["RPM", "m/s", "Pa", "N"]) {
++    expect(screen.getByText(unit)).toBeVisible();
++  }
++  expect(screen.getAllByText("SIMULATED")).toHaveLength(4);
++  expect(screen.getAllByText("稳定 / STABLE")).toHaveLength(4);
++});
++
++it("reports each inspected sensor as tutorial evidence", async () => {
++  const user = userEvent.setup();
++  const onInspect = vi.fn();
++  render(<TelemetryCards onInspect={onInspect} />);
++
++  for (const name of ["查看风扇转速说明", "查看来流速度说明", "查看车底相对压力说明", "查看垂向载荷说明"]) {
++    await user.click(screen.getByRole("button", { name }));
++  }
++  expect(onInspect.mock.calls.map(([sensor]) => sensor)).toEqual(["rpm", "wind", "pressure", "load"]);
++});
++
++it("selects and reports all four teaching field views", async () => {
++  const user = userEvent.setup();
++  const onInspect = vi.fn();
++  render(<FieldSelector onInspect={onInspect} />);
++
++  for (const name of ["压力", "涡量", "流线", "速度"]) {
++    await user.click(screen.getByRole("radio", { name }));
++  }
++  expect(labStore.getState().selectedField).toBe("speed");
++  expect(onInspect.mock.calls.map(([field]) => field)).toEqual(["pressure", "vorticity", "streamlines", "speed"]);
++  expect(screen.getByText("D2Q9 BGK")).toBeVisible();
++  expect(screen.getByText("240 × 96")).toBeVisible();
++  expect(screen.getByText("二维教学近似")).toBeVisible();
++});
++
++it("shows the active quality name and exact solver grid", () => {
++  render(<FieldSelector onInspect={() => undefined} quality={qualityProfile("high")} />);
++
++  expect(screen.getByText("HIGH")).toBeVisible();
++  expect(screen.getByText("320 × 128")).toBeVisible();
++});
++
++it("uses roving tab focus and all arrow keys to select fields cyclically", async () => {
++  const user = userEvent.setup();
++  const onInspect = vi.fn();
++  render(<FieldSelector onInspect={onInspect} />);
++  const radios = screen.getAllByRole("radio");
++
++  expect(radios.map((radio) => radio.tabIndex)).toEqual([0, -1, -1, -1]);
++  radios[0]!.focus();
++  await user.keyboard("{ArrowRight}{ArrowDown}{ArrowLeft}{ArrowUp}{ArrowLeft}");
++
++  expect(screen.getByRole("radio", { name: "流线" })).toHaveFocus();
++  expect(labStore.getState().selectedField).toBe("streamlines");
++  expect(onInspect.mock.calls.map(([field]) => field)).toEqual([
++    "pressure",
++    "vorticity",
++    "pressure",
++    "speed",
++    "streamlines",
++  ]);
++  expect(screen.getAllByRole("radio").map((radio) => radio.tabIndex)).toEqual([-1, -1, -1, 0]);
++});
++
++it("maps only the latest sixty seconds and never more than 1,200 points", () => {
++  const history = Array.from({ length: 1_300 }, (_, sequence) => frame({
++    sequence,
++    simulationTimeMs: sequence * 50,
++  }));
++
++  const mapped = mapHistoryToChartData(history);
++  expect(mapped).toHaveLength(1_200);
++  expect(mapped[0]).toMatchObject({ timeSeconds: 5, rpm: 4380.4, pressurePa: -32.44 });
++  expect(mapped.at(-1)?.timeSeconds).toBe(64.95);
++});
++
++it("marks a stable chart window without changing telemetry history", async () => {
++  const user = userEvent.setup();
++  const history = [
++    frame({ sequence: 1, simulationTimeMs: 50, quality: "transient" }),
++    frame({ sequence: 2, simulationTimeMs: 100, quality: "stable" }),
++    frame({ sequence: 3, simulationTimeMs: 150, quality: "stable" }),
++  ];
++  labStore.setState({ history });
++  const onInspectStableWindow = vi.fn();
++  render(<HistoryChart onInspectStableWindow={onInspectStableWindow} />);
++
++  await user.click(screen.getByRole("button", { name: "标记稳定窗口" }));
++  expect(onInspectStableWindow).toHaveBeenCalledOnce();
++  expect(labStore.getState().history).toBe(history);
++});
++
++it("renders four visible, separately positioned unit axes", () => {
++  labStore.setState({ history: [
++    frame({ sequence: 1, simulationTimeMs: 100, quality: "transient" }),
++    frame({ sequence: 2, simulationTimeMs: 150, quality: "transient" }),
++  ] });
++  render(<HistoryChart onInspectStableWindow={() => undefined} />);
++  const plot = screen.getByLabelText("最近 60 秒遥测曲线");
++  const axes = plot.querySelectorAll(".recharts-yAxis");
++  const axisLines = plot.querySelectorAll<SVGLineElement>(".recharts-yAxis .recharts-cartesian-axis-line");
++
++  expect(axes).toHaveLength(4);
++  for (const unit of ["m/s", "RPM", "Pa", "N"]) {
++    expect(within(plot).getByText(unit)).toBeVisible();
++  }
++  expect(new Set(Array.from(axisLines, (line) => line.getAttribute("x1"))).size).toBe(4);
++});
++
++it("does not expose a zero-duration stable window from one sample", () => {
++  labStore.setState({ history: [frame({ sequence: 1, simulationTimeMs: 100, quality: "stable" })] });
++  render(<HistoryChart onInspectStableWindow={() => undefined} />);
++
++  expect(screen.queryByRole("button", { name: "标记稳定窗口" })).not.toBeInTheDocument();
++});
++
++it("accrues stable evidence only from physical stable quality at exactly 30 percent", () => {
++  const previous = frame({ simulationTimeMs: 1_000, quality: "transient" });
++  const stable = frame({ simulationTimeMs: 3_000, fanPowerPct: 30, quality: "stable", rpm: 99_999 });
++
++  expect(recordStableTelemetry(emptyEvidence, previous, stable, 30).stableSeconds).toBe(2);
++  expect(recordStableTelemetry(emptyEvidence, previous, stable, 31).stableSeconds).toBe(0);
++  expect(recordStableTelemetry(emptyEvidence, previous, { ...stable, quality: "transient" }, 30).stableSeconds).toBe(0);
++});
++
++it("records sensor, field, and stable-window evidence without duplicate identifiers", () => {
++  const withSensor = recordSensorInspection(recordSensorInspection(emptyEvidence, "rpm"), "rpm");
++  const withField = recordFieldInspection(recordFieldInspection(withSensor, "pressure"), "pressure");
++  const complete = recordStableWindowInspection(withField);
++
++  expect(complete).toMatchObject({
++    viewedSensors: ["rpm"],
++    viewedFields: ["pressure"],
++    inspectedStableWindow: true,
++  });
++});
+diff --git a/src/features/shell/AppShell.tsx b/src/features/shell/AppShell.tsx
+new file mode 100644
+index 0000000..b06f454
+--- /dev/null
++++ b/src/features/shell/AppShell.tsx
+@@ -0,0 +1,117 @@
++import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
++
++export type AppShellProps = {
++  left: ReactNode;
++  scene: ReactNode;
++  right: ReactNode;
++  bottom: ReactNode;
++  headerActions?: ReactNode;
++};
++
++type CompactPanel = "tutorial" | "controls" | "charts";
++
++const COMPACT_PANELS: readonly { id: CompactPanel; label: string }[] = [
++  { id: "tutorial", label: "教程" },
++  { id: "controls", label: "控制" },
++  { id: "charts", label: "曲线" },
++];
++
++export function AppShell({ left, scene, right, bottom, headerActions }: AppShellProps) {
++  const [compactPanel, setCompactPanel] = useState<CompactPanel>("tutorial");
++  const [compactLayout, setCompactLayout] = useState(() => (
++    typeof window !== "undefined" && window.matchMedia?.("(max-width: 1100px)").matches === true
++  ));
++  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
++  useEffect(() => {
++    const query = window.matchMedia?.("(max-width: 1100px)");
++    if (!query) return;
++    const update = () => setCompactLayout(query.matches);
++    query.addEventListener("change", update);
++    return () => query.removeEventListener("change", update);
++  }, []);
++  const selectAdjacentTab = (event: ReactKeyboardEvent<HTMLButtonElement>, index: number) => {
++    let nextIndex: number | undefined;
++    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
++      nextIndex = (index + 1) % COMPACT_PANELS.length;
++    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
++      nextIndex = (index - 1 + COMPACT_PANELS.length) % COMPACT_PANELS.length;
++    } else if (event.key === "Home") {
++      nextIndex = 0;
++    } else if (event.key === "End") {
++      nextIndex = COMPACT_PANELS.length - 1;
++    }
++    if (nextIndex === undefined) return;
++    event.preventDefault();
++    const nextPanel = COMPACT_PANELS[nextIndex]!;
++    setCompactPanel(nextPanel.id);
++    tabRefs.current[nextIndex]?.focus();
++  };
++
++  return (
++    <div className="app-shell">
++      <header className="topbar" role="banner">
++        <div>
++          <span className="eyebrow">CFD TEACHING CONSOLE</span>
++          <h1>SophiFlow Lab</h1>
++        </div>
++        <div className="topbar-actions">
++          {headerActions}
++          <span className="model-scope-badge">2D TEACHING CFD / 二维教学近似</span>
++          <span className="provenance-badge">SIMULATED / 模拟数据</span>
++        </div>
++      </header>
++      <div className="compact-panel-tabs" role="tablist" aria-label="窄屏实验面板">
++        {COMPACT_PANELS.map((panel, index) => (
++          <button
++            type="button"
++            role="tab"
++            aria-controls={`compact-panel-${panel.id}`}
++            aria-selected={compactPanel === panel.id}
++            id={`compact-tab-${panel.id}`}
++            key={panel.id}
++            ref={(element) => { tabRefs.current[index] = element; }}
++            tabIndex={compactPanel === panel.id ? 0 : -1}
++            onClick={() => setCompactPanel(panel.id)}
++            onKeyDown={(event) => selectAdjacentTab(event, index)}
++          >
++            {panel.label}
++          </button>
++        ))}
++      </div>
++      <nav
++        className="tutorial-rail"
++        aria-label="教学章节"
++        data-compact-active={compactPanel === "tutorial"}
++      ><div
++        aria-labelledby={compactLayout ? "compact-tab-tutorial" : undefined}
++        hidden={compactLayout && compactPanel !== "tutorial"}
++        id="compact-panel-tutorial"
++        inert={compactLayout && compactPanel !== "tutorial" ? true : undefined}
++        role={compactLayout ? "tabpanel" : undefined}
++      >{left}</div></nav>
++      <main className="scene-panel" aria-label="数字风洞">{scene}</main>
++      <aside
++        className="control-panel"
++        aria-label="实验控制"
++        data-compact-active={compactPanel === "controls"}
++      ><div
++        aria-labelledby={compactLayout ? "compact-tab-controls" : undefined}
++        hidden={compactLayout && compactPanel !== "controls"}
++        id="compact-panel-controls"
++        inert={compactLayout && compactPanel !== "controls" ? true : undefined}
++        role={compactLayout ? "tabpanel" : undefined}
++      >{right}</div></aside>
++      <section
++        className="chart-drawer"
++        aria-label="实验曲线"
++        data-compact-active={compactPanel === "charts"}
++      ><div
++        aria-labelledby={compactLayout ? "compact-tab-charts" : undefined}
++        hidden={compactLayout && compactPanel !== "charts"}
++        id="compact-panel-charts"
++        inert={compactLayout && compactPanel !== "charts" ? true : undefined}
++        role={compactLayout ? "tabpanel" : undefined}
++      >{bottom}</div></section>
++    </div>
++  );
++}
+diff --git a/src/features/shell/AppShell.test.tsx b/src/features/shell/AppShell.test.tsx
+new file mode 100644
+index 0000000..f35be61
+--- /dev/null
++++ b/src/features/shell/AppShell.test.tsx
+@@ -0,0 +1,58 @@
++import { render, screen } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { afterEach, expect, it, vi } from "vitest";
++import { AppShell } from "./AppShell";
++
++afterEach(() => vi.unstubAllGlobals());
++
++function useCompactViewport() {
++  vi.stubGlobal("matchMedia", vi.fn(() => ({
++    matches: true,
++    media: "(max-width: 1100px)",
++    onchange: null,
++    addEventListener: vi.fn(),
++    removeEventListener: vi.fn(),
++    addListener: vi.fn(),
++    removeListener: vi.fn(),
++    dispatchEvent: vi.fn(),
++  })));
++}
++
++it("provides a keyboard-operable three-tab compact panel affordance", async () => {
++  useCompactViewport();
++  const user = userEvent.setup();
++  render(
++    <AppShell
++      left={<p>教程内容</p>}
++      scene={<p>场景内容</p>}
++      right={<p>控制内容</p>}
++      bottom={<p>曲线内容</p>}
++    />,
++  );
++
++  expect(screen.getByRole("tablist", { name: "窄屏实验面板" })).toBeInTheDocument();
++  const tutorialTab = screen.getByRole("tab", { name: "教程" });
++  const controlTab = screen.getByRole("tab", { name: "控制" });
++  const chartTab = screen.getByRole("tab", { name: "曲线" });
++  expect(tutorialTab).toHaveAttribute("aria-selected", "true");
++  const panels = screen.getAllByRole("tabpanel", { hidden: true });
++  expect(panels).toHaveLength(3);
++  for (const tab of [tutorialTab, controlTab, chartTab]) {
++    const panel = document.getElementById(tab.getAttribute("aria-controls")!);
++    expect(panel).toHaveAttribute("role", "tabpanel");
++    expect(panel).toHaveAttribute("aria-labelledby", tab.id);
++  }
++  expect(document.getElementById("compact-panel-tutorial")).not.toHaveAttribute("hidden");
++  expect(document.getElementById("compact-panel-controls")).toHaveAttribute("hidden");
++  expect(document.getElementById("compact-panel-charts")).toHaveAttribute("hidden");
++
++  await user.click(controlTab);
++  expect(controlTab).toHaveAttribute("aria-selected", "true");
++  expect(document.getElementById("compact-panel-tutorial")).toHaveAttribute("hidden");
++  expect(document.getElementById("compact-panel-controls")).not.toHaveAttribute("hidden");
++
++  chartTab.focus();
++  await user.keyboard("{ArrowLeft}");
++  expect(controlTab).toHaveFocus();
++  expect(controlTab).toHaveAttribute("aria-selected", "true");
++});
+diff --git a/src/features/scene/CameraControlBar.tsx b/src/features/scene/CameraControlBar.tsx
+new file mode 100644
+index 0000000..a53f694
+--- /dev/null
++++ b/src/features/scene/CameraControlBar.tsx
+@@ -0,0 +1,32 @@
++import type { CameraCommand } from "./cameraCommands";
++
++type CameraControlBarProps = {
++  disabled?: boolean;
++  onCommand(command: CameraCommand): void;
++};
++
++const COMMANDS: readonly { command: CameraCommand; label: string; symbol: string }[] = [
++  { command: "reset", label: "重置三维视角", symbol: "↺" },
++  { command: "rotate-left", label: "向左旋转三维视角", symbol: "←" },
++  { command: "rotate-right", label: "向右旋转三维视角", symbol: "→" },
++  { command: "zoom-in", label: "放大三维视角", symbol: "+" },
++  { command: "zoom-out", label: "缩小三维视角", symbol: "−" },
++];
++
++export function CameraControlBar({ disabled = false, onCommand }: CameraControlBarProps) {
++  return (
++    <div className="camera-control-bar" role="group" aria-label="三维视角控制">
++      {COMMANDS.map(({ command, label, symbol }) => (
++        <button
++          type="button"
++          aria-label={label}
++          disabled={disabled}
++          key={command}
++          onClick={() => onCommand(command)}
++        >
++          <span aria-hidden="true">{symbol}</span>
++        </button>
++      ))}
++    </div>
++  );
++}
+diff --git a/src/features/scene/cameraCommands.ts b/src/features/scene/cameraCommands.ts
+new file mode 100644
+index 0000000..4c8a74c
+--- /dev/null
++++ b/src/features/scene/cameraCommands.ts
+@@ -0,0 +1,40 @@
++import { Vector3, type PerspectiveCamera } from "three";
++
++export type CameraCommand = "reset" | "rotate-left" | "rotate-right" | "zoom-in" | "zoom-out";
++
++export type CameraCommandTarget = {
++  camera: PerspectiveCamera;
++  controls: {
++    target: Vector3;
++    update(): void;
++  };
++};
++
++const INITIAL_POSITION = new Vector3(7.8, 4.6, 10.4);
++const INITIAL_TARGET = new Vector3(0, -0.05, 0);
++const Y_AXIS = new Vector3(0, 1, 0);
++const ROTATION_STEP = Math.PI / 12;
++const MIN_DISTANCE = 7;
++const MAX_DISTANCE = 18;
++
++export function applyCameraCommand(
++  { camera, controls }: CameraCommandTarget,
++  command: CameraCommand,
++): void {
++  if (command === "reset") {
++    camera.position.copy(INITIAL_POSITION);
++    controls.target.copy(INITIAL_TARGET);
++  } else {
++    const offset = camera.position.clone().sub(controls.target);
++    if (command === "rotate-left" || command === "rotate-right") {
++      offset.applyAxisAngle(Y_AXIS, command === "rotate-left" ? ROTATION_STEP : -ROTATION_STEP);
++    } else {
++      const scale = command === "zoom-in" ? 0.85 : 1.15;
++      offset.setLength(Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, offset.length() * scale)));
++    }
++    camera.position.copy(controls.target).add(offset);
++  }
++  camera.lookAt(controls.target);
++  camera.updateProjectionMatrix();
++  controls.update();
++}
+diff --git a/src/features/scene/CameraControls.test.tsx b/src/features/scene/CameraControls.test.tsx
+new file mode 100644
+index 0000000..0e43edd
+--- /dev/null
++++ b/src/features/scene/CameraControls.test.tsx
+@@ -0,0 +1,35 @@
++import { render, screen } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { PerspectiveCamera, Vector3 } from "three";
++import { expect, it, vi } from "vitest";
++import { CameraControlBar } from "./CameraControlBar";
++import { applyCameraCommand } from "./cameraCommands";
++
++it("uses keyboard-activated DOM controls to rotate, zoom, and reset the shared camera target", async () => {
++  const user = userEvent.setup();
++  const camera = new PerspectiveCamera();
++  camera.position.set(7.8, 4.6, 10.4);
++  const controls = { target: new Vector3(0, -0.05, 0), update: vi.fn() };
++  const execute = (command: Parameters<typeof applyCameraCommand>[1]) => {
++    applyCameraCommand({ camera, controls }, command);
++  };
++  render(<CameraControlBar onCommand={execute} />);
++
++  const initialPosition = camera.position.clone();
++  const rotateRight = screen.getByRole("button", { name: "向右旋转三维视角" });
++  rotateRight.focus();
++  await user.keyboard("{Enter}");
++  expect(camera.position.equals(initialPosition)).toBe(false);
++
++  const distanceBeforeZoom = camera.position.distanceTo(controls.target);
++  await user.click(screen.getByRole("button", { name: "放大三维视角" }));
++  expect(camera.position.distanceTo(controls.target)).toBeLessThan(distanceBeforeZoom);
++
++  await user.click(screen.getByRole("button", { name: "重置三维视角" }));
++  expect(camera.position.toArray()).toEqual([7.8, 4.6, 10.4]);
++  expect(controls.target.toArray()).toEqual([0, -0.05, 0]);
++  expect(controls.update).toHaveBeenCalledTimes(3);
++  for (const name of ["向左旋转三维视角", "缩小三维视角"]) {
++    expect(screen.getByRole("button", { name })).toBeEnabled();
++  }
++});
+diff --git a/src/features/scene/WindTunnelScene.tsx b/src/features/scene/WindTunnelScene.tsx
+new file mode 100644
+index 0000000..ce32d78
+--- /dev/null
++++ b/src/features/scene/WindTunnelScene.tsx
+@@ -0,0 +1,176 @@
++import { OrbitControls } from "@react-three/drei";
++import { Canvas, useFrame } from "@react-three/fiber";
++import { useEffect, useRef, useState, type ComponentRef } from "react";
++import type { PerspectiveCamera } from "three";
++import { useLabStore } from "../experiment/labStore";
++import { AdaptiveQualityController, qualityProfile, type QualityProfile } from "../shell/quality";
++import { CameraControlBar } from "./CameraControlBar";
++import { applyCameraCommand, type CameraCommand } from "./cameraCommands";
++import { FieldSlice } from "./FieldSlice";
++import { FlowParticles } from "./FlowParticles";
++import { Hotspots } from "./Hotspots";
++import type { HotspotId } from "./hotspotTypes";
++import { SceneFallback } from "./SceneFallback";
++import { VehicleModel } from "./VehicleModel";
++import { WindTunnelGeometry } from "./WindTunnelGeometry";
++import { registerWebglContextRecovery } from "./webglContextRecovery";
++
++export type WindTunnelSceneProps = {
++  webglAvailable?: boolean;
++  onHotspot(id: HotspotId): void;
++  quality?: QualityProfile;
++  onQualityChange?(profile: QualityProfile): void;
++  onContextLost?(): void;
++  onContextRestored?(): void;
++};
++
++function detectWebgl() {
++  if (typeof window === "undefined" || typeof window.WebGLRenderingContext === "undefined") return false;
++  try {
++    const canvas = document.createElement("canvas");
++    const context = canvas.getContext("webgl2") || canvas.getContext("webgl");
++    if (!context) return false;
++    const loseContext = context.getExtension("WEBGL_lose_context") as { loseContext?(): void } | null;
++    loseContext?.loseContext?.();
++    return true;
++  } catch {
++    return false;
++  }
++}
++
++let cachedWebglAvailability: boolean | undefined;
++
++function getWebglAvailability() {
++  if (cachedWebglAvailability === undefined) cachedWebglAvailability = detectWebgl();
++  return cachedWebglAvailability;
++}
++
++function useReducedMotion() {
++  const [reduced, setReduced] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true);
++  useEffect(() => {
++    const query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
++    if (!query) return;
++    const update = () => setReduced(query.matches);
++    query.addEventListener("change", update);
++    return () => query.removeEventListener("change", update);
++  }, []);
++  return reduced;
++}
++
++function QualityFrameMonitor({
++  paused,
++  profile,
++  onChange,
++}: {
++  paused: boolean;
++  profile: QualityProfile;
++  onChange(profile: QualityProfile): void;
++}) {
++  const [controller] = useState(() => new AdaptiveQualityController(profile.name, onChange));
++  useEffect(() => { controller.setOnChange(onChange); }, [controller, onChange]);
++  useEffect(() => { controller.setProfile(profile.name); }, [controller, profile.name]);
++  useFrame((_, delta) => {
++    if (!paused) controller.recordFrame(delta * 1_000);
++  });
++  return null;
++}
++
++export function WindTunnelScene({
++  webglAvailable,
++  onHotspot,
++  quality = qualityProfile("medium"),
++  onQualityChange = () => undefined,
++  onContextLost = () => undefined,
++  onContextRestored = () => undefined,
++}: WindTunnelSceneProps) {
++  const resolvedWebglAvailable = webglAvailable ?? getWebglAvailability();
++  const [selected, setSelected] = useState<HotspotId | null>(null);
++  const [canvasElement, setCanvasElement] = useState<HTMLCanvasElement | null>(null);
++  const [contextLost, setContextLost] = useState(false);
++  const [sceneKey, setSceneKey] = useState(0);
++  const cameraRef = useRef<PerspectiveCamera | null>(null);
++  const orbitControlsRef = useRef<ComponentRef<typeof OrbitControls>>(null);
++  const frame = useLabStore((state) => state.flowField);
++  const fieldMode = useLabStore((state) => state.selectedField);
++  const phase = useLabStore((state) => state.phase);
++  const windSpeedMps = useLabStore((state) => state.telemetry.windSpeedMps);
++  const reducedMotion = useReducedMotion();
++  useEffect(() => {
++    if (!canvasElement) return;
++    return registerWebglContextRecovery(
++      canvasElement,
++      () => {
++        setContextLost(true);
++        onContextLost();
++      },
++      () => {
++        setContextLost(false);
++        setSceneKey((current) => current + 1);
++        onContextRestored();
++      },
++    );
++  }, [canvasElement, onContextLost, onContextRestored]);
++  const selectHotspot = (id: HotspotId) => {
++    const next = selected === id ? null : id;
++    setSelected(next);
++    if (next) onHotspot(next);
++  };
++  const commandCamera = (command: CameraCommand) => {
++    const camera = cameraRef.current;
++    const controls = orbitControlsRef.current;
++    if (!camera || !controls) return;
++    applyCameraCommand({ camera, controls }, command);
++  };
++
++  return (
++    <section className="wind-tunnel-scene" aria-label="三维数字风洞工作区">
++      <div className="scene-hud">
++        <span><span>2D TEACHING CFD</span><span> / 二维教学近似</span></span>
++        <span>{resolvedWebglAvailable ? `${fieldMode.toUpperCase()} / ${frame ? "实时场" : "示意流场"}` : "DIAGRAM MODE / 示意模式"}</span>
++      </div>
++      <div className="scene-viewport">
++        {resolvedWebglAvailable && (
++        <div className={`scene-canvas${contextLost ? " scene-canvas-context-lost" : ""}`} aria-label="交互式三维风洞">
++          <Canvas
++            key={sceneKey}
++            camera={{ position: [7.8, 4.6, 10.4], fov: 38 }}
++            dpr={[1, 1.65]}
++            fallback={<SceneFallback />}
++            onCreated={({ camera, gl }) => {
++              cameraRef.current = camera as PerspectiveCamera;
++              setCanvasElement(gl.domElement);
++            }}
++          >
++            <color attach="background" args={["#09151a"]} />
++            <fog attach="fog" args={["#09151a", 13, 24]} />
++            <ambientLight intensity={1.5} />
++            <directionalLight position={[-4, 7, 8]} intensity={3.2} color="#f8f2df" />
++            <directionalLight position={[7, 2, -4]} intensity={1.5} color="#50e3d0" />
++            <WindTunnelGeometry selected={selected} cutaway={selected === "test-section"} />
++            <FieldSlice frame={frame} mode={fieldMode} reducedMotion={reducedMotion} />
++            <VehicleModel frame={frame} selected={selected} />
++            <QualityFrameMonitor paused={contextLost} profile={quality} onChange={onQualityChange} />
++            {!reducedMotion && quality.particleCount > 0 && (
++              <FlowParticles frame={frame} phase={phase} windSpeedMps={windSpeedMps} count={quality.particleCount} />
++            )}
++            <gridHelper args={[18, 36, "#34505a", "#193038"]} position={[0, -1.56, 0]} />
++            <axesHelper args={[1.05]} position={[-6.1, -1.42, 1.55]} />
++            <OrbitControls ref={orbitControlsRef} makeDefault target={[0, -0.05, 0]} minDistance={7} maxDistance={18} enableDamping dampingFactor={0.08} />
++          </Canvas>
++        </div>
++        )}
++        {(!resolvedWebglAvailable || contextLost) && (
++          <SceneFallback
++            announce={contextLost}
++            message={contextLost ? "三维上下文已丢失，正在等待浏览器恢复。" : undefined}
++          />
++        )}
++        <CameraControlBar
++          disabled={!resolvedWebglAvailable || contextLost}
++          onCommand={commandCamera}
++        />
++      </div>
++      <Hotspots selected={selected} onSelect={selectHotspot} />
++    </section>
++  );
++}
+diff --git a/src/features/scene/Hotspots.tsx b/src/features/scene/Hotspots.tsx
+new file mode 100644
+index 0000000..4009914
+--- /dev/null
++++ b/src/features/scene/Hotspots.tsx
+@@ -0,0 +1,50 @@
++import { HOTSPOT_IDS, type HotspotId } from "./hotspotTypes";
++
++const HOTSPOT_COPY: Record<HotspotId, { title: string; detail: string }> = {
++  straightener: { title: "整流段", detail: "蜂窝格栅削弱横向扰动，让来流更均匀。" },
++  contraction: { title: "收缩段", detail: "渐缩流道平顺加速气流并降低入口湍动。" },
++  "test-section": { title: "透明测试段", detail: "观察车体周围的速度、压力与尾迹结构。" },
++  "model-stand": { title: "模型台", detail: "红色支架定位模型，并代表教学测力平台。" },
++  fan: { title: "风扇段", detail: "六叶风扇提供从 x = -6 到 x = 6 的可控来流。" },
++};
++
++type HotspotsProps = {
++  selected: HotspotId | null;
++  onSelect(id: HotspotId): void;
++};
++
++export function Hotspots({ selected, onSelect }: HotspotsProps) {
++  const active = selected ? HOTSPOT_COPY[selected] : null;
++
++  return (
++    <aside className="scene-hotspots" aria-label="风洞模块热点">
++      <div className="scene-hotspot-buttons">
++        {HOTSPOT_IDS.map((id, index) => (
++          <button
++            aria-label={`${id}：${HOTSPOT_COPY[id].title}`}
++            aria-pressed={selected === id}
++            className="scene-hotspot"
++            data-hotspot-id={id}
++            key={id}
++            onClick={() => onSelect(id)}
++            type="button"
++          >
++            <span>{String(index + 1).padStart(2, "0")}</span>
++            {HOTSPOT_COPY[id].title}
++          </button>
++        ))}
++      </div>
++      <div className="scene-hotspot-card">
++        {active ? (
++          <>
++            <strong>{active.title}</strong>
++            <span>{active.detail}</span>
++            {selected === "test-section" && <em>剖视已开启 · 车辆与中心流场保持可见</em>}
++          </>
++        ) : (
++          <span>选择模块，查看风洞构造与教学说明。</span>
++        )}
++      </div>
++    </aside>
++  );
++}
+diff --git a/src/features/tutorial/TutorialRail.tsx b/src/features/tutorial/TutorialRail.tsx
+new file mode 100644
+index 0000000..e06af2c
+--- /dev/null
++++ b/src/features/tutorial/TutorialRail.tsx
+@@ -0,0 +1,53 @@
++import { LESSONS, type LessonId, type TutorialMode } from "./lessonDefinitions";
++import { canCompleteLesson, completedLessonCount, type TutorialEvidence } from "./tutorialProgress";
++
++type TutorialRailProps = {
++  activeLesson: LessonId;
++  evidence: TutorialEvidence;
++  onAdvance(): void;
++  mode?: TutorialMode;
++  onLessonChange?(lesson: LessonId): void;
++};
++
++export function TutorialRail({ activeLesson, evidence, onAdvance, mode = "guided", onLessonChange }: TutorialRailProps) {
++  const activeIndex = LESSONS.findIndex((lesson) => lesson.id === activeLesson);
++  const activeDefinition = LESSONS[activeIndex] ?? LESSONS[0]!;
++  const complete = canCompleteLesson(activeLesson, evidence);
++  const isFinalLesson = activeIndex === LESSONS.length - 1;
++
++  return (
++    <div className="tutorial-rail-content">
++      <p className="eyebrow">七章教学路径</p>
++      <p>进度 {completedLessonCount(evidence)} / {LESSONS.length}</p>
++      <ol>
++        {LESSONS.map((lesson, index) => {
++          const isComplete = canCompleteLesson(lesson.id, evidence);
++          const isLocked = mode === "guided" && !isComplete && index > activeIndex;
++          const isCurrent = lesson.id === activeLesson;
++          return (
++            <li key={lesson.id}>
++              <button
++                type="button"
++                className={isCurrent ? "lesson-current" : isComplete ? "lesson-complete" : isLocked ? "lesson-locked" : "lesson-available"}
++                aria-current={isCurrent ? "step" : undefined}
++                aria-disabled={isLocked || undefined}
++                onClick={() => !isLocked && onLessonChange?.(lesson.id)}
++              >
++                第 {lesson.ordinal} 章：{lesson.title}{isComplete ? "（已完成）" : isLocked ? "（未解锁）" : ""}
++              </button>
++            </li>
++          );
++        })}
++      </ol>
++      <section aria-labelledby="lesson-goal">
++        <h2 id="lesson-goal">第 {activeDefinition.ordinal} 章：{activeDefinition.title}</h2>
++        <p>{activeDefinition.goal}</p>
++        <p>{activeDefinition.completionHint}</p>
++        {!complete && <p>完成当前目标后可进入下一章。</p>}
++        {!isFinalLesson && <button type="button" disabled={!complete && mode === "guided"} onClick={onAdvance}>进入下一章</button>}
++        {isFinalLesson && <p>{complete ? "七章教程已完成。" : "完成本章目标即可完成教程。"}</p>}
++        {mode === "free" && <p>自由实验已开启，章节限制已解除。</p>}
++      </section>
++    </div>
++  );
++}
+diff --git a/src/features/report/ExperimentReport.tsx b/src/features/report/ExperimentReport.tsx
+new file mode 100644
+index 0000000..189233f
+--- /dev/null
++++ b/src/features/report/ExperimentReport.tsx
+@@ -0,0 +1,287 @@
++import { useMemo, useState } from "react";
++import type { SweepState, SweepPower } from "../sweep/sweepRunner";
++import { SWEEP_POWERS } from "../sweep/sweepRunner";
++import {
++  downloadExperimentCsv,
++  serializeExperimentCsv,
++  type ExperimentCsvInput,
++} from "./csv";
++import { summarizeRun, type RunSummary } from "./experimentSummary";
++
++type DownloadCsv = (csv: string, generatedTime?: string) => unknown;
++
++export type ExperimentReportProps = {
++  sweep: SweepState | null;
++  conclusion: string;
++  onConclusionChange(value: string): void;
++  onSelectLargestResidual(power: SweepPower, largestPower: SweepPower): void;
++  onStartSweep(): void;
++  onCancelSweep(): void;
++  onRetrySweep(): void;
++  generatedTime?: string;
++  downloadCsv?: DownloadCsv;
++  serializeCsv?: (input: ExperimentCsvInput) => string;
++};
++
++type ConditionResult = {
++  power: SweepPower;
++  summary: RunSummary;
++  residual: number | null;
++};
++
++export function ExperimentReport(props: ExperimentReportProps) {
++  const conditions = useMemo(() => buildConditionResults(props.sweep), [props.sweep]);
++  const largestResidualPower = findLargestResidualPower(conditions);
++
++  return (
++    <section className="experiment-report" aria-labelledby="experiment-report-title">
++      <div className="report-heading">
++        <div>
++          <p className="section-kicker">AUTOMATED SWEEP &amp; REPORT</p>
++          <h2 id="experiment-report-title">三工况实验报告</h2>
++        </div>
++        <div className="report-disclaimers">
++          <span>SIMULATED / 模拟数据</span>
++          <span>2D TEACHING CFD / 二维教学近似</span>
++        </div>
++      </div>
++
++      <SweepPanel
++        sweep={props.sweep}
++        onStart={props.onStartSweep}
++        onCancel={props.onCancelSweep}
++        onRetry={props.onRetrySweep}
++      />
++      <div className="condition-summary-grid">
++        {conditions.map(({ power, summary }) => <ConditionCard key={power} power={power} summary={summary} />)}
++      </div>
++      <ComparisonTable
++        conditions={conditions}
++        largestResidualPower={largestResidualPower}
++        onSelect={(power) => {
++          if (largestResidualPower !== null) props.onSelectLargestResidual(power, largestResidualPower);
++        }}
++      />
++      <ReportPanel {...props} />
++    </section>
++  );
++}
++
++export function SweepPanel({
++  sweep,
++  onStart,
++  onCancel,
++  onRetry,
++}: Pick<ExperimentReportProps, "sweep"> & {
++  onStart(): void;
++  onCancel(): void;
++  onRetry(): void;
++}) {
++  const active = sweep !== null && ["ramping", "stabilizing", "sampling"].includes(sweep.status);
++  const label = sweep === null ? "未开始" : statusLabel(sweep);
++
++  return (
++    <div className="sweep-panel">
++      <div>
++        <strong>固定序列 30% → 60% → 90%</strong>
++        <span>{label}</span>
++      </div>
++      <div className="sweep-actions">
++        <button type="button" disabled={active} onClick={onStart}>
++          {sweep === null ? "开始自动扫频" : "重新运行扫频"}
++        </button>
++        {active && <button type="button" onClick={onCancel}>取消扫频</button>}
++        {sweep?.status === "failed" && <button type="button" onClick={onRetry}>重试当前工况</button>}
++      </div>
++      {sweep?.error && <p className="sweep-error" role="alert">{sweep.error}</p>}
++    </div>
++  );
++}
++
++export function ComparisonTable({
++  conditions,
++  largestResidualPower,
++  onSelect,
++}: {
++  conditions: ConditionResult[];
++  largestResidualPower: SweepPower | null;
++  onSelect(power: SweepPower): void;
++}) {
++  return (
++    <section className="comparison-panel" aria-labelledby="comparison-title">
++      <div className="comparison-heading">
++        <h3 id="comparison-title">残差对比</h3>
++        <p>观察趋势：风速增大时，动压与垂向载荷近似按 v² 增长。</p>
++      </div>
++      <div className="comparison-table-wrap">
++        <table>
++          <thead><tr><th>工况</th><th>平均风速</th><th>平均载荷</th><th>|v² 基线残差|</th><th>判断</th></tr></thead>
++          <tbody>
++            {conditions.map(({ power, summary, residual }) => (
++              <tr key={power}>
++                <th scope="row">{power}%</th>
++                <td>{format(summary.windSpeedMps.mean, 2)} m/s</td>
++                <td>{format(summary.verticalLoadN.mean, 3)} N</td>
++                <td>{format(residual, 3)} N</td>
++                <td><label><input
++                  type="radio"
++                  name="largest-residual"
++                  disabled={largestResidualPower === null}
++                  aria-label={`${power}% 为最大残差`}
++                  onChange={() => onSelect(power)}
++                /> 选择</label></td>
++              </tr>
++            ))}
++          </tbody>
++        </table>
++      </div>
++    </section>
++  );
++}
++
++export function ReportPanel({
++  sweep,
++  conclusion,
++  onConclusionChange,
++  generatedTime,
++  downloadCsv = downloadExperimentCsv,
++  serializeCsv = serializeExperimentCsv,
++}: ExperimentReportProps) {
++  const [failedSnapshot, setFailedSnapshot] = useState<ExportSnapshot | null>(null);
++  const remainingCharacters = Math.max(0, 12 - conclusion.trim().length);
++  const canExport = sweep?.status === "completed" && remainingCharacters === 0;
++
++  const runExport = (snapshot: ExportSnapshot) => {
++    let csv = snapshot.csv;
++    if (csv === undefined) {
++      try {
++        csv = serializeCsv(snapshot.input);
++      } catch {
++        setFailedSnapshot(snapshot);
++        return;
++      }
++    }
++    const serializedSnapshot = { ...snapshot, csv };
++    try {
++      downloadCsv(csv, snapshot.generatedTime);
++      setFailedSnapshot(null);
++    } catch {
++      setFailedSnapshot(serializedSnapshot);
++    }
++  };
++
++  const exportReport = () => {
++    if (!sweep) return;
++    const snapshotTime = generatedTime ?? new Date().toISOString();
++    const samples = SWEEP_POWERS.flatMap((power) => (
++      (sweep.samplesByPower[power] ?? []).map((sample) => ({ ...sample }))
++    ));
++    const input: ExperimentCsvInput = {
++      metadata: { generatedTime: snapshotTime, conclusion, provenance: "simulated" },
++      samples,
++    };
++    runExport({ input, generatedTime: snapshotTime });
++  };
++
++  return (
++    <section className="report-panel" aria-labelledby="conclusion-title">
++      <div>
++        <label id="conclusion-title" htmlFor="experiment-conclusion">实验结论</label>
++        <textarea
++          id="experiment-conclusion"
++          value={conclusion}
++          minLength={12}
++          rows={3}
++          onChange={(event) => onConclusionChange(event.currentTarget.value)}
++        />
++        <small>{remainingCharacters > 0 ? `还需 ${remainingCharacters} 个字符` : "已满足至少 12 个字符"}</small>
++      </div>
++      <div className="report-actions">
++        <button type="button" onClick={() => window.print()}>打印报告</button>
++        <button type="button" disabled={!canExport} onClick={exportReport}>导出 CSV</button>
++        {failedSnapshot && <button type="button" onClick={() => runExport(failedSnapshot)}>重试导出</button>}
++      </div>
++      {failedSnapshot && <p className="export-error" role="alert">导出失败，实验数据仍保留</p>}
++    </section>
++  );
++}
++
++type ExportSnapshot = {
++  input: ExperimentCsvInput;
++  generatedTime: string;
++  csv?: string;
++};
++
++function ConditionCard({ power, summary }: { power: SweepPower; summary: RunSummary }) {
++  return (
++    <article className="condition-card">
++      <div><h3>{power}%</h3><span className={summary.valid ? "summary-valid" : "summary-invalid"}>{summary.valid ? "有效" : "无效"}</span></div>
++      <dl>
++        <dt>稳定样本</dt><dd>{summary.sampleCount}</dd>
++        <dt>RPM avg ± std</dt><dd>{format(summary.rpm.mean, 0)} ± {format(summary.rpm.standardDeviation, 0)} RPM</dd>
++        <dt>RPM min–max</dt><dd>{format(summary.rpm.min, 0)}–{format(summary.rpm.max, 0)} RPM</dd>
++        <dt>风速 avg ± std</dt><dd>{format(summary.windSpeedMps.mean, 2)} ± {format(summary.windSpeedMps.standardDeviation, 2)} m/s</dd>
++        <dt>风速 min–max</dt><dd>{format(summary.windSpeedMps.min, 2)}–{format(summary.windSpeedMps.max, 2)} m/s</dd>
++        <dt>压力 avg ± std</dt><dd>{format(summary.underbodyPressurePa.mean, 1)} ± {format(summary.underbodyPressurePa.standardDeviation, 1)} Pa</dd>
++        <dt>压力 min–max</dt><dd>{format(summary.underbodyPressurePa.min, 1)}–{format(summary.underbodyPressurePa.max, 1)} Pa</dd>
++        <dt>载荷 avg ± std</dt><dd>{format(summary.verticalLoadN.mean, 3)} ± {format(summary.verticalLoadN.standardDeviation, 3)} N</dd>
++        <dt>载荷 min–max</dt><dd>{format(summary.verticalLoadN.min, 3)}–{format(summary.verticalLoadN.max, 3)} N</dd>
++      </dl>
++    </article>
++  );
++}
++
++function buildConditionResults(sweep: SweepState | null): ConditionResult[] {
++  const baseSummaries = SWEEP_POWERS.map((power) => ({
++    power,
++    summary: summarizeRun(sweep?.samplesByPower[power] ?? []),
++  }));
++  const comparisonReady = sweep?.status === "completed"
++    && baseSummaries.every(({ summary }) => summary.valid);
++  const baseline = baseSummaries[0]!.summary;
++  const baselineWind = baseline.windSpeedMps.mean;
++  const baselineLoad = baseline.verticalLoadN.mean;
++  if (!comparisonReady
++    || !isFiniteNumber(baselineWind)
++    || !isFiniteNumber(baselineLoad)
++    || baselineWind === 0) {
++    return baseSummaries.map(({ power, summary }) => ({ power, summary, residual: null }));
++  }
++
++  const compared = baseSummaries.map(({ power, summary }) => {
++    const wind = summary.windSpeedMps.mean;
++    const load = summary.verticalLoadN.mean;
++    if (!isFiniteNumber(wind) || !isFiniteNumber(load)) return { power, summary, residual: null };
++    const expected = baselineLoad * (wind / baselineWind) ** 2;
++    const residual = Math.abs(load - expected);
++    return { power, summary, residual: Number.isFinite(residual) ? residual : null };
++  });
++  return compared.every(({ residual }) => residual !== null)
++    ? compared
++    : compared.map(({ power, summary }) => ({ power, summary, residual: null }));
++}
++
++function findLargestResidualPower(conditions: ConditionResult[]): SweepPower | null {
++  const available = conditions.filter((condition) => condition.residual !== null);
++  if (available.length === 0) return null;
++  return available.reduce((largest, condition) => condition.residual! > largest.residual! ? condition : largest).power;
++}
++
++function statusLabel(sweep: SweepState): string {
++  switch (sweep.status) {
++    case "ramping": return `${sweep.commandedPowerPct}%：正在下发功率`;
++    case "stabilizing": return `${sweep.commandedPowerPct}%：稳定 ${sweep.stableMs / 1_000}/2.0 s`;
++    case "sampling": return `${sweep.commandedPowerPct}%：采样 ${sweep.samplingMs / 1_000}/4.0 s`;
++    case "completed": return "30%、60%、90% 均已完成";
++    case "failed": return `${sweep.commandedPowerPct}%：稳定超时`;
++    case "idle": return "未开始";
++  }
++}
++
++function format(value: number | null, digits: number): string {
++  return value === null ? "—" : value.toFixed(digits);
++}
++
++function isFiniteNumber(value: number | null): value is number {
++  return value !== null && Number.isFinite(value);
++}
+diff --git a/src/App.test.tsx b/src/App.test.tsx
+new file mode 100644
+index 0000000..7948c01
+--- /dev/null
++++ b/src/App.test.tsx
+@@ -0,0 +1,119 @@
++import { act, render, screen, waitFor } from "@testing-library/react";
++import "@testing-library/jest-dom/vitest";
++import userEvent from "@testing-library/user-event";
++import { afterEach, beforeEach, vi } from "vitest";
++import { App, type AppFlowClient } from "./App";
++import { labStore } from "./features/experiment/labStore";
++import type { FlowFieldFrame } from "./features/flow/types";
++import type { QualityProfile } from "./features/shell/quality";
++
++beforeEach(() => labStore.getState().resetLab());
++afterEach(() => vi.restoreAllMocks());
++
++function createFakeFlowClient() {
++  return {
++    ready: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
++    requestFrame: vi.fn<(inletVelocity: number, iterations?: number) => Promise<FlowFieldFrame>>(
++      () => new Promise<FlowFieldFrame>(() => undefined),
++    ),
++    restart: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
++    dispose: vi.fn<() => void>(),
++  } satisfies AppFlowClient;
++}
++
++it("renders the five digital wind-tunnel workbench regions", () => {
++  render(<App />);
++  expect(screen.getByRole("banner")).toHaveTextContent("SophiFlow Lab");
++  expect(screen.getByRole("navigation", { name: "教学章节" })).toBeInTheDocument();
++  expect(screen.getByRole("main", { name: "数字风洞" })).toBeInTheDocument();
++  expect(screen.getByRole("complementary", { name: "实验控制" })).toBeInTheDocument();
++  expect(screen.getByRole("region", { name: "实验曲线" })).toBeInTheDocument();
++});
++
++it("identifies the CFD model as a two-dimensional teaching approximation", () => {
++  render(<App />);
++  expect(screen.getAllByText("2D TEACHING CFD / 二维教学近似")).toHaveLength(2);
++});
++
++it("keeps live announcements limited to phase and fault changes", async () => {
++  const client = createFakeFlowClient();
++  const { container } = render(<App flowClientFactory={() => client} />);
++  await screen.findByRole("heading", { name: "实验曲线" });
++  await screen.findByRole("button", { name: /straightener：整流段/ });
++
++  const liveRegions = Array.from(container.querySelectorAll("[aria-live], [role='status']"));
++  expect(liveRegions).toEqual([screen.getByText("待机 / IDLE")]);
++});
++
++it("advances freely without evidence and restores the chosen lesson in guided mode", async () => {
++  const user = userEvent.setup();
++  render(<App />);
++
++  await user.click(screen.getByRole("button", { name: "自由实验" }));
++  await user.click(screen.getByRole("button", { name: "进入下一章" }));
++  expect(screen.getByRole("heading", { name: "第 2 章：启动虚拟风扇" })).toBeInTheDocument();
++
++  await user.click(screen.getByRole("button", { name: "教学模式" }));
++  expect(screen.getByRole("heading", { name: "第 2 章：启动虚拟风扇" })).toBeInTheDocument();
++  expect(screen.getByRole("button", { name: /第 1 章.*认识风洞/ })).toHaveClass("lesson-available");
++});
++
++it("assembles the automatic sweep report and starts the fixed sequence", async () => {
++  const user = userEvent.setup();
++  labStore.getState().resetLab();
++  render(<App />);
++
++  expect(screen.getByRole("heading", { name: "三工况实验报告" })).toBeVisible();
++  await user.click(screen.getByRole("button", { name: "开始自动扫频" }));
++  expect(labStore.getState().fanPowerPct).toBe(30);
++  expect(["ramping", "stabilizing"]).toContain(labStore.getState().phase);
++  expect(labStore.getState().sweep?.commandedPowerPct).toBe(30);
++});
++
++it("wires the flow failure recovery button to the mounted runtime", async () => {
++  const user = userEvent.setup();
++  const client = createFakeFlowClient();
++  render(<App flowClientFactory={() => client} />);
++  act(() => labStore.setState({ flowStatus: "failed", flowError: "worker stopped" }));
++
++  await user.click(screen.getByRole("button", { name: "重新启动求解器" }));
++  expect(client.restart).toHaveBeenCalledOnce();
++});
++
++it("rebuilds the worker for a new grid without clearing telemetry, tutorial, or the last field", async () => {
++  const user = userEvent.setup();
++  const width = vi.spyOn(window, "innerWidth", "get").mockReturnValue(1_024);
++  vi.spyOn(navigator, "hardwareConcurrency", "get").mockReturnValue(12);
++  const clients: ReturnType<typeof createFakeFlowClient>[] = [];
++  const factory = vi.fn((profile: QualityProfile) => {
++    void profile;
++    const client = createFakeFlowClient();
++    clients.push(client);
++    return client;
++  });
++  render(<App flowClientFactory={factory} />);
++  await user.click(screen.getByRole("button", { name: "自由实验" }));
++  await user.click(screen.getByRole("button", { name: "进入下一章" }));
++  const telemetry = labStore.getState().telemetry;
++  const lastField: FlowFieldFrame = {
++    width: 240,
++    height: 96,
++    speed: new Float32Array(1),
++    pressure: new Float32Array(1),
++    vorticity: new Float32Array(1),
++    velocityX: new Float32Array(1),
++    velocityY: new Float32Array(1),
++    provenance: "2d-teaching-cfd",
++  };
++  act(() => labStore.setState({ flowField: lastField }));
++
++  width.mockReturnValue(1_440);
++  act(() => window.dispatchEvent(new Event("resize")));
++
++  await waitFor(() => expect(factory).toHaveBeenCalledTimes(2));
++  expect(factory.mock.calls.map(([profile]) => profile.name)).toEqual(["medium", "high"]);
++  expect(clients[0]!.dispose).toHaveBeenCalledOnce();
++  expect(labStore.getState().telemetry).toBe(telemetry);
++  expect(labStore.getState().flowField).toBe(lastField);
++  expect(screen.getByRole("heading", { name: "第 2 章：启动虚拟风扇" })).toBeVisible();
++});
+diff --git a/src/styles/global.css b/src/styles/global.css
+new file mode 100644
+index 0000000..581db4e
+--- /dev/null
++++ b/src/styles/global.css
+@@ -0,0 +1,1185 @@
++:root {
++  --bg: #071014;
++  --panel: #0d181d;
++  --panel-raised: #132229;
++  --tunnel: #e9e6df;
++  --ink: #e9f2f3;
++  --muted: #8da3aa;
++  --flow: #50e3c2;
++  --warning: #f2bd4f;
++  --danger: #e44b43;
++  color: var(--ink);
++  background: var(--bg);
++  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
++}
++
++* {
++  box-sizing: border-box;
++}
++
++body {
++  margin: 0;
++  min-width: 320px;
++  min-height: 100vh;
++  overflow-x: hidden;
++  background: var(--bg);
++}
++
++img,
++svg,
++canvas {
++  max-width: 100%;
++}
++
++button,
++input,
++select,
++textarea {
++  font: inherit;
++}
++
++button {
++  min-width: 44px;
++}
++
++.app-shell {
++  display: grid;
++  grid-template-areas:
++    "header header header"
++    "left scene right"
++    "left bottom right";
++  grid-template-columns: 240px minmax(0, 1fr) 320px;
++  grid-template-rows: auto minmax(30rem, 1fr) auto;
++  min-height: 100vh;
++  background: var(--bg);
++  overflow-x: clip;
++}
++
++.compact-panel-tabs {
++  display: none;
++}
++
++.topbar {
++  grid-area: header;
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 1rem;
++  padding: 0.85rem 1.25rem;
++  border-bottom: 1px solid var(--panel-raised);
++  background: var(--panel);
++}
++
++.eyebrow {
++  color: var(--flow);
++  font-size: 0.7rem;
++  font-weight: 700;
++  letter-spacing: 0.12em;
++}
++
++h1 {
++  margin: 0.15rem 0 0;
++  font-size: 1.15rem;
++}
++
++.topbar-actions {
++  display: flex;
++  align-items: center;
++  flex-wrap: wrap;
++  justify-content: flex-end;
++  gap: 0.75rem;
++}
++
++.provenance-badge {
++  color: var(--warning);
++  font-size: 0.72rem;
++  font-weight: 700;
++  letter-spacing: 0.04em;
++}
++
++.model-scope-badge {
++  color: var(--muted);
++  font-size: 0.72rem;
++  font-weight: 700;
++  letter-spacing: 0.04em;
++}
++
++.tutorial-rail,
++.control-panel,
++.chart-drawer {
++  padding: 1rem;
++  background: var(--panel);
++}
++
++.tutorial-rail {
++  grid-area: left;
++  border-right: 1px solid var(--panel-raised);
++}
++
++.scene-panel {
++  grid-area: scene;
++  min-height: 0;
++  padding: 0;
++  background: var(--panel-raised);
++  overflow: auto;
++}
++
++.experiment-lower-deck {
++  display: grid;
++  gap: 1rem;
++}
++
++.experiment-lower-deck > .history-panel {
++  height: 200px;
++}
++
++.wind-tunnel-scene {
++  position: relative;
++  display: grid;
++  grid-template-rows: auto minmax(18rem, 1fr) auto;
++  width: 100%;
++  height: 100%;
++  min-height: 30rem;
++  overflow: hidden;
++  background: #09151a;
++}
++
++.scene-hud {
++  z-index: 3;
++  display: flex;
++  justify-content: space-between;
++  gap: 1rem;
++  padding: 0.7rem 0.9rem;
++  border-bottom: 1px solid #294049;
++  color: #9db1b7;
++  background: rgb(7 16 20 / 88%);
++  font: 700 0.66rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
++  letter-spacing: 0.08em;
++}
++
++.scene-hud span:last-child {
++  color: var(--flow);
++}
++
++.scene-canvas {
++  width: 100%;
++  height: 100%;
++  min-height: 18rem;
++}
++
++.scene-viewport {
++  position: relative;
++  min-width: 0;
++  min-height: 18rem;
++  overflow: hidden;
++}
++
++.scene-canvas-context-lost {
++  position: absolute;
++  inset: 0;
++  visibility: hidden;
++}
++
++.camera-control-bar {
++  position: absolute;
++  z-index: 5;
++  top: 0.55rem;
++  right: 0.55rem;
++  display: grid;
++  grid-template-columns: repeat(5, 44px);
++  gap: 0.3rem;
++}
++
++.camera-control-bar button {
++  width: 44px;
++  height: 44px;
++  padding: 0;
++  border: 1px solid #34505a;
++  color: var(--flow);
++  background: rgb(7 16 20 / 92%);
++  cursor: pointer;
++}
++
++.camera-control-bar button:disabled {
++  color: #71868d;
++  cursor: not-allowed;
++}
++
++.scene-canvas canvas {
++  display: block;
++}
++
++.scene-hotspots {
++  z-index: 3;
++  display: grid;
++  grid-template-columns: minmax(0, 1fr) minmax(13rem, 0.58fr);
++  gap: 0.75rem;
++  padding: 0.75rem;
++  border-top: 1px solid #294049;
++  background: rgb(7 16 20 / 94%);
++}
++
++.scene-hotspot-buttons {
++  display: grid;
++  grid-template-columns: repeat(5, minmax(0, 1fr));
++  gap: 0.4rem;
++}
++
++.scene-hotspot {
++  min-width: 0;
++  padding: 0.52rem 0.44rem;
++  overflow: hidden;
++  border: 1px solid #314b54;
++  color: #b9c8cb;
++  background: #0d1b20;
++  text-align: left;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++  cursor: pointer;
++}
++
++.scene-hotspot span {
++  margin-right: 0.38rem;
++  color: var(--flow);
++  font: 700 0.62rem ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.scene-hotspot:hover,
++.scene-hotspot:focus-visible,
++.scene-hotspot[aria-pressed="true"] {
++  border-color: var(--flow);
++  outline: none;
++  color: #f4f7f5;
++  background: #123238;
++  box-shadow: inset 0 -2px 0 var(--flow);
++}
++
++.scene-hotspot-card {
++  display: flex;
++  flex-direction: column;
++  justify-content: center;
++  min-height: 3.4rem;
++  padding-left: 0.75rem;
++  border-left: 2px solid #314b54;
++  color: #9db1b7;
++  font-size: 0.72rem;
++}
++
++.scene-hotspot-card strong {
++  color: #eef3f1;
++}
++
++.scene-hotspot-card em {
++  margin-top: 0.18rem;
++  color: var(--flow);
++  font-style: normal;
++}
++
++.scene-fallback {
++  display: grid;
++  place-items: center;
++  min-height: 18rem;
++  padding: 1rem;
++}
++
++.flow-failure-alert {
++  display: grid;
++  gap: 0.45rem;
++  margin: 0 0 0.8rem;
++  padding: 0.7rem;
++  border: 1px solid var(--danger);
++  color: #fff4f2;
++  background: #2a1516;
++}
++
++.flow-failure-alert span {
++  color: #f1c9c5;
++  font-size: 0.72rem;
++  overflow-wrap: anywhere;
++}
++
++.flow-failure-alert button,
++.application-fallback button {
++  min-width: 44px;
++  min-height: 44px;
++  border: 1px solid var(--flow);
++  color: var(--flow);
++  background: #071014;
++  cursor: pointer;
++}
++
++.application-fallback {
++  display: grid;
++  place-content: center;
++  gap: 0.75rem;
++  min-height: 100vh;
++  padding: 1.5rem;
++  color: var(--ink);
++  background: var(--bg);
++}
++
++.application-fallback p {
++  max-width: 42rem;
++  margin: 0;
++}
++
++.fallback-declarations {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 0.75rem;
++  color: var(--warning);
++  font: 700 0.72rem ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.scene-fallback-diagram {
++  width: min(100%, 70rem);
++  height: auto;
++  border: 1px solid #294049;
++}
++
++.scene-fallback p,
++.scene-loading {
++  color: #9db1b7;
++  font-size: 0.76rem;
++}
++
++.scene-fallback strong {
++  color: var(--warning);
++}
++
++.control-panel {
++  grid-area: right;
++  border-left: 1px solid var(--panel-raised);
++}
++
++.chart-drawer {
++  grid-area: bottom;
++  border-top: 1px solid var(--panel-raised);
++  min-width: 0;
++  min-height: 0;
++  padding: 0.75rem 1rem;
++  overflow: hidden;
++}
++
++.dashboard-sidebar {
++  display: flex;
++  flex-direction: column;
++  gap: 0.85rem;
++}
++
++.dashboard-section {
++  border-bottom: 1px solid #294049;
++  padding-bottom: 0.85rem;
++}
++
++.dashboard-section-heading,
++.history-heading,
++.fan-power-row,
++.telemetry-meta,
++.telemetry-quality {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 0.75rem;
++}
++
++.dashboard-section-heading {
++  align-items: flex-start;
++  margin-bottom: 0.7rem;
++}
++
++.dashboard-section h2,
++.history-panel h2 {
++  margin: 0.08rem 0 0;
++  color: #eef4f3;
++  font-size: 0.9rem;
++}
++
++.section-kicker {
++  margin: 0;
++  color: var(--muted);
++  font: 700 0.61rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
++  letter-spacing: 0.09em;
++}
++
++.phase-badge,
++.sample-time {
++  color: var(--muted);
++  font: 700 0.62rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.phase-ramping,
++.phase-stabilizing,
++.phase-sampling {
++  color: var(--flow);
++}
++
++.phase-paused {
++  color: var(--warning);
++}
++
++.fan-power-row label {
++  color: #b8c8cb;
++  font-size: 0.75rem;
++}
++
++.fan-power-row output {
++  color: var(--flow);
++  font: 700 1.35rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.fan-slider {
++  width: 100%;
++  margin: 0;
++  accent-color: var(--flow);
++}
++
++.fan-slider-hit-area {
++  display: flex;
++  align-items: center;
++  width: 100%;
++  min-height: 44px;
++  margin-top: 0.35rem;
++  cursor: pointer;
++}
++
++.slider-scale {
++  display: flex;
++  justify-content: space-between;
++  color: #738990;
++  font: 0.58rem ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.experiment-actions {
++  display: grid;
++  grid-template-columns: repeat(3, minmax(0, 1fr));
++  gap: 0.35rem;
++  margin-top: 0.75rem;
++}
++
++.experiment-actions button,
++.field-options button,
++.telemetry-quality button,
++.chart-legend button,
++.stable-window-marker {
++  border: 1px solid #34505a;
++  color: #c8d5d7;
++  background: #0a151a;
++  cursor: pointer;
++}
++
++.field-options button,
++.telemetry-quality button,
++.chart-legend button,
++.stable-window-marker,
++.scene-hotspot,
++.sweep-actions button,
++.report-actions button {
++  min-height: 44px;
++}
++
++.experiment-actions button {
++  min-height: 44px;
++  padding: 0.42rem 0.25rem;
++  font-size: 0.68rem;
++}
++
++.tutorial-mode-toggle {
++  display: flex;
++  gap: 0.25rem;
++}
++
++.tutorial-mode-toggle button,
++.tutorial-rail button {
++  min-height: 44px;
++  border: 1px solid #34505a;
++  color: #c8d5d7;
++  background: #0a151a;
++  cursor: pointer;
++}
++
++.tutorial-rail-content ol {
++  display: grid;
++  gap: 0.35rem;
++  margin: 0;
++  padding: 0;
++  list-style: none;
++}
++
++.tutorial-rail-content li button {
++  width: 100%;
++  padding: 0.5rem;
++  text-align: left;
++}
++
++.tutorial-rail-content section > button {
++  width: 100%;
++  padding: 0.55rem;
++}
++
++.experiment-actions .action-primary,
++.field-options .field-selected {
++  border-color: var(--flow);
++  color: var(--flow);
++  box-shadow: inset 0 -2px 0 var(--flow);
++}
++
++.experiment-actions button:disabled {
++  border-color: #24373e;
++  color: #53686e;
++  cursor: not-allowed;
++}
++
++.field-options {
++  display: grid;
++  grid-template-columns: repeat(4, minmax(0, 1fr));
++  gap: 0.3rem;
++}
++
++.field-options button {
++  min-width: 0;
++  padding: 0.48rem 0.15rem;
++}
++
++.field-options button span,
++.field-options button small {
++  display: block;
++}
++
++.field-options button span {
++  font-size: 0.72rem;
++}
++
++.field-options button small {
++  margin-top: 0.2rem;
++  overflow: hidden;
++  color: #789097;
++  font: 0.5rem ui-monospace, SFMono-Regular, Menlo, monospace;
++  text-overflow: ellipsis;
++}
++
++.solver-status {
++  margin: 0.75rem 0 0;
++  border-top: 1px solid #243940;
++  font-size: 0.63rem;
++}
++
++.solver-status div {
++  display: flex;
++  justify-content: space-between;
++  gap: 0.65rem;
++  padding: 0.28rem 0;
++  border-bottom: 1px solid #1d3037;
++}
++
++.solver-status dt {
++  color: #789097;
++}
++
++.solver-status dd {
++  margin: 0;
++  color: #c7d3d5;
++  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
++  text-align: right;
++}
++
++.telemetry-grid {
++  display: grid;
++  grid-template-columns: repeat(2, minmax(0, 1fr));
++  border-top: 1px solid #294049;
++  border-left: 1px solid #294049;
++}
++
++.telemetry-card {
++  min-width: 0;
++  padding: 0.55rem;
++  border-right: 1px solid #294049;
++  border-bottom: 1px solid #294049;
++}
++
++.telemetry-meta h3 {
++  margin: 0;
++  overflow: hidden;
++  color: #aebfc2;
++  font-size: 0.64rem;
++  font-weight: 600;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.telemetry-meta span {
++  color: var(--warning);
++  font: 0.48rem ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.telemetry-reading {
++  display: flex;
++  align-items: baseline;
++  gap: 0.32rem;
++  margin: 0.48rem 0;
++}
++
++.telemetry-reading strong {
++  min-width: 0;
++  color: var(--flow);
++  font: 700 1.18rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.telemetry-reading span {
++  color: #b2c0c3;
++  font-size: 0.58rem;
++}
++
++.telemetry-quality span {
++  overflow: hidden;
++  color: #758b92;
++  font: 0.46rem ui-monospace, SFMono-Regular, Menlo, monospace;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.telemetry-quality button {
++  padding: 0.12rem 0.25rem;
++  font-size: 0.52rem;
++}
++
++.history-panel {
++  display: grid;
++  grid-template-rows: auto minmax(0, 1fr) auto;
++  height: 100%;
++  min-height: 0;
++}
++
++.history-heading {
++  align-items: flex-start;
++  margin-bottom: 0.35rem;
++}
++
++.chart-legend {
++  display: flex;
++  flex-wrap: wrap;
++  justify-content: flex-end;
++  gap: 0.3rem;
++}
++
++.chart-legend button {
++  padding: 0.2rem 0.38rem;
++  color: #71868d;
++  font-size: 0.58rem;
++}
++
++.chart-legend button[aria-pressed="true"] {
++  color: #c8d5d7;
++}
++
++.chart-legend button span {
++  display: inline-block;
++  width: 0.55rem;
++  height: 2px;
++  margin-right: 0.25rem;
++  vertical-align: middle;
++}
++
++.history-chart-plot {
++  position: relative;
++  min-width: 0;
++  min-height: 7rem;
++}
++
++.chart-empty {
++  display: grid;
++  place-items: center;
++  height: 100%;
++  margin: 0;
++  color: #72888f;
++  font-size: 0.7rem;
++}
++
++.stable-window-marker {
++  justify-self: end;
++  padding: 0.25rem 0.45rem;
++  color: var(--flow);
++  font-size: 0.62rem;
++}
++
++.stable-window-marker span {
++  margin-left: 0.35rem;
++  color: #789097;
++  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.experiment-report {
++  display: grid;
++  gap: 0.75rem;
++  padding-top: 0.85rem;
++  border-top: 1px solid #294049;
++}
++
++.report-heading,
++.report-disclaimers,
++.sweep-panel > div,
++.sweep-actions,
++.comparison-heading,
++.report-panel,
++.report-actions,
++.condition-card > div {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 0.65rem;
++}
++
++.report-heading {
++  align-items: flex-start;
++}
++
++.report-heading h2,
++.comparison-heading h3,
++.condition-card h3 {
++  margin: 0.1rem 0 0;
++  font-size: 0.88rem;
++}
++
++.report-disclaimers {
++  flex-wrap: wrap;
++  justify-content: flex-end;
++  color: var(--warning);
++  font: 700 0.58rem ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.report-disclaimers span:last-child {
++  color: var(--muted);
++}
++
++.sweep-panel,
++.comparison-panel,
++.report-panel,
++.condition-card {
++  border: 1px solid #294049;
++  background: #0a151a;
++}
++
++.sweep-panel,
++.report-panel {
++  padding: 0.65rem;
++}
++
++.sweep-panel strong,
++.sweep-panel span {
++  display: block;
++}
++
++.sweep-panel strong {
++  color: var(--flow);
++  font-size: 0.72rem;
++}
++
++.sweep-panel span {
++  margin-top: 0.2rem;
++  color: var(--muted);
++  font: 0.62rem ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.sweep-actions button,
++.report-actions button {
++  padding: 0.38rem 0.55rem;
++  border: 1px solid #34505a;
++  color: #c8d5d7;
++  background: #0d1b20;
++  font-size: 0.64rem;
++  cursor: pointer;
++}
++
++.sweep-actions button:first-child,
++.report-actions button:nth-child(2) {
++  border-color: var(--flow);
++  color: var(--flow);
++}
++
++.sweep-actions button:disabled,
++.report-actions button:disabled {
++  border-color: #24373e;
++  color: #53686e;
++  cursor: not-allowed;
++}
++
++.sweep-error,
++.export-error {
++  margin: 0.5rem 0 0;
++  color: var(--danger);
++  font-size: 0.66rem;
++}
++
++.condition-summary-grid {
++  display: grid;
++  grid-template-columns: repeat(3, minmax(0, 1fr));
++  gap: 0.55rem;
++}
++
++.condition-card {
++  padding: 0.6rem;
++}
++
++.condition-card h3 {
++  color: var(--flow);
++}
++
++.summary-valid,
++.summary-invalid {
++  font: 700 0.55rem ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.summary-valid {
++  color: var(--flow);
++}
++
++.summary-invalid {
++  color: var(--warning);
++}
++
++.condition-card dl {
++  display: grid;
++  grid-template-columns: minmax(7rem, 1fr) auto;
++  gap: 0.25rem 0.65rem;
++  margin: 0.5rem 0 0;
++  font-size: 0.62rem;
++}
++
++.condition-card dt {
++  color: var(--muted);
++}
++
++.condition-card dd {
++  margin: 0;
++  color: #d4dfe0;
++  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
++  text-align: right;
++}
++
++.comparison-heading {
++  padding: 0.55rem 0.65rem;
++}
++
++.comparison-heading p {
++  margin: 0;
++  color: var(--muted);
++  font-size: 0.64rem;
++}
++
++.comparison-table-wrap {
++  overflow-x: auto;
++}
++
++.comparison-panel table {
++  width: 100%;
++  border-collapse: collapse;
++  font-size: 0.62rem;
++}
++
++.comparison-panel th,
++.comparison-panel td {
++  padding: 0.42rem 0.55rem;
++  border-top: 1px solid #20353c;
++  color: #c5d1d3;
++  text-align: right;
++  white-space: nowrap;
++}
++
++.comparison-panel th:first-child,
++.comparison-panel td:first-child {
++  text-align: left;
++}
++
++.comparison-panel thead th {
++  color: var(--muted);
++  font-weight: 600;
++}
++
++.comparison-panel input {
++  accent-color: var(--flow);
++}
++
++.report-panel {
++  align-items: flex-end;
++}
++
++.report-panel > div:first-child {
++  flex: 1;
++}
++
++.report-panel label,
++.report-panel small {
++  display: block;
++  color: var(--muted);
++  font-size: 0.62rem;
++}
++
++.report-panel textarea {
++  width: 100%;
++  margin: 0.3rem 0;
++  padding: 0.45rem;
++  border: 1px solid #34505a;
++  color: var(--ink);
++  background: #071014;
++  resize: vertical;
++}
++
++@media print {
++  .topbar,
++  .compact-panel-tabs,
++  .tutorial-rail,
++  .scene-panel,
++  .control-panel,
++  .history-panel,
++  .sweep-actions,
++  .report-actions {
++    display: none !important;
++  }
++
++  .app-shell,
++  .chart-drawer {
++    display: block;
++    color: #111;
++    background: #fff;
++  }
++
++  .experiment-report,
++  .condition-card,
++  .comparison-panel,
++  .report-panel {
++    border-color: #aaa;
++    color: #111;
++    background: #fff;
++  }
++}
++
++.experiment-actions button:hover:not(:disabled),
++.field-options button:hover,
++.telemetry-quality button:hover,
++.chart-legend button:hover,
++.stable-window-marker:hover,
++.experiment-actions button:focus-visible,
++.field-options button:focus-visible,
++.telemetry-quality button:focus-visible,
++.chart-legend button:focus-visible,
++.stable-window-marker:focus-visible {
++  border-color: var(--flow);
++  outline: 2px solid #1e5c58;
++  outline-offset: 1px;
++}
++
++:where(button, input, select, textarea, a, [tabindex]):focus-visible {
++  outline: 3px solid var(--flow) !important;
++  outline-offset: 2px !important;
++}
++
++@media (prefers-reduced-motion: reduce) {
++  *,
++  *::before,
++  *::after {
++    scroll-behavior: auto !important;
++    animation-duration: 0.01ms !important;
++    animation-iteration-count: 1 !important;
++    transition-duration: 0.01ms !important;
++  }
++}
++
++@media (max-width: 1100px) {
++  .app-shell {
++    grid-template-areas:
++      "header"
++      "scene"
++      "tabs"
++      "compact-panel";
++    grid-template-columns: minmax(0, 1fr);
++    grid-template-rows: auto minmax(24rem, 58vh) 48px auto;
++  }
++
++  .compact-panel-tabs {
++    grid-area: tabs;
++    z-index: 6;
++    display: grid;
++    grid-template-columns: repeat(3, minmax(0, 1fr));
++    min-width: 0;
++    border-top: 1px solid #294049;
++    border-bottom: 1px solid #294049;
++    background: var(--panel);
++  }
++
++  .compact-panel-tabs button {
++    min-width: 44px;
++    min-height: 44px;
++    border: 0;
++    border-right: 1px solid #294049;
++    color: var(--muted);
++    background: var(--panel);
++    cursor: pointer;
++  }
++
++  .compact-panel-tabs button[aria-selected="true"] {
++    color: var(--flow);
++    box-shadow: inset 0 -3px 0 var(--flow);
++  }
++
++  .tutorial-rail,
++  .control-panel,
++  .chart-drawer {
++    display: none;
++    grid-area: compact-panel;
++    border: 0;
++    min-width: 0;
++    max-width: 100vw;
++    overflow: auto;
++  }
++
++  .tutorial-rail[data-compact-active="true"],
++  .control-panel[data-compact-active="true"],
++  .chart-drawer[data-compact-active="true"] {
++    display: block;
++  }
++
++  .scene-hotspots {
++    grid-template-columns: 1fr;
++  }
++
++  .scene-hotspot-buttons {
++    grid-template-columns: repeat(2, minmax(0, 1fr));
++  }
++
++  .condition-summary-grid {
++    grid-template-columns: 1fr;
++  }
++
++  .report-heading,
++  .report-panel {
++    align-items: stretch;
++    flex-direction: column;
++  }
++}
++
++@media (max-width: 600px) {
++  .app-shell {
++    grid-template-rows: 52px 48vh 48px minmax(0, auto);
++  }
++
++  .topbar {
++    min-width: 0;
++    height: 52px;
++    gap: 0.3rem;
++    padding: 0.25rem 0.45rem;
++    overflow: hidden;
++  }
++
++  .topbar > div:first-child {
++    flex: 0 0 auto;
++  }
++
++  .topbar .eyebrow {
++    display: none;
++  }
++
++  .topbar h1 {
++    max-width: 4.6rem;
++    font-size: 0.82rem;
++    line-height: 1;
++  }
++
++  .topbar-actions {
++    min-width: 0;
++    flex: 1;
++    flex-wrap: nowrap;
++    gap: 0.2rem;
++  }
++
++  .tutorial-mode-toggle {
++    flex: 0 0 auto;
++  }
++
++  .tutorial-mode-toggle button {
++    min-width: 44px;
++    min-height: 44px;
++    padding: 0.15rem 0.3rem;
++    font-size: 0.58rem;
++  }
++
++  .model-scope-badge,
++  .provenance-badge {
++    min-width: 0;
++    max-width: 4.2rem;
++    font-size: 0.44rem;
++    line-height: 1.15;
++    overflow-wrap: anywhere;
++  }
++
++  .compact-panel-tabs {
++    position: sticky;
++    bottom: 0;
++  }
++
++  .scene-panel,
++  .wind-tunnel-scene {
++    width: 100%;
++    height: 48vh;
++    min-height: 0;
++  }
++
++  .wind-tunnel-scene {
++    grid-template-rows: auto minmax(0, 1fr) auto;
++  }
++
++  .scene-viewport,
++  .scene-canvas,
++  .scene-fallback {
++    min-height: 0;
++  }
++
++  .scene-hud {
++    gap: 0.35rem;
++    padding: 0.42rem 0.5rem;
++    font-size: 0.52rem;
++  }
++
++  .scene-hotspots {
++    gap: 0.4rem;
++    padding: 0.4rem;
++  }
++
++  .scene-hotspot-buttons {
++    grid-template-columns: repeat(2, minmax(0, 1fr));
++    max-height: 7rem;
++    overflow-y: auto;
++  }
++
++  .scene-hotspot {
++    min-height: 44px;
++  }
++
++  .scene-hotspot-card {
++    min-height: 44px;
++    padding-left: 0.45rem;
++  }
++
++  .tutorial-rail,
++  .control-panel,
++  .chart-drawer {
++    max-height: calc(52vh - 100px);
++    padding: 0.75rem;
++  }
++
++  .telemetry-grid,
++  .condition-summary-grid {
++    grid-template-columns: minmax(0, 1fr);
++  }
++
++  .report-heading,
++  .report-panel,
++  .report-actions,
++  .sweep-panel > div {
++    align-items: stretch;
++    flex-direction: column;
++  }
++
++  .experiment-lower-deck > .history-panel {
++    height: 230px;
++  }
++}

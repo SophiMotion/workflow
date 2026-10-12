@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0.0",
+  "fixture": "test1-four-bar",
+  "sourceFile": "test1.f3d",
+  "parameters": {
+    "w1": "20 mm",
+    "w2": "20 mm",
+    "l1": "200 mm",
+    "l2": "250 mm",
+    "d": "10 mm",
+    "t1": "20 mm",
+    "t2": "20 mm"
+  },
+  "expected": {
+    "minimumUniqueComponents": 3,
+    "minimumOccurrences": 8,
+    "revoluteJointCount": 4,
+    "hasBom": true,
+    "hasPhysicalProperties": true,
+    "hasVisualMeshes": true,
+    "hasCollisionMeshes": true,
+    "hasUrdf": true,
+    "hasClosedLoopConstraints": true
+  },
+  "writebackCheck": {
+    "parameter": "l1",
+    "oldExpression": "200 mm",
+    "newExpression": "220 mm",
+    "preserveDesignGuid": true,
+    "changeSourceFingerprint": true
+  }
+}

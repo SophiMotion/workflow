@@ -1,0 +1,452 @@
+{
+  "initial": {
+    "ready": true,
+    "models": [
+      {
+        "id": "d4f47e24-9a0b-49b3-82ae-b43088e3afce",
+        "kind": "sophicar",
+        "name": "线控底盘 1",
+        "position": [
+          -76.23458725961602,
+          3.2250000000000036,
+          120.10515956629658
+        ],
+        "yaw": 154.3067091608063,
+        "pitch": 0,
+        "footprint": {
+          "width": 1.6255000000000057,
+          "length": 2.1400000000000228
+        },
+        "meshes": 454,
+        "wheels": []
+      },
+      {
+        "id": "94df6015-1052-4c55-8b3f-92c77c383832",
+        "kind": "robot",
+        "name": "移动机器人 1",
+        "position": [
+          9.08844,
+          3.225,
+          21.899263
+        ],
+        "yaw": 195,
+        "footprint": {
+          "width": 0.6410000029802349,
+          "length": 0.6080000029802336
+        },
+        "meshes": 27,
+        "wheels": []
+      },
+      {
+        "id": "20a72af5-f803-4926-8098-b55c754c8844",
+        "kind": "rover",
+        "name": "Sophi 开放式智能试验车",
+        "position": [
+          24.998015268620918,
+          3.2250000000000036,
+          33.92199884486393
+        ],
+        "yaw": -25.000000000000068,
+        "pitch": 0,
+        "footprint": {
+          "width": 2.039999964833264,
+          "length": 3.8380000591278085
+        },
+        "meshes": 30,
+        "wheels": [
+          -355.34625923809267,
+          -355.34625923809267,
+          -355.34625923809267,
+          -355.34625923809267
+        ]
+      },
+      {
+        "id": "35661809-72f8-4957-837e-53bf3132dc9f",
+        "kind": "fusion",
+        "name": "SophiFusion 无刷小车",
+        "position": [
+          -0.1695474640874653,
+          3.2250000000000036,
+          11.190399042576196
+        ],
+        "yaw": 29.406126048888886,
+        "pitch": 0,
+        "footprint": {
+          "width": 0.3443999868631451,
+          "length": 0.5000000000000037
+        },
+        "meshes": 10,
+        "wheels": [
+          -1154.000092203784,
+          -1154.000092203784,
+          -1154.000092203784,
+          -1154.000092203784
+        ]
+      },
+      {
+        "id": "0ed01181-cf50-4c1f-a659-52b0a11e7c94",
+        "kind": "nav",
+        "name": "Sophicar 导航小车",
+        "position": [
+          -22.562746447407857,
+          3.2250000000000036,
+          60.19793082871375
+        ],
+        "yaw": -24.99999999999992,
+        "pitch": 0,
+        "footprint": {
+          "width": 0.46500000342727077,
+          "length": 0.4031013846397401
+        },
+        "meshes": 6,
+        "wheels": [
+          -952.3780261417559,
+          -952.3780261417559
+        ]
+      },
+      {
+        "id": "3def596a-1bf4-4ebd-bc9e-05cc5a56572e",
+        "kind": "edu",
+        "name": "Sophicar 教育小车",
+        "position": [
+          4.133115509484575,
+          3.2250000000000036,
+          197.3485922854693
+        ],
+        "yaw": -47.006948984355375,
+        "pitch": 0,
+        "footprint": {
+          "width": 0.3540000023841898,
+          "length": 0.519999980926542
+        },
+        "meshes": 12,
+        "wheels": [
+          -3271.4183442544395,
+          -3271.4183442544395,
+          -3271.4183442544395,
+          -3271.4183442544395
+        ]
+      },
+      {
+        "id": "471fb8e6-f254-42fe-8cbf-581980b721c7",
+        "kind": "sophicore",
+        "name": "SophiCore 轮式机器人",
+        "position": [
+          33.46589078523295,
+          3.2250000000000036,
+          128.15715639721967
+        ],
+        "yaw": 155.0000000000048,
+        "pitch": 0,
+        "footprint": {
+          "width": 0.8500000238418579,
+          "length": 0.8999999761581456
+        },
+        "meshes": 8,
+        "wheels": [
+          -1211.156479788621,
+          -1211.156479788621
+        ]
+      }
+    ],
+    "drives": [
+      {
+        "id": "d4f47e24-9a0b-49b3-82ae-b43088e3afce",
+        "preset": "campus-race-v3",
+        "speed": 8,
+        "actualSpeed": 8,
+        "yielding": false,
+        "distance": 20.369701188882818,
+        "travel": 468.6968489080002,
+        "playing": true
+      },
+      {
+        "id": "20a72af5-f803-4926-8098-b55c754c8844",
+        "preset": "campus-level-network-v2",
+        "speed": 2.5,
+        "actualSpeed": 0,
+        "yielding": false,
+        "distance": 149.2454288799989,
+        "travel": 149.2454288799989,
+        "playing": false
+      },
+      {
+        "id": "35661809-72f8-4957-837e-53bf3132dc9f",
+        "preset": "campus-west-south-v4",
+        "speed": 1.5,
+        "actualSpeed": 1.5,
+        "yielding": false,
+        "distance": 90.58900723799705,
+        "travel": 90.58900723799705,
+        "playing": true
+      },
+      {
+        "id": "0ed01181-cf50-4c1f-a659-52b0a11e7c94",
+        "preset": "campus-west-north-v4",
+        "speed": 1.2,
+        "actualSpeed": 1.2,
+        "yielding": false,
+        "distance": 72.5712055920018,
+        "travel": 72.5712055920018,
+        "playing": true
+      },
+      {
+        "id": "3def596a-1bf4-4ebd-bc9e-05cc5a56572e",
+        "preset": "campus-race-inner-v4",
+        "speed": 3,
+        "actualSpeed": 3,
+        "yielding": false,
+        "distance": 179.92800893399416,
+        "travel": 179.92800893399416,
+        "playing": true
+      },
+      {
+        "id": "471fb8e6-f254-42fe-8cbf-581980b721c7",
+        "preset": "campus-proving-v3",
+        "speed": 2,
+        "actualSpeed": 0,
+        "yielding": false,
+        "distance": 90.83673598414657,
+        "travel": 90.83673598414657,
+        "playing": false
+      }
+    ],
+    "traffic": {
+      "overlaps": [],
+      "interventions": 0,
+      "elapsed": 62.38340000000023
+    },
+    "camera": {
+      "near": 1.4326548781894402,
+      "far": 1800,
+      "distance": 143.26548781894402
+    },
+    "selected": "rover",
+    "drawCalls": 1331
+  },
+  "after": {
+    "ready": true,
+    "models": [
+      {
+        "id": "d4f47e24-9a0b-49b3-82ae-b43088e3afce",
+        "kind": "sophicar",
+        "name": "线控底盘 1",
+        "position": [
+          -85.07067002534181,
+          3.2250000000000036,
+          143.61503123658318
+        ],
+        "yaw": 163.201742913943,
+        "pitch": 0,
+        "footprint": {
+          "width": 1.6255000000000057,
+          "length": 2.1400000000000228
+        },
+        "meshes": 454,
+        "wheels": []
+      },
+      {
+        "id": "94df6015-1052-4c55-8b3f-92c77c383832",
+        "kind": "robot",
+        "name": "移动机器人 1",
+        "position": [
+          9.08844,
+          3.225,
+          21.899263
+        ],
+        "yaw": 195,
+        "footprint": {
+          "width": 0.6410000029802349,
+          "length": 0.6080000029802336
+        },
+        "meshes": 27,
+        "wheels": []
+      },
+      {
+        "id": "20a72af5-f803-4926-8098-b55c754c8844",
+        "kind": "rover",
+        "name": "Sophi 开放式智能试验车",
+        "position": [
+          24.998015268620918,
+          3.2250000000000036,
+          33.92199884486393
+        ],
+        "yaw": -25.000000000000068,
+        "pitch": 0,
+        "footprint": {
+          "width": 2.039999964833264,
+          "length": 3.8380000591278085
+        },
+        "meshes": 30,
+        "wheels": [
+          -355.34625923809267,
+          -355.34625923809267,
+          -355.34625923809267,
+          -355.34625923809267
+        ]
+      },
+      {
+        "id": "35661809-72f8-4957-837e-53bf3132dc9f",
+        "kind": "fusion",
+        "name": "SophiFusion 无刷小车",
+        "position": [
+          -13.501802629807884,
+          3.2250000000000036,
+          39.81382696863031
+        ],
+        "yaw": -79.40612604889064,
+        "pitch": 0,
+        "footprint": {
+          "width": 0.3443999868631451,
+          "length": 0.5000000000000037
+        },
+        "meshes": 10,
+        "wheels": [
+          -2284.8911750062266,
+          -2284.8911750062266,
+          -2284.8911750062266,
+          -2284.8911750062266
+        ]
+      },
+      {
+        "id": "0ed01181-cf50-4c1f-a659-52b0a11e7c94",
+        "kind": "nav",
+        "name": "Sophicar 导航小车",
+        "position": [
+          -51.6080449779082,
+          3.2250000000000036,
+          53.86592862421541
+        ],
+        "yaw": 154.99999999999952,
+        "pitch": 0,
+        "footprint": {
+          "width": 0.46500000342727077,
+          "length": 0.4031013846397401
+        },
+        "meshes": 6,
+        "wheels": [
+          -1884.398498582705,
+          -1884.398498582705
+        ]
+      },
+      {
+        "id": "3def596a-1bf4-4ebd-bc9e-05cc5a56572e",
+        "kind": "edu",
+        "name": "Sophicar 教育小车",
+        "position": [
+          11.455269873662424,
+          3.2250000000000036,
+          136.60230685128772
+        ],
+        "yaw": -56.59910331063795,
+        "pitch": 0,
+        "footprint": {
+          "width": 0.3540000023841898,
+          "length": 0.519999980926542
+        },
+        "meshes": 12,
+        "wheels": [
+          -6499.59834425414,
+          -6499.59834425414,
+          -6499.59834425414,
+          -6499.59834425414
+        ]
+      },
+      {
+        "id": "471fb8e6-f254-42fe-8cbf-581980b721c7",
+        "kind": "sophicore",
+        "name": "SophiCore 轮式机器人",
+        "position": [
+          33.46589078523295,
+          3.2250000000000036,
+          128.15715639721967
+        ],
+        "yaw": 155.0000000000048,
+        "pitch": 0,
+        "footprint": {
+          "width": 0.8500000238418579,
+          "length": 0.8999999761581456
+        },
+        "meshes": 8,
+        "wheels": [
+          -1211.156479788621,
+          -1211.156479788621
+        ]
+      }
+    ],
+    "drives": [
+      {
+        "id": "d4f47e24-9a0b-49b3-82ae-b43088e3afce",
+        "preset": "campus-race-v3",
+        "speed": 8,
+        "actualSpeed": 8,
+        "yielding": false,
+        "distance": 45.50895346977233,
+        "travel": 942.1632489080464,
+        "playing": true
+      },
+      {
+        "id": "20a72af5-f803-4926-8098-b55c754c8844",
+        "preset": "campus-level-network-v2",
+        "speed": 2.5,
+        "actualSpeed": 0,
+        "yielding": false,
+        "distance": 149.2454288799989,
+        "travel": 149.2454288799989,
+        "playing": false
+      },
+      {
+        "id": "35661809-72f8-4957-837e-53bf3132dc9f",
+        "preset": "campus-west-south-v4",
+        "speed": 1.5,
+        "actualSpeed": 1.5,
+        "yielding": false,
+        "distance": 58.743698345420185,
+        "travel": 179.36395723798879,
+        "playing": true
+      },
+      {
+        "id": "0ed01181-cf50-4c1f-a659-52b0a11e7c94",
+        "preset": "campus-west-north-v4",
+        "speed": 1.2,
+        "actualSpeed": 1.2,
+        "yielding": false,
+        "distance": 22.970906699427974,
+        "travel": 143.59116559200214,
+        "playing": true
+      },
+      {
+        "id": "3def596a-1bf4-4ebd-bc9e-05cc5a56572e",
+        "preset": "campus-race-inner-v4",
+        "speed": 3,
+        "actualSpeed": 3,
+        "yielding": false,
+        "distance": 357.4779089339777,
+        "travel": 357.4779089339777,
+        "playing": true
+      },
+      {
+        "id": "471fb8e6-f254-42fe-8cbf-581980b721c7",
+        "preset": "campus-proving-v3",
+        "speed": 2,
+        "actualSpeed": 0,
+        "yielding": false,
+        "distance": 90.83673598414657,
+        "travel": 90.83673598414657,
+        "playing": false
+      }
+    ],
+    "traffic": {
+      "overlaps": [],
+      "interventions": 0,
+      "elapsed": 121.5667000000064
+    },
+    "camera": {
+      "near": 1.4326548781894402,
+      "far": 1800,
+      "distance": 143.26548781894402
+    },
+    "selected": "rover",
+    "drawCalls": 1331
+  }
+}

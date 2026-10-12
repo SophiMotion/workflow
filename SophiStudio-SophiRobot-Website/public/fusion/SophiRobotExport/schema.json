@@ -1,0 +1,233 @@
+{
+  "head": [
+    {
+      "key": "rotation",
+      "min": -90,
+      "max": 90
+    },
+    {
+      "key": "tilt",
+      "min": -30,
+      "max": 30
+    }
+  ],
+  "sourceSha256": "a8435cbd1f3598f699c9bc4f95bd08b898c1e92c5d29baf5d6665e07fb7ed3de",
+  "fields": [
+    {
+      "key": "base_length",
+      "min": 650,
+      "max": 1400,
+      "unit": "mm"
+    },
+    {
+      "key": "base_width",
+      "min": 650,
+      "max": 1200,
+      "unit": "mm"
+    },
+    {
+      "key": "base_height",
+      "min": 160,
+      "max": 350,
+      "unit": "mm"
+    },
+    {
+      "key": "base_angle",
+      "min": 15,
+      "max": 60,
+      "unit": "deg"
+    },
+    {
+      "key": "base_middle_length",
+      "min": 40,
+      "max": 220,
+      "unit": "mm"
+    },
+    {
+      "key": "thin_sheet",
+      "min": 1,
+      "max": 6,
+      "unit": "mm"
+    },
+    {
+      "key": "structural_sheet",
+      "min": 5,
+      "max": 5,
+      "unit": "mm"
+    },
+    {
+      "key": "wheel_base",
+      "min": 300,
+      "max": 850,
+      "unit": "mm"
+    },
+    {
+      "key": "wheel_track",
+      "min": 400,
+      "max": 950,
+      "unit": "mm"
+    },
+    {
+      "key": "od_tire",
+      "min": 100,
+      "max": 220,
+      "unit": "mm"
+    },
+    {
+      "key": "tire_thickness",
+      "min": 8,
+      "max": 50,
+      "unit": "mm"
+    },
+    {
+      "key": "total_height",
+      "min": 1200,
+      "max": 2200,
+      "unit": "mm"
+    },
+    {
+      "key": "shoulder_length",
+      "min": 250,
+      "max": 800,
+      "unit": "mm"
+    },
+    {
+      "key": "hip_length",
+      "min": 180,
+      "max": 650,
+      "unit": "mm"
+    },
+    {
+      "key": "hip_position",
+      "min": 350,
+      "max": 1500,
+      "unit": "mm"
+    },
+    {
+      "key": "tube_diameter",
+      "min": 30,
+      "max": 80,
+      "unit": "mm"
+    },
+    {
+      "key": "tube_thickness",
+      "min": 1,
+      "max": 16,
+      "unit": "mm"
+    },
+    {
+      "key": "upper_arm_length",
+      "min": 100,
+      "max": 500,
+      "unit": "mm"
+    },
+    {
+      "key": "lower_arm_length",
+      "min": 100,
+      "max": 650,
+      "unit": "mm"
+    },
+    {
+      "key": "thigh_length",
+      "min": 100,
+      "max": 500,
+      "unit": "mm"
+    },
+    {
+      "key": "lower_leg_length",
+      "min": 100,
+      "max": 500,
+      "unit": "mm"
+    }
+  ],
+  "joints": {
+    "arm_l": [
+      {
+        "key": "shoulder_lift",
+        "min": -180,
+        "max": 180
+      },
+      {
+        "key": "shoulder_swing",
+        "min": -100,
+        "max": 40
+      },
+      {
+        "key": "arm_twist",
+        "min": -90,
+        "max": 90
+      },
+      {
+        "key": "elbow_bend",
+        "min": 0,
+        "max": 135
+      },
+      {
+        "key": "wrist_rotation",
+        "min": -90,
+        "max": 90
+      },
+      {
+        "key": "clamp",
+        "min": 0,
+        "max": 45
+      }
+    ],
+    "arm_r": [
+      {
+        "key": "shoulder_lift",
+        "min": -180,
+        "max": 180
+      },
+      {
+        "key": "shoulder_swing",
+        "min": -100,
+        "max": 40
+      },
+      {
+        "key": "arm_twist",
+        "min": -90,
+        "max": 90
+      },
+      {
+        "key": "elbow_bend",
+        "min": 0,
+        "max": 135
+      },
+      {
+        "key": "wrist_rotation",
+        "min": -90,
+        "max": 90
+      },
+      {
+        "key": "clamp",
+        "min": 0,
+        "max": 45
+      }
+    ],
+    "leg_l": [
+      {
+        "key": "shoulder_lift",
+        "min": -90,
+        "max": 90
+      },
+      {
+        "key": "elbow_bend",
+        "min": 0,
+        "max": 135
+      }
+    ],
+    "leg_r": [
+      {
+        "key": "shoulder_lift",
+        "min": -90,
+        "max": 90
+      },
+      {
+        "key": "elbow_bend",
+        "min": 0,
+        "max": 135
+      }
+    ]
+  }
+}

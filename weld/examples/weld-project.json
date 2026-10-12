@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "name": "机器人焊接工作站",
+  "part": "框架支架 · Frame bracket",
+  "material": "Q235B",
+  "strategy": "balanced",
+  "process": "mag",
+  "weave": "straight",
+  "gas": "mix",
+  "params": {
+    "current": 220,
+    "voltage": 24,
+    "speed": 8,
+    "efficiency": 0.85,
+    "thickness": 6,
+    "preheat": 20,
+    "cooling": 3,
+    "torchDistance": 15,
+    "gasFlow": 18,
+    "preflow": 0.7,
+    "postflow": 3,
+    "coolDuration": 90,
+    "poolTemp": 1550
+  },
+  "seams": [
+    {
+      "id": "W01",
+      "name": "底板 · 前侧角焊缝",
+      "length": 320,
+      "enabled": true
+    },
+    {
+      "id": "W02",
+      "name": "底板 · 后侧角焊缝",
+      "length": 320,
+      "enabled": true
+    },
+    {
+      "id": "W03",
+      "name": "筋板 · 左侧角焊缝",
+      "length": 180,
+      "enabled": true
+    },
+    {
+      "id": "W04",
+      "name": "筋板 · 右侧角焊缝",
+      "length": 180,
+      "enabled": true
+    }
+  ]
+}

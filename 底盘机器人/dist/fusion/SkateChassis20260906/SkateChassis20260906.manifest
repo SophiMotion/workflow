@@ -1,0 +1,11 @@
+{
+  "autodeskProduct": "Fusion",
+  "type": "addin",
+  "id": "1ffeed66-5d78-4ec5-ae2f-202609060001",
+  "author": "SophiStudio",
+  "description": {"": "接收 SkateChassis 网页配置，生成可编辑参数模型并保存 F3D。"},
+  "version": "1.0.0",
+  "runOnStartup": true,
+  "supportedOS": "windows|mac",
+  "editEnabled": true
+}

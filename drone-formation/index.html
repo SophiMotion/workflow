@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b1524"><title>点阵飞行 · 1000 架无人机</title>
+<link rel="stylesheet" href="./style.css">
+<script type="importmap">{"imports":{"three":"./vendor/three.module.min.js","three/addons/":"./vendor/examples/jsm/"}}</script>
+</head>
+<body>
+<header><div class="studio-heading"><img class="studio-logo" src="sophistudio-logo.png" alt="SophiStudio"><h1>点阵飞行</h1></div><span><i></i>1,000 架</span></header>
+<main>
+<aside>
+<h2>模型与编队</h2>
+<div class="upload-group">
+<button id="upload" class="upload"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V3m-5 5 5-5 5 5M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></svg>上传 GLB</button>
+<input id="file" type="file" accept=".glb" hidden>
+<p class="hint">选择本地三维模型 · 文件仅在本机处理</p>
+<p id="filename" class="filename" hidden></p>
+</div>
+<div class="field"><label for="formation">编队类型</label><select id="formation"><option value="sphere">球形编队</option><option value="helix">螺旋编队</option><option value="cube">立方体编队</option><option value="model" disabled>上传的模型</option></select></div>
+<div class="field"><label for="duration">飞行时长</label><div class="duration"><input id="duration" type="number" min="3" max="60" value="12" step="1"><span>s</span></div></div>
+<label class="toggle-row" for="reference"><span>显示参考模型</span><input id="reference" type="checkbox" disabled role="switch"><span class="switch" aria-hidden="true"></span></label>
+<p id="message" role="status" aria-live="polite">示例编队已就绪。上传 GLB 可生成模型点阵。</p>
+<p class="simulation-note">可视化演示 · 不含真实飞控航线</p>
+</aside>
+<section class="workspace" aria-label="三维点阵场景">
+<div id="viewport"><button id="reset-view" title="恢复默认视角" aria-label="恢复默认视角"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6"/></svg></button><div id="fatal" role="alert" hidden></div><span id="phase">编队就绪</span></div>
+<div class="playback">
+<button id="play" class="primary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7Z"/></svg><span>播放</span></button>
+<button id="restart"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6"/></svg><span>重新编队</span></button>
+<div class="timeline"><input id="progress" type="range" min="0" max="1000" value="1000" aria-label="飞行进度"><output id="time" for="progress">12.0 / 12 s</output></div>
+<span class="navigation-hint">拖动旋转 · 滚轮缩放</span>
+</div>
+</section>
+</main>
+<script type="module" src="./bootstrap.js"></script>
+</body></html>

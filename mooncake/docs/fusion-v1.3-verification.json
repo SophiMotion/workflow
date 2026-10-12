@@ -1,0 +1,209 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "passed": true,
+      "text": {
+        "character": "HELLO",
+        "size": 18,
+        "font": "serif",
+        "layout": "circular"
+      },
+      "file": "/Users/wubo/Documents/2026-2/sophistudio/mooncake/mooncake/exports/Mooncake-68mm-fc71bdf3.f3d",
+      "parts": [
+        {
+          "name": "02_模具外套筒",
+          "solid": true,
+          "volumeCm3": 68.4281394607302,
+          "positionMm": [
+            57.8,
+            -57.8,
+            0.0
+          ],
+          "threads": 0
+        },
+        {
+          "name": "03_可换镜像凹纹压片",
+          "solid": true,
+          "volumeCm3": 21.46168694860375,
+          "positionMm": [
+            -57.8,
+            57.8,
+            12.0
+          ],
+          "threads": 1
+        },
+        {
+          "name": "04_螺纹推杆与手柄",
+          "solid": true,
+          "volumeCm3": 19.398949832827142,
+          "positionMm": [
+            57.8,
+            57.8,
+            10.0
+          ],
+          "threads": 1
+        },
+        {
+          "name": "01_月饼_HELLO_68mm",
+          "solid": true,
+          "volumeCm3": 89.6313492320081,
+          "positionMm": [
+            -57.8,
+            -57.8,
+            0.0
+          ],
+          "threads": 0
+        }
+      ],
+      "reopened": [
+        {
+          "name": "02_模具外套筒",
+          "solid": true,
+          "volumeCm3": 68.4281394607302,
+          "positionMm": [
+            57.8,
+            -57.8,
+            0.0
+          ],
+          "threads": 0
+        },
+        {
+          "name": "03_可换镜像凹纹压片",
+          "solid": true,
+          "volumeCm3": 21.46168694860375,
+          "positionMm": [
+            -57.8,
+            57.8,
+            12.0
+          ],
+          "threads": 1
+        },
+        {
+          "name": "04_螺纹推杆与手柄",
+          "solid": true,
+          "volumeCm3": 19.398949832827142,
+          "positionMm": [
+            57.8,
+            57.8,
+            10.0
+          ],
+          "threads": 1
+        },
+        {
+          "name": "01_月饼_HELLO_68mm",
+          "solid": true,
+          "volumeCm3": 89.6313492320081,
+          "positionMm": [
+            -57.8,
+            -57.8,
+            0.0
+          ],
+          "threads": 0
+        }
+      ]
+    },
+    {
+      "passed": true,
+      "text": {
+        "character": "团圆",
+        "size": 18,
+        "font": "serif",
+        "layout": "straight"
+      },
+      "file": "/Users/wubo/Documents/2026-2/sophistudio/mooncake/mooncake/exports/Mooncake-68mm-e3decebd.f3d",
+      "parts": [
+        {
+          "name": "02_模具外套筒",
+          "solid": true,
+          "volumeCm3": 68.4281394607302,
+          "positionMm": [
+            57.8,
+            -57.8,
+            0.0
+          ],
+          "threads": 0
+        },
+        {
+          "name": "03_可换镜像凹纹压片",
+          "solid": true,
+          "volumeCm3": 21.398663443107743,
+          "positionMm": [
+            -57.8,
+            57.8,
+            12.0
+          ],
+          "threads": 1
+        },
+        {
+          "name": "04_螺纹推杆与手柄",
+          "solid": true,
+          "volumeCm3": 19.398949832827142,
+          "positionMm": [
+            57.8,
+            57.8,
+            10.0
+          ],
+          "threads": 1
+        },
+        {
+          "name": "01_月饼_团圆_68mm",
+          "solid": true,
+          "volumeCm3": 89.6943727375041,
+          "positionMm": [
+            -57.8,
+            -57.8,
+            0.0
+          ],
+          "threads": 0
+        }
+      ],
+      "reopened": [
+        {
+          "name": "02_模具外套筒",
+          "solid": true,
+          "volumeCm3": 68.4281394607302,
+          "positionMm": [
+            57.8,
+            -57.8,
+            0.0
+          ],
+          "threads": 0
+        },
+        {
+          "name": "03_可换镜像凹纹压片",
+          "solid": true,
+          "volumeCm3": 21.398663443107743,
+          "positionMm": [
+            -57.8,
+            57.8,
+            12.0
+          ],
+          "threads": 1
+        },
+        {
+          "name": "04_螺纹推杆与手柄",
+          "solid": true,
+          "volumeCm3": 19.398949832827142,
+          "positionMm": [
+            57.8,
+            57.8,
+            10.0
+          ],
+          "threads": 1
+        },
+        {
+          "name": "01_月饼_团圆_68mm",
+          "solid": true,
+          "volumeCm3": 89.6943727375041,
+          "positionMm": [
+            -57.8,
+            -57.8,
+            0.0
+          ],
+          "threads": 0
+        }
+      ]
+    }
+  ]
+}

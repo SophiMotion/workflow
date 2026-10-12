@@ -1,0 +1,457 @@
+[
+  {
+    "path": ".gitignore",
+    "bytes": 44,
+    "sha256": "94fb3ee2d2cecdeb93d33950eba93eecf0726acde445bed32d284f53e651ae89"
+  },
+  {
+    "path": "Launch Website.cmd",
+    "bytes": 449,
+    "sha256": "6cf66b2d831c95b67ac2340b9a3eb321535023c188b38a67a6da699549d9aa58"
+  },
+  {
+    "path": "README.md",
+    "bytes": 13336,
+    "sha256": "1304c20068185780b42688f477ba186700a9e7d4a973a10311cff2263cac1675"
+  },
+  {
+    "path": "bom.html",
+    "bytes": 330,
+    "sha256": "29e323a8994cb6671e9c36443d5cb5fb32f580d3237c7f369ff406b93d3ce3d4"
+  },
+  {
+    "path": "dist/assets/bom-CNRZVEoZ.js",
+    "bytes": 13244,
+    "sha256": "067facb3ddabe9597e068a3c8818d0408598b733969c8b00519ea8125b414b43"
+  },
+  {
+    "path": "dist/assets/bom-DABYGypJ.css",
+    "bytes": 8971,
+    "sha256": "172d4df2860430b7b2c1b5d0eca0b33f20e6a62d265c9f15289ced8048b6bc53"
+  },
+  {
+    "path": "dist/assets/main-BGSB3-0V.js",
+    "bytes": 80087,
+    "sha256": "4500500122c87b4ff9f89e5e92f27e3388a66a28d22adb3afaf0c61fc012854c"
+  },
+  {
+    "path": "dist/assets/main-rTRCsRqa.css",
+    "bytes": 20216,
+    "sha256": "459667bfbbe845001527e1601e461d481e64eca276f324452fb33103a27493f3"
+  },
+  {
+    "path": "dist/assets/motors-Cge-KBa8.js",
+    "bytes": 8146,
+    "sha256": "b1be346955037514d001775629b6e4959c0d22eea5f1707e947197df473a7cef"
+  },
+  {
+    "path": "dist/assets/step-worker-Dd0gqecu.js",
+    "bytes": 41178,
+    "sha256": "24714f317d6f10272882fa30a830a9b67d70bd8f463cc465bfe8fd37aa6cfe95"
+  },
+  {
+    "path": "dist/assets/three-CC10UbUc.js",
+    "bytes": 487081,
+    "sha256": "b0d81e3b4f0f6f398568bc939da63d48fa41f12c6576697229f448fe63fb2327"
+  },
+  {
+    "path": "dist/bom.html",
+    "bytes": 505,
+    "sha256": "f2512e45645325355276d70ad7b56cfe1474fe454b98839699d1db7bb7826300"
+  },
+  {
+    "path": "dist/fusion/README.md",
+    "bytes": 6547,
+    "sha256": "02f1e45dffa8372dd8f90e5f1bbe414f0eb8eed1a07920dbcdb1e40237f42aa6"
+  },
+  {
+    "path": "dist/fusion/SophiRobot-Fusion-Export.zip",
+    "bytes": 8529,
+    "sha256": "aea212fe945545906a58a9c6bafa4f91582e170e2bfe10ec5684391ef3ae87d0"
+  },
+  {
+    "path": "dist/fusion/SophiRobotExport/SophiRobotExport.manifest",
+    "bytes": 248,
+    "sha256": "674d92c21991bfa0acded213ed016b42a038a182a778136fe77a147db850e32b"
+  },
+  {
+    "path": "dist/fusion/SophiRobotExport/SophiRobotExport.py",
+    "bytes": 5179,
+    "sha256": "6c8d48acc82f58f616479b0ff0596527281e3dcbf04cf15a10711917f84bfdcf"
+  },
+  {
+    "path": "dist/fusion/SophiRobotExport/export_core.py",
+    "bytes": 3590,
+    "sha256": "f4941a179c9ddc0824d7b1fe20b6d68f14c298cfda280656290fdd43ed537b23"
+  },
+  {
+    "path": "dist/fusion/SophiRobotExport/mapping.json",
+    "bytes": 3823,
+    "sha256": "46d131d42ac9fe4df772c7d9919119e3e49225368a880b615ce710d82d0e732f"
+  },
+  {
+    "path": "dist/fusion/SophiRobotExport/schema.json",
+    "bytes": 3759,
+    "sha256": "be90f0f51c9579946fcb855c7dc1ea6b2c765a2da868ee8a84286d98dc8a6855"
+  },
+  {
+    "path": "dist/index.html",
+    "bytes": 920,
+    "sha256": "8478f515289ccdf96e7c64142bf2bff2924f425795f479d619cf47faf74b8500"
+  },
+  {
+    "path": "dist/model.json",
+    "bytes": 58077534,
+    "sha256": "e4fecfb762a35b013897a2bd0b2a40e64e0dbc00918e642b5266a92ac291f9e2"
+  },
+  {
+    "path": "docs/evidence/model-v4-hand-servos.png",
+    "bytes": 95407,
+    "sha256": "0cb27e6042102298250420585ddbcaa0f2fbfeca207d51b5cb5491ae2425467e"
+  },
+  {
+    "path": "docs/evidence/model-v4-head-movement.png",
+    "bytes": 66721,
+    "sha256": "e8b68490e9202b84b6c23da5141eae57c4d3ba4b731e35326dbe69370c549e8e"
+  },
+  {
+    "path": "docs/evidence/model-v4-neutral.png",
+    "bytes": 66357,
+    "sha256": "6ee4abdfce79fa1fdce8ecf9c374688c7ebbca2b3142574dd5f4ebc537cab1c2"
+  },
+  {
+    "path": "docs/evidence/model-v4-posed.png",
+    "bytes": 75450,
+    "sha256": "3ce72713a5dd8b2caf2b72a34c7c0ce7cf306c9b127685b55fbcc73ca4e09d50"
+  },
+  {
+    "path": "docs/model-inspection.json",
+    "bytes": 351004,
+    "sha256": "c6cf8ed949e5ecda87dabdd92c5f3a2df95832c9191092c113d6dfa3f34bb8f8"
+  },
+  {
+    "path": "docs/model-v4.md",
+    "bytes": 13947,
+    "sha256": "527b501c1b9b3d7dfc5840924b42116766a9f0786563227cd66b80a57ea71947"
+  },
+  {
+    "path": "examples/SophiRobot-BOM-CNY.csv",
+    "bytes": 4128,
+    "sha256": "8130ae98b35eee0cc83f6b5b29d3268df516831939c9fe4e99832f1c31f0f065"
+  },
+  {
+    "path": "examples/SophiRobot-fusion-request.json",
+    "bytes": 9440,
+    "sha256": "2e4a0b7c30d3719822443a21850f7cbdacc0d17dfa495cc9371966fe351c3863"
+  },
+  {
+    "path": "examples/default-configuration.json",
+    "bytes": 9249,
+    "sha256": "a0c32ea9f46f22f71c02f7e21bacfb1c65b911e3a552ae81c5d66bc6e374d02b"
+  },
+  {
+    "path": "index.html",
+    "bytes": 669,
+    "sha256": "180cff82a091878dc7a17e9f3697e110dace80f000a7b8327f97d3e1ee9f4d11"
+  },
+  {
+    "path": "package.json",
+    "bytes": 757,
+    "sha256": "f705e86bf95be14207ed8868d5190103c5e562ec88fe0e2b89b6986bc238bf17"
+  },
+  {
+    "path": "pnpm-lock.yaml",
+    "bytes": 33248,
+    "sha256": "c29319a177dc7c813b10365568f60f4f0c214a4f67f1322fce19acc7fc21848c"
+  },
+  {
+    "path": "pnpm-workspace.yaml",
+    "bytes": 29,
+    "sha256": "ac02d96368617c760f093cfe61fdec64b6244007ab3553e0d6621f706f54a353"
+  },
+  {
+    "path": "public/fusion/README.md",
+    "bytes": 6547,
+    "sha256": "02f1e45dffa8372dd8f90e5f1bbe414f0eb8eed1a07920dbcdb1e40237f42aa6"
+  },
+  {
+    "path": "public/fusion/SophiRobot-Fusion-Export.zip",
+    "bytes": 8529,
+    "sha256": "aea212fe945545906a58a9c6bafa4f91582e170e2bfe10ec5684391ef3ae87d0"
+  },
+  {
+    "path": "public/fusion/SophiRobotExport/SophiRobotExport.manifest",
+    "bytes": 248,
+    "sha256": "674d92c21991bfa0acded213ed016b42a038a182a778136fe77a147db850e32b"
+  },
+  {
+    "path": "public/fusion/SophiRobotExport/SophiRobotExport.py",
+    "bytes": 5179,
+    "sha256": "6c8d48acc82f58f616479b0ff0596527281e3dcbf04cf15a10711917f84bfdcf"
+  },
+  {
+    "path": "public/fusion/SophiRobotExport/export_core.py",
+    "bytes": 3590,
+    "sha256": "f4941a179c9ddc0824d7b1fe20b6d68f14c298cfda280656290fdd43ed537b23"
+  },
+  {
+    "path": "public/fusion/SophiRobotExport/mapping.json",
+    "bytes": 3823,
+    "sha256": "46d131d42ac9fe4df772c7d9919119e3e49225368a880b615ce710d82d0e732f"
+  },
+  {
+    "path": "public/fusion/SophiRobotExport/schema.json",
+    "bytes": 3759,
+    "sha256": "be90f0f51c9579946fcb855c7dc1ea6b2c765a2da868ee8a84286d98dc8a6855"
+  },
+  {
+    "path": "public/model.json",
+    "bytes": 58077534,
+    "sha256": "e4fecfb762a35b013897a2bd0b2a40e64e0dbc00918e642b5266a92ac291f9e2"
+  },
+  {
+    "path": "scripts/convert.cjs",
+    "bytes": 1893,
+    "sha256": "4a55b8b90e6b1562ed6170d009b64ead6fbef4324d4cbef43eb8e46437bfa315"
+  },
+  {
+    "path": "scripts/fusion-schema.cjs",
+    "bytes": 1512,
+    "sha256": "ec6ec31cf0e3cc1a41ca3b2f982cefddd2d6e36e0127491aaaae515a821f9ebe"
+  },
+  {
+    "path": "scripts/package-fusion.py",
+    "bytes": 635,
+    "sha256": "6b56404105fea19698876f4f1be8e72c9347bd3a0de2251ad4033065f8ae4a76"
+  },
+  {
+    "path": "scripts/serve.cjs",
+    "bytes": 1875,
+    "sha256": "1c71991fa4220462b3fe688061539abd69b57c0a10a1bfc173e1627bc82f7dca"
+  },
+  {
+    "path": "scripts/verify-step-export.cjs",
+    "bytes": 2818,
+    "sha256": "3d681e492fd798f51a18509bdcb06baeaa3a38c2f01bfca6b1e150a0555e9921"
+  },
+  {
+    "path": "source-model/Assembly testing website 4.step",
+    "bytes": 18167080,
+    "sha256": "a8435cbd1f3598f699c9bc4f95bd08b898c1e92c5d29baf5d6665e07fb7ed3de"
+  },
+  {
+    "path": "src/arm-controls.ts",
+    "bytes": 4599,
+    "sha256": "a66f628e37bda32a7a2a0591e7999b310ae48e0e163c78e54f03352920dee4dd"
+  },
+  {
+    "path": "src/arms.ts",
+    "bytes": 1756,
+    "sha256": "54371dcbddc98983b10facbf85556f06bb5f7b94a887a1624d4160ee5bc21b7b"
+  },
+  {
+    "path": "src/bom-controls.ts",
+    "bytes": 855,
+    "sha256": "7f87f5ef06cd3c912e46736c993a4c3d0baa746ae2c08d24033e3bbb44c46bb0"
+  },
+  {
+    "path": "src/bom-data.ts",
+    "bytes": 5149,
+    "sha256": "b45d720387c8af4a4bb15140d9c0966b0c49151a8fedcb04a6f7f297b8b6c2f6"
+  },
+  {
+    "path": "src/bom.css",
+    "bytes": 9010,
+    "sha256": "38286fb840f1bdc3bd70c6c5ce787c5697cffee3b7c44adf5f08b2c8d0e4a0f0"
+  },
+  {
+    "path": "src/bom.ts",
+    "bytes": 10266,
+    "sha256": "1a63703f4eb15d63f0051db30be936222539bd26e51b2c723566e5b62146be5b"
+  },
+  {
+    "path": "src/fusion-export.ts",
+    "bytes": 761,
+    "sha256": "8e52146475d41312cb3f06106a1ed8f4f8e519bfd55a223e6852548708a7020a"
+  },
+  {
+    "path": "src/geometry.ts",
+    "bytes": 4128,
+    "sha256": "2e070150179c8256b1d478beb7802a8a017867859bc98be5a96793d174210e8d"
+  },
+  {
+    "path": "src/gestures.ts",
+    "bytes": 1136,
+    "sha256": "4e839afea0e4ef6ebea3d61c3a63cfb6ad37683e5708a4da9d4ed3744fdff381"
+  },
+  {
+    "path": "src/head-controls.ts",
+    "bytes": 2861,
+    "sha256": "0ccabadc9bb37c9488f793eea817b541e27c5db6c4d8cde17f2ba6624b191202"
+  },
+  {
+    "path": "src/head.ts",
+    "bytes": 1901,
+    "sha256": "c992e69b6f34285c95beb34b825218c2d22aaa450a563deb7344f1a1016cfbbb"
+  },
+  {
+    "path": "src/icons.ts",
+    "bytes": 1045,
+    "sha256": "1fc6f75e977ff3de5b54f42f22ba9b950e15163393db857f31b12de64df64309"
+  },
+  {
+    "path": "src/limbs.ts",
+    "bytes": 7756,
+    "sha256": "b7b9da1fdbe8ba3b74121210b5c8ff600ea1dd8c7e8d365417d72be2beee0586"
+  },
+  {
+    "path": "src/main.ts",
+    "bytes": 30230,
+    "sha256": "82d037e9d395dca2a26f62167676a278b8576729bd4cf5e25a240d2a377f4619"
+  },
+  {
+    "path": "src/model4-tubes.json",
+    "bytes": 1076,
+    "sha256": "1010dbf33c718f76f400ad31517ba30313feb6f74cbae44df63c37e5650c47d7"
+  },
+  {
+    "path": "src/motor-controls.ts",
+    "bytes": 3919,
+    "sha256": "4d5cc2edbad00a1ea7dee48631773e0f5d99c2c2c948bf9e07e11ed5e40c7fc0"
+  },
+  {
+    "path": "src/motors.ts",
+    "bytes": 2419,
+    "sha256": "b76a26ae6fd888e01505b26302bd7d69b2a43e5403cbc9a4f0d86c4b98b269a9"
+  },
+  {
+    "path": "src/parameters.ts",
+    "bytes": 6894,
+    "sha256": "d59009fc719a4cd499d3bc8b014c2dc5fa424685d53da20205ce7e0f714b6a8f"
+  },
+  {
+    "path": "src/step-export.ts",
+    "bytes": 5019,
+    "sha256": "bcb6dc1507e77ef6f0e7efdf1bb296829ce4e855d29fe16a50336f31a52bab0b"
+  },
+  {
+    "path": "src/step-worker.ts",
+    "bytes": 980,
+    "sha256": "c32832bf6d7b30fe00c21825d33ee87d5ffaf1fe1514801be3d12bee5aa8efab"
+  },
+  {
+    "path": "src/styles.css",
+    "bytes": 20400,
+    "sha256": "e748ed0d4a0bb7c63224ee4b7d308ae898af2ff4643303b547e94c75c35b7bc2"
+  },
+  {
+    "path": "src/viewer.ts",
+    "bytes": 10411,
+    "sha256": "33a7f422d2738a08d15db8544066ff4cd74713d1a553e2a8d4ae0cc871adc49c"
+  },
+  {
+    "path": "src/vite-env.d.ts",
+    "bytes": 38,
+    "sha256": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5"
+  },
+  {
+    "path": "src/walk-controls.ts",
+    "bytes": 6377,
+    "sha256": "e747f0b752ecd0e0f2cbaf62f9332e61eaf0e3d290abfba327aeb76928c01e03"
+  },
+  {
+    "path": "src/walk.ts",
+    "bytes": 716,
+    "sha256": "2a5562fb5d2c210f2dc8376cb73a9d48a646d7635f0d74e24fb6f5dbed08e960"
+  },
+  {
+    "path": "src/wave.ts",
+    "bytes": 713,
+    "sha256": "61c35c7fed15850a4b13703a9a9fcfdf0839f0793ce5d02e729b9fc944192b70"
+  },
+  {
+    "path": "tests/arms.test.ts",
+    "bytes": 782,
+    "sha256": "3957f5deca673f4e667b10e50834b8863b2fb07acc6bdd31e44532bc74bd74ec"
+  },
+  {
+    "path": "tests/bom-controls.test.ts",
+    "bytes": 1201,
+    "sha256": "9b7ebd46ce1f7ae0c64fb625af302408266cd7f3acfc7af17fd68d7890a1ba72"
+  },
+  {
+    "path": "tests/bom.test.ts",
+    "bytes": 1363,
+    "sha256": "4eb9e500c09ad62ac1887ec72823857ba51b1627fb5951808794353c5f0c03ce"
+  },
+  {
+    "path": "tests/config.test.ts",
+    "bytes": 913,
+    "sha256": "fea09fd5f50dae7712ab8e697f1f0cf29a794f4334bb325af4181cd141025f7f"
+  },
+  {
+    "path": "tests/fusion-export.test.ts",
+    "bytes": 1571,
+    "sha256": "56ae8d3922b0fc6f9f0810073ffa98c86f41edb7c5196e5749a7078a0650136c"
+  },
+  {
+    "path": "tests/geometry.test.ts",
+    "bytes": 4622,
+    "sha256": "d49ff0cf391273ef411b19a882ba8ed54f96ed9b68a8fe3a918dc8867c8d62c4"
+  },
+  {
+    "path": "tests/gestures.test.ts",
+    "bytes": 1122,
+    "sha256": "481163213d80d233894fd479c48df768a1df97398602d419e3a79ea101818361"
+  },
+  {
+    "path": "tests/grippers.test.ts",
+    "bytes": 3519,
+    "sha256": "e913de9f90402fc99c9d695373bc72c580ed5cb67b2143a427a638d1760df20b"
+  },
+  {
+    "path": "tests/head.test.ts",
+    "bytes": 1952,
+    "sha256": "73a160bfde03a3e0a0f9191abe4c71c2bce998f6185b0d4013855e42963bf961"
+  },
+  {
+    "path": "tests/limbs.test.ts",
+    "bytes": 6883,
+    "sha256": "44327ebf6073bcbd7aed427e6c406a8c48cfa836b9ea94202b3f726467817a26"
+  },
+  {
+    "path": "tests/motors.test.ts",
+    "bytes": 1856,
+    "sha256": "dd0ff15e7f5b43f3854d15925e10e62618cdba5fe17eb8b1024cd4533cc71fd2"
+  },
+  {
+    "path": "tests/step-export.test.ts",
+    "bytes": 2253,
+    "sha256": "afcdef6f84fe8daf141f66752822959b7ff74562849b8a14041df3ab387ede20"
+  },
+  {
+    "path": "tests/test_fusion_export.py",
+    "bytes": 4613,
+    "sha256": "b1251e17866213ab5c7a85683054b93e557eeac7ec5cf0c837a2e05f07b4b6ca"
+  },
+  {
+    "path": "tests/walk.test.ts",
+    "bytes": 1141,
+    "sha256": "d496a051aff360cc1103995569f970c45852571670a8b73f70a46c8276d01edc"
+  },
+  {
+    "path": "tests/wave.test.ts",
+    "bytes": 1047,
+    "sha256": "59b7d663914299f55e4d50286c54be9c5d5d8edcb770c30d1ba7bcb3975a42ec"
+  },
+  {
+    "path": "tsconfig.json",
+    "bytes": 201,
+    "sha256": "c8c98d41a4fec5efa0479adee89c2ad53c4339067b11839fb7da69d5f6c5269f"
+  },
+  {
+    "path": "vite.config.mjs",
+    "bytes": 217,
+    "sha256": "999f58fade31b164b810fe234295486bd209bdc7d9d13cb78fcc00909987c571"
+  }
+]

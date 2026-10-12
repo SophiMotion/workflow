@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "projects": [
+    {
+      "id": "my-campus-project",
+      "title": "我的校园交通项目",
+      "source": "course",
+      "description": "请填写主要人群、路线、核心任务与待验证问题。",
+      "source_url": "",
+      "stage": "planned",
+      "verification": "unverified",
+      "world": null
+    }
+  ]
+}

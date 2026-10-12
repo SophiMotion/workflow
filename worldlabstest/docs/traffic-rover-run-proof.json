@@ -1,0 +1,197 @@
+{
+  "ready": true,
+  "models": [
+    {
+      "id": "d4f47e24-9a0b-49b3-82ae-b43088e3afce",
+      "kind": "sophicar",
+      "name": "线控底盘 1",
+      "position": [
+        -65.19463489150533,
+        3.2250000000000036,
+        103.11517817684606
+      ],
+      "yaw": 134.0221405846386,
+      "pitch": 0,
+      "meshes": 454,
+      "wheels": []
+    },
+    {
+      "id": "94df6015-1052-4c55-8b3f-92c77c383832",
+      "kind": "robot",
+      "name": "移动机器人 1",
+      "position": [
+        9.08844,
+        3.225,
+        21.899263
+      ],
+      "yaw": 195,
+      "meshes": 27,
+      "wheels": []
+    },
+    {
+      "id": "20a72af5-f803-4926-8098-b55c754c8844",
+      "kind": "rover",
+      "name": "Sophi 开放式智能试验车",
+      "position": [
+        33.46589078523295,
+        3.2250000000000036,
+        128.15715639721967
+      ],
+      "yaw": 155.0000000000048,
+      "pitch": 0,
+      "meshes": 30,
+      "wheels": [
+        -216.32968405714155,
+        -216.32968405714155,
+        -216.32968405714155,
+        -216.32968405714155
+      ]
+    },
+    {
+      "id": "35661809-72f8-4957-837e-53bf3132dc9f",
+      "kind": "fusion",
+      "name": "SophiFusion 无刷小车",
+      "position": [
+        -26.685862895322984,
+        3.2250000000000036,
+        0.42013667391208465
+      ],
+      "yaw": 154.9999999999999,
+      "pitch": 0,
+      "meshes": 10,
+      "wheels": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "0ed01181-cf50-4c1f-a659-52b0a11e7c94",
+      "kind": "nav",
+      "name": "Sophicar 导航小车",
+      "position": [
+        -41.90012031798817,
+        3.2250000000000036,
+        33.04721700723148
+      ],
+      "yaw": 155.0000000000003,
+      "pitch": 0,
+      "meshes": 6,
+      "wheels": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "3def596a-1bf4-4ebd-bc9e-05cc5a56572e",
+      "kind": "edu",
+      "name": "Sophicar 教育小车",
+      "position": [
+        -66.40119562016702,
+        3.2250000000000036,
+        101.77943448584415
+      ],
+      "yaw": 134.0188877681941,
+      "pitch": 0,
+      "meshes": 12,
+      "wheels": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "471fb8e6-f254-42fe-8cbf-581980b721c7",
+      "kind": "sophicore",
+      "name": "SophiCore 轮式机器人",
+      "position": [
+        71.5015343418959,
+        3.2250000000000036,
+        46.589455563921156
+      ],
+      "yaw": 155.00000000000136,
+      "pitch": 0,
+      "meshes": 8,
+      "wheels": [
+        0,
+        0
+      ]
+    }
+  ],
+  "drives": [
+    {
+      "id": "d4f47e24-9a0b-49b3-82ae-b43088e3afce",
+      "preset": "campus-race-v3",
+      "speed": 8,
+      "actualSpeed": 0,
+      "yielding": false,
+      "distance": 0,
+      "travel": 0,
+      "playing": false
+    },
+    {
+      "id": "20a72af5-f803-4926-8098-b55c754c8844",
+      "preset": "campus-proving-v3",
+      "speed": 4,
+      "actualSpeed": 0,
+      "yielding": false,
+      "distance": 90.83673598414657,
+      "travel": 90.85846730399945,
+      "playing": false
+    },
+    {
+      "id": "35661809-72f8-4957-837e-53bf3132dc9f",
+      "preset": "campus-west-south-v4",
+      "speed": 1.5,
+      "actualSpeed": 0,
+      "yielding": false,
+      "distance": 0,
+      "travel": 0,
+      "playing": false
+    },
+    {
+      "id": "0ed01181-cf50-4c1f-a659-52b0a11e7c94",
+      "preset": "campus-west-north-v4",
+      "speed": 1.2,
+      "actualSpeed": 0,
+      "yielding": false,
+      "distance": 0,
+      "travel": 0,
+      "playing": false
+    },
+    {
+      "id": "3def596a-1bf4-4ebd-bc9e-05cc5a56572e",
+      "preset": "campus-race-inner-v4",
+      "speed": 3,
+      "actualSpeed": 0,
+      "yielding": false,
+      "distance": 0,
+      "travel": 0,
+      "playing": false
+    },
+    {
+      "id": "471fb8e6-f254-42fe-8cbf-581980b721c7",
+      "preset": "campus-proving-v3",
+      "speed": 2,
+      "actualSpeed": 0,
+      "yielding": false,
+      "distance": 0,
+      "travel": 0,
+      "playing": false
+    }
+  ],
+  "traffic": {
+    "overlaps": [],
+    "interventions": 0,
+    "elapsed": 141.3871000000098
+  },
+  "camera": {
+    "near": 0.12103305333668148,
+    "far": 1800,
+    "distance": 12.103305333668146
+  },
+  "selected": "rover",
+  "drawCalls": 80
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@sophicad/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "sophicad-mcp": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -b --pretty false",
+    "test": "npm run build && vitest run",
+    "typecheck": "tsc -b --pretty false"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@sophicad/core": "0.1.0",
+    "@sophicad/schema": "0.1.0",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {}
+}

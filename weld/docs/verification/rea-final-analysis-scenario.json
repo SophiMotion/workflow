@@ -1,0 +1,88 @@
+{
+  "browser": {
+    "mode": "launch",
+    "executable_path": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "headless": true
+  },
+  "start_url": {
+    "url": "http://127.0.0.1:8765/weld.html"
+  },
+  "environment": {
+    "viewport": {
+      "width": 1600,
+      "height": 1000,
+      "device_scale_factor": 1
+    },
+    "locale": "zh-CN",
+    "timezone": "Asia/Shanghai"
+  },
+  "actions": [
+    {
+      "step_id": "viewport-ready",
+      "action": "wait_for",
+      "locator": {
+        "kind": "css",
+        "selector": "canvas"
+      },
+      "state": "visible",
+      "timeout_ms": 10000
+    },
+    {
+      "step_id": "initial-render",
+      "action": "wait_for_timeout",
+      "duration_ms": 1500
+    },
+    {
+      "step_id": "run-demo",
+      "action": "click",
+      "locator": {
+        "kind": "css",
+        "selector": "#runBtn"
+      }
+    },
+    {
+      "step_id": "weld-preview",
+      "action": "wait_for_timeout",
+      "duration_ms": 2200
+    },
+    {
+      "step_id": "pause",
+      "action": "click",
+      "locator": {
+        "kind": "css",
+        "selector": "[data-action=\"play\"]"
+      }
+    },
+    {
+      "step_id": "temperature-result",
+      "action": "select_option",
+      "locator": {
+        "kind": "css",
+        "selector": "#metric"
+      },
+      "value": {
+        "source": "literal",
+        "value": "temperature"
+      }
+    },
+    {
+      "step_id": "settle-temperature",
+      "action": "wait_for_timeout",
+      "duration_ms": 300
+    }
+  ],
+  "capture": {
+    "at_end": [
+      "screenshot",
+      "accessibility",
+      "url"
+    ],
+    "events": [
+      "console",
+      "page-errors"
+    ],
+    "after_each_step": [
+      "accessibility"
+    ]
+  }
+}

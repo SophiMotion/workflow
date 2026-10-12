@@ -1,0 +1,1298 @@
+# Review package: Task 8 (changed-file current snapshots; no commits by ruling)
+
+## Files
+src/features/dashboard/ControlPanel.tsx
+src/features/dashboard/TelemetryCards.tsx
+src/features/dashboard/FieldSelector.tsx
+src/features/dashboard/HistoryChart.tsx
+src/features/dashboard/historyMapping.ts
+src/features/dashboard/evidenceRecording.ts
+src/features/dashboard/Dashboard.test.tsx
+src/App.tsx
+src/styles/global.css
+src/test/setup.ts
+
+## Current contents
+diff --git a/src/features/dashboard/ControlPanel.tsx b/src/features/dashboard/ControlPanel.tsx
+new file mode 100644
+index 0000000..009bef6
+--- /dev/null
++++ b/src/features/dashboard/ControlPanel.tsx
+@@ -0,0 +1,71 @@
++import { useId } from "react";
++import { labStore, useLabStore } from "../experiment/labStore";
++import type { RunPhase } from "../experiment/model";
++
++const PHASE_LABELS: Record<RunPhase, string> = {
++  idle: "待机 / IDLE",
++  ramping: "加速 / RAMPING",
++  stabilizing: "稳定中 / STABILIZING",
++  sampling: "采样 / SAMPLING",
++  paused: "已暂停 / PAUSED",
++  completed: "已完成 / COMPLETED",
++};
++
++const ACTIVE_PHASES: readonly RunPhase[] = ["ramping", "stabilizing", "sampling"];
++
++export function ControlPanel() {
++  const inputId = useId();
++  const phase = useLabStore((state) => state.phase);
++  const fanPowerPct = useLabStore((state) => state.fanPowerPct);
++  const hasHistory = useLabStore((state) => state.history.length > 0);
++  const active = ACTIVE_PHASES.includes(phase);
++
++  const startOrResume = () => {
++    if (phase === "paused") {
++      labStore.getState().resumeRun();
++      return;
++    }
++    labStore.getState().startRun();
++  };
++
++  const reset = () => {
++    if (hasHistory && !window.confirm("停止实验并清除当前 60 秒遥测历史？")) return;
++    labStore.getState().resetLab();
++  };
++
++  return (
++    <section className="dashboard-section fan-controls" aria-labelledby="fan-control-title">
++      <div className="dashboard-section-heading">
++        <div>
++          <p className="section-kicker">FAN CONTROL</p>
++          <h2 id="fan-control-title">风扇控制</h2>
++        </div>
++        <span className={`phase-badge phase-${phase}`} aria-live="polite">{PHASE_LABELS[phase]}</span>
++      </div>
++
++      <div className="fan-power-row">
++        <label htmlFor={inputId}>风扇功率</label>
++        <output htmlFor={inputId}>{fanPowerPct}%</output>
++      </div>
++      <input
++        id={inputId}
++        className="fan-slider"
++        type="range"
++        min="0"
++        max="100"
++        step="1"
++        value={fanPowerPct}
++        onChange={(event) => labStore.getState().setFanPower(event.currentTarget.valueAsNumber)}
++      />
++      <div className="slider-scale" aria-hidden="true"><span>0</span><span>50</span><span>100</span></div>
++
++      <div className="experiment-actions">
++        <button type="button" className="action-primary" disabled={active} onClick={startOrResume}>
++          {phase === "paused" ? "继续实验" : "启动实验"}
++        </button>
++        <button type="button" disabled={!active} onClick={() => labStore.getState().pauseRun()}>暂停实验</button>
++        <button type="button" onClick={reset}>停止并重置</button>
++      </div>
++    </section>
++  );
++}
+diff --git a/src/features/dashboard/TelemetryCards.tsx b/src/features/dashboard/TelemetryCards.tsx
+new file mode 100644
+index 0000000..dfd6b6c
+--- /dev/null
++++ b/src/features/dashboard/TelemetryCards.tsx
+@@ -0,0 +1,62 @@
++import { useLabStore } from "../experiment/labStore";
++import type { TelemetryFrame } from "../experiment/model";
++
++export type SensorId = "rpm" | "wind" | "pressure" | "load";
++
++type TelemetryCardsProps = {
++  onInspect(sensor: SensorId): void;
++};
++
++type TelemetryDefinition = {
++  id: SensorId;
++  label: string;
++  unit: string;
++  value(frame: TelemetryFrame): string;
++};
++
++const TELEMETRY: readonly TelemetryDefinition[] = [
++  { id: "rpm", label: "风扇转速", unit: "RPM", value: (frame) => frame.rpm.toFixed(0) },
++  { id: "wind", label: "来流速度", unit: "m/s", value: (frame) => frame.windSpeedMps.toFixed(2) },
++  { id: "pressure", label: "车底相对压力", unit: "Pa", value: (frame) => frame.underbodyPressurePa.toFixed(1) },
++  { id: "load", label: "垂向载荷", unit: "N", value: (frame) => frame.verticalLoadN.toFixed(3) },
++];
++
++const QUALITY_LABELS: Record<TelemetryFrame["quality"], string> = {
++  transient: "瞬态 / TRANSIENT",
++  stable: "稳定 / STABLE",
++  invalid: "无效 / INVALID",
++};
++
++export function TelemetryCards({ onInspect }: TelemetryCardsProps) {
++  const frame = useLabStore((state) => state.telemetry);
++
++  return (
++    <section className="dashboard-section telemetry-section" aria-labelledby="telemetry-title">
++      <div className="dashboard-section-heading">
++        <div>
++          <p className="section-kicker">LIVE TELEMETRY</p>
++          <h2 id="telemetry-title">虚拟传感器</h2>
++        </div>
++        <span className="sample-time">T+{(frame.simulationTimeMs / 1000).toFixed(2)} s</span>
++      </div>
++      <div className="telemetry-grid">
++        {TELEMETRY.map((item) => (
++          <article className="telemetry-card" key={item.id}>
++            <div className="telemetry-meta">
++              <h3>{item.label}</h3>
++              <span>SIMULATED</span>
++            </div>
++            <p className="telemetry-reading">
++              <strong>{item.value(frame)}</strong>
++              <span>{item.unit}</span>
++            </p>
++            <div className="telemetry-quality">
++              <span>{QUALITY_LABELS[frame.quality]}</span>
++              <button type="button" aria-label={`查看${item.label}说明`} onClick={() => onInspect(item.id)}>查看</button>
++            </div>
++          </article>
++        ))}
++      </div>
++    </section>
++  );
++}
+diff --git a/src/features/dashboard/FieldSelector.tsx b/src/features/dashboard/FieldSelector.tsx
+new file mode 100644
+index 0000000..90cfaec
+--- /dev/null
++++ b/src/features/dashboard/FieldSelector.tsx
+@@ -0,0 +1,71 @@
++import { useLabStore, type LabState } from "../experiment/labStore";
++import { mapWindToLatticeVelocity } from "../flow/flowRuntime";
++
++export type FieldId = LabState["selectedField"];
++
++type FieldSelectorProps = {
++  onInspect(field: FieldId): void;
++};
++
++const FIELDS: readonly { id: FieldId; label: string; english: string }[] = [
++  { id: "speed", label: "速度", english: "VELOCITY" },
++  { id: "pressure", label: "压力", english: "PRESSURE" },
++  { id: "vorticity", label: "涡量", english: "VORTICITY" },
++  { id: "streamlines", label: "流线", english: "STREAMLINES" },
++];
++
++const FLOW_STATUS: Record<LabState["flowStatus"], string> = {
++  idle: "待机 / IDLE",
++  loading: "求解中 / SOLVING",
++  ready: "流场就绪 / READY",
++  failed: "求解失败 / FAILED",
++};
++
++export function FieldSelector({ onInspect }: FieldSelectorProps) {
++  const selectedField = useLabStore((state) => state.selectedField);
++  const selectField = useLabStore((state) => state.selectField);
++  const flowField = useLabStore((state) => state.flowField);
++  const flowStatus = useLabStore((state) => state.flowStatus);
++  const windSpeedMps = useLabStore((state) => state.telemetry.windSpeedMps);
++  const gridWidth = flowField?.width ?? 240;
++  const gridHeight = flowField?.height ?? 96;
++
++  const select = (field: FieldId) => {
++    selectField(field);
++    onInspect(field);
++  };
++
++  return (
++    <section className="dashboard-section field-section" aria-labelledby="field-selector-title">
++      <div className="dashboard-section-heading">
++        <div>
++          <p className="section-kicker">FIELD SELECTOR</p>
++          <h2 id="field-selector-title">场变量选择</h2>
++        </div>
++      </div>
++      <div className="field-options" role="radiogroup" aria-label="场变量选择">
++        {FIELDS.map((field) => (
++          <button
++            type="button"
++            role="radio"
++            aria-label={field.label}
++            aria-checked={selectedField === field.id}
++            className={selectedField === field.id ? "field-selected" : undefined}
++            key={field.id}
++            onClick={() => select(field.id)}
++          >
++            <span>{field.label}</span>
++            <small>{field.english}</small>
++          </button>
++        ))}
++      </div>
++      <dl className="solver-status" aria-label="二维求解器状态">
++        <div><dt>求解器</dt><dd>D2Q9 BGK</dd></div>
++        <div><dt>活动网格</dt><dd>{gridWidth} × {gridHeight}</dd></div>
++        <div><dt>格点入口速度</dt><dd>{mapWindToLatticeVelocity(windSpeedMps).toFixed(4)} lu</dd></div>
++        <div><dt>流场状态</dt><dd>{FLOW_STATUS[flowStatus]}</dd></div>
++        <div><dt>模型范围</dt><dd>二维教学近似</dd></div>
++      </dl>
++    </section>
++  );
++}
+diff --git a/src/features/dashboard/HistoryChart.tsx b/src/features/dashboard/HistoryChart.tsx
+new file mode 100644
+index 0000000..9479cfc
+--- /dev/null
++++ b/src/features/dashboard/HistoryChart.tsx
+@@ -0,0 +1,123 @@
++import { useMemo, useState } from "react";
++import {
++  CartesianGrid,
++  Line,
++  LineChart,
++  ReferenceArea,
++  ResponsiveContainer,
++  Tooltip,
++  XAxis,
++  YAxis,
++} from "recharts";
++import { useLabStore } from "../experiment/labStore";
++import { mapHistoryToChartData, type ChartPoint } from "./historyMapping";
++
++type SeriesKey = "rpm" | "windSpeedMps" | "pressurePa" | "loadN";
++
++const SERIES: readonly { key: SeriesKey; label: string; color: string }[] = [
++  { key: "windSpeedMps", label: "风速 m/s", color: "#50e3c2" },
++  { key: "rpm", label: "转速 RPM", color: "#7ea9ff" },
++  { key: "pressurePa", label: "压力 Pa", color: "#f2bd4f" },
++  { key: "loadN", label: "载荷 N", color: "#e8685f" },
++];
++
++type HistoryChartProps = {
++  onInspectStableWindow(): void;
++};
++
++export function HistoryChart({ onInspectStableWindow }: HistoryChartProps) {
++  const history = useLabStore((state) => state.history);
++  const data = useMemo(() => mapHistoryToChartData(history), [history]);
++  const stableWindow = useMemo(() => findStableWindow(data), [data]);
++  const [hiddenSeries, setHiddenSeries] = useState<ReadonlySet<SeriesKey>>(() => new Set());
++
++  const toggleSeries = (key: SeriesKey) => {
++    setHiddenSeries((current) => {
++      const next = new Set(current);
++      if (next.has(key)) next.delete(key);
++      else next.add(key);
++      return next;
++    });
++  };
++
++  return (
++    <div className="history-panel">
++      <div className="history-heading">
++        <div>
++          <p className="section-kicker">60 SECOND HISTORY</p>
++          <h2 id="history-title">实验曲线</h2>
++        </div>
++        <div className="chart-legend" aria-label="曲线显示选项">
++          {SERIES.map((series) => (
++            <button
++              type="button"
++              key={series.key}
++              aria-pressed={!hiddenSeries.has(series.key)}
++              onClick={() => toggleSeries(series.key)}
++            >
++              <span style={{ backgroundColor: series.color }} aria-hidden="true" />{series.label}
++            </button>
++          ))}
++        </div>
++      </div>
++
++      <div className="history-chart-plot" aria-label="最近 60 秒遥测曲线">
++        {data.length === 0 && <p className="chart-empty">启动实验后将在此显示最近 60 秒数据。</p>}
++        {data.length > 0 && (
++          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 800, height: 140 }}>
++            <LineChart data={data} margin={{ top: 10, right: 28, bottom: 2, left: 6 }}>
++              <CartesianGrid stroke="#20353d" vertical={false} />
++              <XAxis dataKey="timeSeconds" type="number" domain={["dataMin", "dataMax"]} tickFormatter={(value) => `${Number(value).toFixed(0)}s`} stroke="#80969d" />
++              <YAxis yAxisId="velocity" orientation="left" stroke="#50e3c2" width={42} />
++              <YAxis yAxisId="rpm" orientation="left" stroke="#7ea9ff" width={42} hide />
++              <YAxis yAxisId="pressure" orientation="right" stroke="#f2bd4f" width={42} />
++              <YAxis yAxisId="load" orientation="right" stroke="#e8685f" width={42} hide />
++              <Tooltip labelFormatter={(value) => `T+${Number(value).toFixed(2)} s`} />
++              {stableWindow && (
++                <ReferenceArea
++                  x1={stableWindow.start}
++                  x2={stableWindow.end}
++                  yAxisId="velocity"
++                  fill="#50e3c2"
++                  fillOpacity={0.08}
++                  strokeOpacity={0}
++                />
++              )}
++              <Line yAxisId="velocity" dataKey="windSpeedMps" name="风速 m/s" stroke="#50e3c2" dot={false} isAnimationActive={false} hide={hiddenSeries.has("windSpeedMps")} />
++              <Line yAxisId="rpm" dataKey="rpm" name="转速 RPM" stroke="#7ea9ff" dot={false} isAnimationActive={false} hide={hiddenSeries.has("rpm")} />
++              <Line yAxisId="pressure" dataKey="pressurePa" name="压力 Pa" stroke="#f2bd4f" dot={false} isAnimationActive={false} hide={hiddenSeries.has("pressurePa")} />
++              <Line yAxisId="load" dataKey="loadN" name="载荷 N" stroke="#e8685f" dot={false} isAnimationActive={false} hide={hiddenSeries.has("loadN")} />
++            </LineChart>
++          </ResponsiveContainer>
++        )}
++      </div>
++      {stableWindow && (
++        <button type="button" className="stable-window-marker" aria-label="标记稳定窗口" onClick={onInspectStableWindow}>
++          标记稳定窗口
++          <span>{stableWindow.start.toFixed(2)}–{stableWindow.end.toFixed(2)} s</span>
++        </button>
++      )}
++    </div>
++  );
++}
++
++function findStableWindow(data: readonly ChartPoint[]): { start: number; end: number } | null {
++  let bestStart = -1;
++  let bestEnd = -1;
++  let currentStart = -1;
++
++  data.forEach((point, index) => {
++    if (point.quality === "stable") {
++      if (currentStart < 0) currentStart = index;
++      if (bestStart < 0 || index - currentStart > bestEnd - bestStart) {
++        bestStart = currentStart;
++        bestEnd = index;
++      }
++    } else {
++      currentStart = -1;
++    }
++  });
++
++  if (bestStart < 0 || bestEnd < 0) return null;
++  return { start: data[bestStart]!.timeSeconds, end: data[bestEnd]!.timeSeconds };
++}
+diff --git a/src/features/dashboard/historyMapping.ts b/src/features/dashboard/historyMapping.ts
+new file mode 100644
+index 0000000..f72fc8f
+--- /dev/null
++++ b/src/features/dashboard/historyMapping.ts
+@@ -0,0 +1,27 @@
++import { MAX_HISTORY } from "../experiment/labStore";
++import type { TelemetryFrame } from "../experiment/model";
++
++const HISTORY_WINDOW_MS = 60_000;
++
++export type ChartPoint = {
++  timeSeconds: number;
++  rpm: number;
++  windSpeedMps: number;
++  pressurePa: number;
++  loadN: number;
++  quality: TelemetryFrame["quality"];
++};
++
++export function mapHistoryToChartData(history: readonly TelemetryFrame[]): ChartPoint[] {
++  const latestTime = history.at(-1)?.simulationTimeMs ?? 0;
++  const cutoff = Math.max(0, latestTime - HISTORY_WINDOW_MS);
++  const inWindow = history.filter((frame) => frame.simulationTimeMs >= cutoff);
++  return inWindow.slice(-MAX_HISTORY).map((frame) => ({
++    timeSeconds: frame.simulationTimeMs / 1000,
++    rpm: frame.rpm,
++    windSpeedMps: frame.windSpeedMps,
++    pressurePa: frame.underbodyPressurePa,
++    loadN: frame.verticalLoadN,
++    quality: frame.quality,
++  }));
++}
+diff --git a/src/features/dashboard/evidenceRecording.ts b/src/features/dashboard/evidenceRecording.ts
+new file mode 100644
+index 0000000..09235cf
+--- /dev/null
++++ b/src/features/dashboard/evidenceRecording.ts
+@@ -0,0 +1,37 @@
++import type { TelemetryFrame } from "../experiment/model";
++import type { TutorialEvidence } from "../tutorial/tutorialProgress";
++import type { FieldId } from "./FieldSelector";
++import type { SensorId } from "./TelemetryCards";
++
++export function recordStableTelemetry(
++  evidence: TutorialEvidence,
++  previous: TelemetryFrame,
++  next: TelemetryFrame,
++  commandedFanPower: number,
++): TutorialEvidence {
++  const elapsedSeconds = (next.simulationTimeMs - previous.simulationTimeMs) / 1000;
++  if (commandedFanPower !== 30 || next.fanPowerPct !== 30
++    || next.quality !== "stable" || elapsedSeconds <= 0) return evidence;
++
++  // `quality` comes from the source's physical state before sensor noise is applied.
++  return {
++    ...evidence,
++    stableSeconds: Math.round((evidence.stableSeconds + elapsedSeconds) * 1000) / 1000,
++  };
++}
++
++export function recordSensorInspection(evidence: TutorialEvidence, sensor: SensorId): TutorialEvidence {
++  return { ...evidence, viewedSensors: appendUnique(evidence.viewedSensors, sensor) };
++}
++
++export function recordFieldInspection(evidence: TutorialEvidence, field: FieldId): TutorialEvidence {
++  return { ...evidence, viewedFields: appendUnique(evidence.viewedFields, field) };
++}
++
++export function recordStableWindowInspection(evidence: TutorialEvidence): TutorialEvidence {
++  return evidence.inspectedStableWindow ? evidence : { ...evidence, inspectedStableWindow: true };
++}
++
++function appendUnique(values: readonly string[], value: string): string[] {
++  return values.includes(value) ? [...values] : [...values, value];
++}
+diff --git a/src/features/dashboard/Dashboard.test.tsx b/src/features/dashboard/Dashboard.test.tsx
+new file mode 100644
+index 0000000..39f74f0
+--- /dev/null
++++ b/src/features/dashboard/Dashboard.test.tsx
+@@ -0,0 +1,150 @@
++import { fireEvent, render, screen } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { beforeEach, expect, it, vi } from "vitest";
++import { labStore } from "../experiment/labStore";
++import type { TelemetryFrame } from "../experiment/model";
++import { ControlPanel } from "./ControlPanel";
++import { FieldSelector } from "./FieldSelector";
++import { HistoryChart } from "./HistoryChart";
++import { TelemetryCards } from "./TelemetryCards";
++import { mapHistoryToChartData } from "./historyMapping";
++import {
++  recordFieldInspection,
++  recordSensorInspection,
++  recordStableTelemetry,
++  recordStableWindowInspection,
++} from "./evidenceRecording";
++import { emptyEvidence } from "../tutorial/tutorialProgress";
++
++function frame(overrides: Partial<TelemetryFrame> = {}): TelemetryFrame {
++  return {
++    sequence: 1,
++    simulationTimeMs: 50,
++    phase: "sampling",
++    fanPowerPct: 30,
++    rpm: 4380.4,
++    windSpeedMps: 8.456,
++    underbodyPressurePa: -32.44,
++    verticalLoadN: 0.1849,
++    quality: "stable",
++    provenance: "simulated",
++    ...overrides,
++  };
++}
++
++beforeEach(() => labStore.getState().resetLab());
++
++it("commands fan power and supports run, pause, resume, and reset", async () => {
++  const user = userEvent.setup();
++  const confirmReset = vi.spyOn(window, "confirm").mockReturnValue(true);
++  render(<ControlPanel />);
++
++  const slider = screen.getByRole("slider", { name: "风扇功率" });
++  fireEvent.change(slider, { target: { value: "100" } });
++  expect(labStore.getState().fanPowerPct).toBe(100);
++  expect(screen.getByText("100%", { selector: "output" })).toBeVisible();
++
++  await user.click(screen.getByRole("button", { name: "启动实验" }));
++  expect(labStore.getState().phase).toBe("ramping");
++  await user.click(screen.getByRole("button", { name: "暂停实验" }));
++  expect(labStore.getState().phase).toBe("paused");
++  await user.click(screen.getByRole("button", { name: "继续实验" }));
++  expect(labStore.getState().phase).toBe("ramping");
++
++  labStore.getState().acceptFrame(frame());
++  await user.click(screen.getByRole("button", { name: "停止并重置" }));
++  expect(confirmReset).toHaveBeenCalledOnce();
++  expect(labStore.getState()).toMatchObject({ phase: "idle", history: [] });
++  confirmReset.mockRestore();
++});
++
++it("shows exact telemetry formats, units, quality, and simulated provenance", () => {
++  labStore.setState({ telemetry: frame() });
++  render(<TelemetryCards onInspect={() => undefined} />);
++
++  expect(screen.getByText("4380")).toBeVisible();
++  expect(screen.getByText("8.46")).toBeVisible();
++  expect(screen.getByText("-32.4")).toBeVisible();
++  expect(screen.getByText("0.185")).toBeVisible();
++  expect(screen.getByText("车底相对压力")).toBeVisible();
++  for (const unit of ["RPM", "m/s", "Pa", "N"]) {
++    expect(screen.getByText(unit)).toBeVisible();
++  }
++  expect(screen.getAllByText("SIMULATED")).toHaveLength(4);
++  expect(screen.getAllByText("稳定 / STABLE")).toHaveLength(4);
++});
++
++it("reports each inspected sensor as tutorial evidence", async () => {
++  const user = userEvent.setup();
++  const onInspect = vi.fn();
++  render(<TelemetryCards onInspect={onInspect} />);
++
++  for (const name of ["查看风扇转速说明", "查看来流速度说明", "查看车底相对压力说明", "查看垂向载荷说明"]) {
++    await user.click(screen.getByRole("button", { name }));
++  }
++  expect(onInspect.mock.calls.map(([sensor]) => sensor)).toEqual(["rpm", "wind", "pressure", "load"]);
++});
++
++it("selects and reports all four teaching field views", async () => {
++  const user = userEvent.setup();
++  const onInspect = vi.fn();
++  render(<FieldSelector onInspect={onInspect} />);
++
++  for (const name of ["压力", "涡量", "流线", "速度"]) {
++    await user.click(screen.getByRole("radio", { name }));
++  }
++  expect(labStore.getState().selectedField).toBe("speed");
++  expect(onInspect.mock.calls.map(([field]) => field)).toEqual(["pressure", "vorticity", "streamlines", "speed"]);
++  expect(screen.getByText("D2Q9 BGK")).toBeVisible();
++  expect(screen.getByText("240 × 96")).toBeVisible();
++  expect(screen.getByText("二维教学近似")).toBeVisible();
++});
++
++it("maps only the latest sixty seconds and never more than 1,200 points", () => {
++  const history = Array.from({ length: 1_300 }, (_, sequence) => frame({
++    sequence,
++    simulationTimeMs: sequence * 50,
++  }));
++
++  const mapped = mapHistoryToChartData(history);
++  expect(mapped).toHaveLength(1_200);
++  expect(mapped[0]).toMatchObject({ timeSeconds: 5, rpm: 4380.4, pressurePa: -32.44 });
++  expect(mapped.at(-1)?.timeSeconds).toBe(64.95);
++});
++
++it("marks a stable chart window without changing telemetry history", async () => {
++  const user = userEvent.setup();
++  const history = [
++    frame({ sequence: 1, simulationTimeMs: 50, quality: "transient" }),
++    frame({ sequence: 2, simulationTimeMs: 100, quality: "stable" }),
++    frame({ sequence: 3, simulationTimeMs: 150, quality: "stable" }),
++  ];
++  labStore.setState({ history });
++  const onInspectStableWindow = vi.fn();
++  render(<HistoryChart onInspectStableWindow={onInspectStableWindow} />);
++
++  await user.click(screen.getByRole("button", { name: "标记稳定窗口" }));
++  expect(onInspectStableWindow).toHaveBeenCalledOnce();
++  expect(labStore.getState().history).toBe(history);
++});
++
++it("accrues stable evidence only from physical stable quality at exactly 30 percent", () => {
++  const previous = frame({ simulationTimeMs: 1_000, quality: "transient" });
++  const stable = frame({ simulationTimeMs: 3_000, fanPowerPct: 30, quality: "stable", rpm: 99_999 });
++
++  expect(recordStableTelemetry(emptyEvidence, previous, stable, 30).stableSeconds).toBe(2);
++  expect(recordStableTelemetry(emptyEvidence, previous, stable, 31).stableSeconds).toBe(0);
++  expect(recordStableTelemetry(emptyEvidence, previous, { ...stable, quality: "transient" }, 30).stableSeconds).toBe(0);
++});
++
++it("records sensor, field, and stable-window evidence without duplicate identifiers", () => {
++  const withSensor = recordSensorInspection(recordSensorInspection(emptyEvidence, "rpm"), "rpm");
++  const withField = recordFieldInspection(recordFieldInspection(withSensor, "pressure"), "pressure");
++  const complete = recordStableWindowInspection(withField);
++
++  expect(complete).toMatchObject({
++    viewedSensors: ["rpm"],
++    viewedFields: ["pressure"],
++    inspectedStableWindow: true,
++  });
++});
+diff --git a/src/App.tsx b/src/App.tsx
+new file mode 100644
+index 0000000..181e84a
+--- /dev/null
++++ b/src/App.tsx
+@@ -0,0 +1,90 @@
++import { lazy, Suspense, useEffect, useState } from "react";
++import { ControlPanel } from "./features/dashboard/ControlPanel";
++import { FieldSelector, type FieldId } from "./features/dashboard/FieldSelector";
++import { TelemetryCards, type SensorId } from "./features/dashboard/TelemetryCards";
++import {
++  recordFieldInspection,
++  recordSensorInspection,
++  recordStableTelemetry,
++  recordStableWindowInspection,
++} from "./features/dashboard/evidenceRecording";
++import { createDefaultSimulationSource } from "./features/experiment/SimulationSource";
++import { labStore } from "./features/experiment/labStore";
++import { startSimulationRuntime } from "./features/experiment/simulationRuntime";
++import { AppShell } from "./features/shell/AppShell";
++import { TutorialModeToggle } from "./features/tutorial/TutorialModeToggle";
++import { TutorialRail } from "./features/tutorial/TutorialRail";
++import { advanceLesson, emptyEvidence } from "./features/tutorial/tutorialProgress";
++import { LESSONS, type LessonId, type TutorialMode } from "./features/tutorial/lessonDefinitions";
++
++const LazyWindTunnelScene = lazy(() => import("./features/scene/WindTunnelScene").then((module) => ({ default: module.WindTunnelScene })));
++const LazyHistoryChart = lazy(() => import("./features/dashboard/HistoryChart").then((module) => ({ default: module.HistoryChart })));
++
++export function App() {
++  const [mode, setMode] = useState<TutorialMode>("guided");
++  const [activeLesson, setActiveLesson] = useState<LessonId>("anatomy");
++  const [evidence, setEvidence] = useState(emptyEvidence);
++
++  useEffect(() => {
++    const source = createDefaultSimulationSource(20260818);
++    const stopSimulation = startSimulationRuntime({ source, tickMs: 50 });
++    const unsubscribe = labStore.subscribe((state, previous) => {
++      if (state.phase === "idle" && state.history.length === 0
++        && (previous.phase !== "idle" || previous.history.length > 0)) {
++        source.reset();
++      }
++
++      if (state.telemetry === previous.telemetry) return;
++      setEvidence((current) => recordStableTelemetry(
++        current,
++        previous.telemetry,
++        state.telemetry,
++        state.fanPowerPct,
++      ));
++    });
++
++    return () => {
++      unsubscribe();
++      stopSimulation();
++    };
++  }, []);
++
++  const inspectSensor = (sensor: SensorId) => setEvidence((current) => recordSensorInspection(current, sensor));
++  const inspectField = (field: FieldId) => setEvidence((current) => recordFieldInspection(current, field));
++
++  return (
++    <AppShell
++      headerActions={<TutorialModeToggle mode={mode} onModeChange={setMode} />}
++      left={<TutorialRail
++        activeLesson={activeLesson}
++        evidence={evidence}
++        mode={mode}
++        onLessonChange={setActiveLesson}
++        onAdvance={() => setActiveLesson((currentLesson) => {
++          if (mode === "guided") return advanceLesson(currentLesson, evidence);
++          const currentIndex = LESSONS.findIndex((lesson) => lesson.id === currentLesson);
++          return LESSONS[Math.min(currentIndex + 1, LESSONS.length - 1)]!.id;
++        })}
++      />}
++      scene={
++        <Suspense fallback={<p className="scene-loading" role="status">正在初始化数字风洞…</p>}>
++          <LazyWindTunnelScene onHotspot={(id) => setEvidence((current) => current.viewedHotspots.includes(id)
++            ? current
++            : { ...current, viewedHotspots: [...current.viewedHotspots, id] })} />
++        </Suspense>
++      }
++      right={(
++        <div className="dashboard-sidebar">
++          <ControlPanel />
++          <FieldSelector onInspect={inspectField} />
++          <TelemetryCards onInspect={inspectSensor} />
++        </div>
++      )}
++      bottom={(
++        <Suspense fallback={<p className="chart-empty" role="status">正在准备实验曲线…</p>}>
++          <LazyHistoryChart onInspectStableWindow={() => setEvidence(recordStableWindowInspection)} />
++        </Suspense>
++      )}
++    />
++  );
++}
+diff --git a/src/styles/global.css b/src/styles/global.css
+new file mode 100644
+index 0000000..3f28c71
+--- /dev/null
++++ b/src/styles/global.css
+@@ -0,0 +1,583 @@
++:root {
++  --bg: #071014;
++  --panel: #0d181d;
++  --panel-raised: #132229;
++  --tunnel: #e9e6df;
++  --ink: #e9f2f3;
++  --muted: #8da3aa;
++  --flow: #50e3c2;
++  --warning: #f2bd4f;
++  --danger: #e44b43;
++  color: var(--ink);
++  background: var(--bg);
++  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
++}
++
++* {
++  box-sizing: border-box;
++}
++
++body {
++  margin: 0;
++  min-width: 320px;
++  min-height: 100vh;
++  background: var(--bg);
++}
++
++button,
++input,
++select,
++textarea {
++  font: inherit;
++}
++
++.app-shell {
++  display: grid;
++  grid-template-areas:
++    "header header header"
++    "left scene right"
++    "left bottom right";
++  grid-template-columns: 240px minmax(0, 1fr) 320px;
++  grid-template-rows: auto minmax(0, 1fr) 220px;
++  min-height: 100vh;
++  background: var(--bg);
++}
++
++.topbar {
++  grid-area: header;
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 1rem;
++  padding: 0.85rem 1.25rem;
++  border-bottom: 1px solid var(--panel-raised);
++  background: var(--panel);
++}
++
++.eyebrow {
++  color: var(--flow);
++  font-size: 0.7rem;
++  font-weight: 700;
++  letter-spacing: 0.12em;
++}
++
++h1 {
++  margin: 0.15rem 0 0;
++  font-size: 1.15rem;
++}
++
++.topbar-actions {
++  display: flex;
++  align-items: center;
++  gap: 0.75rem;
++}
++
++.provenance-badge {
++  color: var(--warning);
++  font-size: 0.72rem;
++  font-weight: 700;
++  letter-spacing: 0.04em;
++}
++
++.model-scope-badge {
++  color: var(--muted);
++  font-size: 0.72rem;
++  font-weight: 700;
++  letter-spacing: 0.04em;
++}
++
++.tutorial-rail,
++.control-panel,
++.chart-drawer {
++  padding: 1rem;
++  background: var(--panel);
++}
++
++.tutorial-rail {
++  grid-area: left;
++  border-right: 1px solid var(--panel-raised);
++}
++
++.scene-panel {
++  grid-area: scene;
++  min-height: 0;
++  padding: 0;
++  background: var(--panel-raised);
++  overflow: hidden;
++}
++
++.wind-tunnel-scene {
++  position: relative;
++  display: grid;
++  grid-template-rows: auto minmax(18rem, 1fr) auto;
++  width: 100%;
++  height: 100%;
++  min-height: 30rem;
++  overflow: hidden;
++  background: #09151a;
++}
++
++.scene-hud {
++  z-index: 3;
++  display: flex;
++  justify-content: space-between;
++  gap: 1rem;
++  padding: 0.7rem 0.9rem;
++  border-bottom: 1px solid #294049;
++  color: #9db1b7;
++  background: rgb(7 16 20 / 88%);
++  font: 700 0.66rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
++  letter-spacing: 0.08em;
++}
++
++.scene-hud span:last-child {
++  color: var(--flow);
++}
++
++.scene-canvas {
++  min-height: 18rem;
++}
++
++.scene-canvas canvas {
++  display: block;
++}
++
++.scene-hotspots {
++  z-index: 3;
++  display: grid;
++  grid-template-columns: minmax(0, 1fr) minmax(13rem, 0.58fr);
++  gap: 0.75rem;
++  padding: 0.75rem;
++  border-top: 1px solid #294049;
++  background: rgb(7 16 20 / 94%);
++}
++
++.scene-hotspot-buttons {
++  display: grid;
++  grid-template-columns: repeat(5, minmax(0, 1fr));
++  gap: 0.4rem;
++}
++
++.scene-hotspot {
++  min-width: 0;
++  padding: 0.52rem 0.44rem;
++  overflow: hidden;
++  border: 1px solid #314b54;
++  color: #b9c8cb;
++  background: #0d1b20;
++  text-align: left;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++  cursor: pointer;
++}
++
++.scene-hotspot span {
++  margin-right: 0.38rem;
++  color: var(--flow);
++  font: 700 0.62rem ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.scene-hotspot:hover,
++.scene-hotspot:focus-visible,
++.scene-hotspot[aria-pressed="true"] {
++  border-color: var(--flow);
++  outline: none;
++  color: #f4f7f5;
++  background: #123238;
++  box-shadow: inset 0 -2px 0 var(--flow);
++}
++
++.scene-hotspot-card {
++  display: flex;
++  flex-direction: column;
++  justify-content: center;
++  min-height: 3.4rem;
++  padding-left: 0.75rem;
++  border-left: 2px solid #314b54;
++  color: #9db1b7;
++  font-size: 0.72rem;
++}
++
++.scene-hotspot-card strong {
++  color: #eef3f1;
++}
++
++.scene-hotspot-card em {
++  margin-top: 0.18rem;
++  color: var(--flow);
++  font-style: normal;
++}
++
++.scene-fallback {
++  display: grid;
++  place-items: center;
++  min-height: 18rem;
++  padding: 1rem;
++}
++
++.scene-fallback-diagram {
++  width: min(100%, 70rem);
++  height: auto;
++  border: 1px solid #294049;
++}
++
++.scene-fallback p,
++.scene-loading {
++  color: #9db1b7;
++  font-size: 0.76rem;
++}
++
++.scene-fallback strong {
++  color: var(--warning);
++}
++
++.control-panel {
++  grid-area: right;
++  border-left: 1px solid var(--panel-raised);
++}
++
++.chart-drawer {
++  grid-area: bottom;
++  border-top: 1px solid var(--panel-raised);
++  min-width: 0;
++  min-height: 0;
++  padding: 0.75rem 1rem;
++  overflow: hidden;
++}
++
++.dashboard-sidebar {
++  display: flex;
++  flex-direction: column;
++  gap: 0.85rem;
++}
++
++.dashboard-section {
++  border-bottom: 1px solid #294049;
++  padding-bottom: 0.85rem;
++}
++
++.dashboard-section-heading,
++.history-heading,
++.fan-power-row,
++.telemetry-meta,
++.telemetry-quality {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 0.75rem;
++}
++
++.dashboard-section-heading {
++  align-items: flex-start;
++  margin-bottom: 0.7rem;
++}
++
++.dashboard-section h2,
++.history-panel h2 {
++  margin: 0.08rem 0 0;
++  color: #eef4f3;
++  font-size: 0.9rem;
++}
++
++.section-kicker {
++  margin: 0;
++  color: var(--muted);
++  font: 700 0.61rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
++  letter-spacing: 0.09em;
++}
++
++.phase-badge,
++.sample-time {
++  color: var(--muted);
++  font: 700 0.62rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.phase-ramping,
++.phase-stabilizing,
++.phase-sampling {
++  color: var(--flow);
++}
++
++.phase-paused {
++  color: var(--warning);
++}
++
++.fan-power-row label {
++  color: #b8c8cb;
++  font-size: 0.75rem;
++}
++
++.fan-power-row output {
++  color: var(--flow);
++  font: 700 1.35rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.fan-slider {
++  width: 100%;
++  margin: 0.7rem 0 0;
++  accent-color: var(--flow);
++}
++
++.slider-scale {
++  display: flex;
++  justify-content: space-between;
++  color: #738990;
++  font: 0.58rem ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.experiment-actions {
++  display: grid;
++  grid-template-columns: repeat(3, minmax(0, 1fr));
++  gap: 0.35rem;
++  margin-top: 0.75rem;
++}
++
++.experiment-actions button,
++.field-options button,
++.telemetry-quality button,
++.chart-legend button,
++.stable-window-marker {
++  border: 1px solid #34505a;
++  color: #c8d5d7;
++  background: #0a151a;
++  cursor: pointer;
++}
++
++.experiment-actions button {
++  min-height: 2.35rem;
++  padding: 0.42rem 0.25rem;
++  font-size: 0.68rem;
++}
++
++.experiment-actions .action-primary,
++.field-options .field-selected {
++  border-color: var(--flow);
++  color: var(--flow);
++  box-shadow: inset 0 -2px 0 var(--flow);
++}
++
++.experiment-actions button:disabled {
++  border-color: #24373e;
++  color: #53686e;
++  cursor: not-allowed;
++}
++
++.field-options {
++  display: grid;
++  grid-template-columns: repeat(4, minmax(0, 1fr));
++  gap: 0.3rem;
++}
++
++.field-options button {
++  min-width: 0;
++  padding: 0.48rem 0.15rem;
++}
++
++.field-options button span,
++.field-options button small {
++  display: block;
++}
++
++.field-options button span {
++  font-size: 0.72rem;
++}
++
++.field-options button small {
++  margin-top: 0.2rem;
++  overflow: hidden;
++  color: #789097;
++  font: 0.5rem ui-monospace, SFMono-Regular, Menlo, monospace;
++  text-overflow: ellipsis;
++}
++
++.solver-status {
++  margin: 0.75rem 0 0;
++  border-top: 1px solid #243940;
++  font-size: 0.63rem;
++}
++
++.solver-status div {
++  display: flex;
++  justify-content: space-between;
++  gap: 0.65rem;
++  padding: 0.28rem 0;
++  border-bottom: 1px solid #1d3037;
++}
++
++.solver-status dt {
++  color: #789097;
++}
++
++.solver-status dd {
++  margin: 0;
++  color: #c7d3d5;
++  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
++  text-align: right;
++}
++
++.telemetry-grid {
++  display: grid;
++  grid-template-columns: repeat(2, minmax(0, 1fr));
++  border-top: 1px solid #294049;
++  border-left: 1px solid #294049;
++}
++
++.telemetry-card {
++  min-width: 0;
++  padding: 0.55rem;
++  border-right: 1px solid #294049;
++  border-bottom: 1px solid #294049;
++}
++
++.telemetry-meta h3 {
++  margin: 0;
++  overflow: hidden;
++  color: #aebfc2;
++  font-size: 0.64rem;
++  font-weight: 600;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.telemetry-meta span {
++  color: var(--warning);
++  font: 0.48rem ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.telemetry-reading {
++  display: flex;
++  align-items: baseline;
++  gap: 0.32rem;
++  margin: 0.48rem 0;
++}
++
++.telemetry-reading strong {
++  min-width: 0;
++  color: var(--flow);
++  font: 700 1.18rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.telemetry-reading span {
++  color: #b2c0c3;
++  font-size: 0.58rem;
++}
++
++.telemetry-quality span {
++  overflow: hidden;
++  color: #758b92;
++  font: 0.46rem ui-monospace, SFMono-Regular, Menlo, monospace;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.telemetry-quality button {
++  padding: 0.12rem 0.25rem;
++  font-size: 0.52rem;
++}
++
++.history-panel {
++  display: grid;
++  grid-template-rows: auto minmax(0, 1fr) auto;
++  height: 100%;
++  min-height: 0;
++}
++
++.history-heading {
++  align-items: flex-start;
++  margin-bottom: 0.35rem;
++}
++
++.chart-legend {
++  display: flex;
++  flex-wrap: wrap;
++  justify-content: flex-end;
++  gap: 0.3rem;
++}
++
++.chart-legend button {
++  padding: 0.2rem 0.38rem;
++  color: #71868d;
++  font-size: 0.58rem;
++}
++
++.chart-legend button[aria-pressed="true"] {
++  color: #c8d5d7;
++}
++
++.chart-legend button span {
++  display: inline-block;
++  width: 0.55rem;
++  height: 2px;
++  margin-right: 0.25rem;
++  vertical-align: middle;
++}
++
++.history-chart-plot {
++  position: relative;
++  min-width: 0;
++  min-height: 7rem;
++}
++
++.chart-empty {
++  display: grid;
++  place-items: center;
++  height: 100%;
++  margin: 0;
++  color: #72888f;
++  font-size: 0.7rem;
++}
++
++.stable-window-marker {
++  justify-self: end;
++  padding: 0.25rem 0.45rem;
++  color: var(--flow);
++  font-size: 0.62rem;
++}
++
++.stable-window-marker span {
++  margin-left: 0.35rem;
++  color: #789097;
++  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.experiment-actions button:hover:not(:disabled),
++.field-options button:hover,
++.telemetry-quality button:hover,
++.chart-legend button:hover,
++.stable-window-marker:hover,
++.experiment-actions button:focus-visible,
++.field-options button:focus-visible,
++.telemetry-quality button:focus-visible,
++.chart-legend button:focus-visible,
++.stable-window-marker:focus-visible {
++  border-color: var(--flow);
++  outline: 2px solid #1e5c58;
++  outline-offset: 1px;
++}
++
++@media (max-width: 900px) {
++  .app-shell {
++    grid-template-areas:
++      "header"
++      "scene"
++      "left"
++      "right"
++      "bottom";
++    grid-template-columns: minmax(0, 1fr);
++    grid-template-rows: auto minmax(18rem, 1fr) auto auto 220px;
++  }
++
++  .tutorial-rail,
++  .control-panel {
++    border: 0;
++    border-top: 1px solid var(--panel-raised);
++  }
++
++  .scene-hotspots {
++    grid-template-columns: 1fr;
++  }
++
++  .scene-hotspot-buttons {
++    grid-template-columns: repeat(2, minmax(0, 1fr));
++  }
++}
+diff --git a/src/test/setup.ts b/src/test/setup.ts
+new file mode 100644
+index 0000000..79c4646
+--- /dev/null
++++ b/src/test/setup.ts
+@@ -0,0 +1,9 @@
++import "@testing-library/jest-dom/vitest";
++
++class TestResizeObserver {
++  observe() {}
++  unobserve() {}
++  disconnect() {}
++}
++
++globalThis.ResizeObserver = TestResizeObserver as unknown as typeof ResizeObserver;

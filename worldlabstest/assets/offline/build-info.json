@@ -1,0 +1,11 @@
+{
+  "revision": "campus-street-life-20261002-v5",
+  "three": "0.180.0",
+  "spark": "2.3.0",
+  "assetCount": 24,
+  "rawAssetBytes": 109310815,
+  "sources": {
+    "three": "https://registry.npmjs.org/three/-/three-0.180.0.tgz",
+    "spark": "https://sparkjs.dev/releases/spark/2.3.0/spark.module.js"
+  }
+}

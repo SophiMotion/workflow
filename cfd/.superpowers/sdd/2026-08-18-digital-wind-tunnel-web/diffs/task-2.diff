@@ -1,0 +1,328 @@
+# Review package: Task 2 (new-file snapshot; no commits by controller ruling)
+
+## Files changed
+src/features/experiment/model.ts
+src/features/experiment/physics.ts
+src/features/experiment/physics.test.ts
+src/features/experiment/SimulationSource.ts
+src/features/experiment/SimulationSource.test.ts
+src/features/experiment/experimentMachine.ts
+src/features/experiment/experimentMachine.test.ts
+
+## Diff
+diff --git a/src/features/experiment/model.ts b/src/features/experiment/model.ts
+new file mode 100644
+index 0000000..993af83
+--- /dev/null
++++ b/src/features/experiment/model.ts
+@@ -0,0 +1,34 @@
++export type RunPhase = "idle" | "ramping" | "stabilizing" | "sampling" | "paused" | "completed";
++export type ActiveRunPhase = Exclude<RunPhase, "idle" | "paused" | "completed">;
++
++export type TelemetryFrame = {
++  sequence: number;
++  simulationTimeMs: number;
++  phase: RunPhase;
++  fanPowerPct: number;
++  rpm: number;
++  windSpeedMps: number;
++  underbodyPressurePa: number;
++  verticalLoadN: number;
++  quality: "transient" | "stable" | "invalid";
++  provenance: "simulated";
++};
++
++export type SimulationConfig = {
++  maxRpm: number;
++  maxWindSpeedMps: number;
++  airDensityKgM3: number;
++  referenceAreaM2: number;
++  pressureCoefficient: number;
++  liftCoefficient: number;
++  rampTauMs: number;
++  coastTauMs: number;
++  windTauMs: number;
++};
++
++export interface TelemetrySource {
++  setFanPower(percent: number): void;
++  setPhase(phase: RunPhase): void;
++  step(dtMs: number): TelemetryFrame;
++  reset(): TelemetryFrame;
++}
+diff --git a/src/features/experiment/physics.ts b/src/features/experiment/physics.ts
+new file mode 100644
+index 0000000..fb170cc
+--- /dev/null
++++ b/src/features/experiment/physics.ts
+@@ -0,0 +1,6 @@
++export const calculateDynamicPressure = (rho: number, velocity: number) => 0.5 * rho * velocity ** 2;
++
++export function stepFirstOrder(current: number, target: number, dtMs: number, tauMs: number) {
++  const alpha = 1 - Math.exp(-dtMs / tauMs);
++  return current + (target - current) * alpha;
++}
+diff --git a/src/features/experiment/physics.test.ts b/src/features/experiment/physics.test.ts
+new file mode 100644
+index 0000000..91a361f
+--- /dev/null
++++ b/src/features/experiment/physics.test.ts
+@@ -0,0 +1,14 @@
++import { describe, expect, it } from "vitest";
++import { calculateDynamicPressure, stepFirstOrder } from "./physics";
++
++describe("physics", () => {
++  it("calculates standard-air dynamic pressure", () => {
++    expect(calculateDynamicPressure(1.225, 10)).toBeCloseTo(61.25, 5);
++  });
++
++  it("moves a first-order response toward its target without overshoot", () => {
++    const next = stepFirstOrder(0, 100, 50, 1000);
++    expect(next).toBeGreaterThan(0);
++    expect(next).toBeLessThan(100);
++  });
++});
+diff --git a/src/features/experiment/SimulationSource.ts b/src/features/experiment/SimulationSource.ts
+new file mode 100644
+index 0000000..e55c217
+--- /dev/null
++++ b/src/features/experiment/SimulationSource.ts
+@@ -0,0 +1,137 @@
++import type { RunPhase, SimulationConfig, TelemetryFrame, TelemetrySource } from "./model";
++import { calculateDynamicPressure, stepFirstOrder } from "./physics";
++
++const defaultConfig: SimulationConfig = {
++  maxRpm: 6200,
++  maxWindSpeedMps: 12,
++  airDensityKgM3: 1.225,
++  referenceAreaM2: 0.018,
++  pressureCoefficient: 0.62,
++  liftCoefficient: 0.38,
++  rampTauMs: 1200,
++  coastTauMs: 650,
++  windTauMs: 900,
++};
++
++type PhysicalState = {
++  rpm: number;
++  windSpeedMps: number;
++  underbodyPressurePa: number;
++  verticalLoadN: number;
++};
++
++class XorShift32 {
++  private value: number;
++
++  constructor(seed: number) {
++    this.value = (seed >>> 0) || 0x6d2b79f5;
++  }
++
++  nextSigned(): number {
++    let value = this.value;
++    value ^= value << 13;
++    value ^= value >>> 17;
++    value ^= value << 5;
++    this.value = value >>> 0;
++    return (this.value / 0xffffffff) * 2 - 1;
++  }
++}
++
++class DefaultSimulationSource implements TelemetrySource {
++  private readonly random: XorShift32;
++  private readonly config: SimulationConfig;
++  private fanPowerPct = 0;
++  private phase: RunPhase = "idle";
++  private sequence = 0;
++  private simulationTimeMs = 0;
++  private physical: PhysicalState = { rpm: 0, windSpeedMps: 0, underbodyPressurePa: 0, verticalLoadN: 0 };
++  private previousWindSpeedMps = 0;
++  private readonly windDelay: number[] = [0];
++  private readonly pressureDelay: number[] = [0, 0];
++  private readonly loadDelay: number[] = [0, 0];
++
++  constructor(seed: number, config: SimulationConfig = defaultConfig) {
++    this.random = new XorShift32(seed);
++    this.config = config;
++  }
++
++  setFanPower(percent: number): void {
++    this.fanPowerPct = Math.min(100, Math.max(0, percent));
++  }
++
++  setPhase(phase: RunPhase): void {
++    this.phase = phase;
++  }
++
++  step(dtMs: number): TelemetryFrame {
++    const safeDtMs = Math.max(0, dtMs);
++    const targetRpm = this.config.maxRpm * (this.fanPowerPct / 100);
++    const rpmTauMs = targetRpm >= this.physical.rpm ? this.config.rampTauMs : this.config.coastTauMs;
++    const nextRpm = stepFirstOrder(this.physical.rpm, targetRpm, safeDtMs, rpmTauMs);
++    const targetWindSpeedMps = this.config.maxWindSpeedMps * (nextRpm / this.config.maxRpm);
++    const nextWindSpeedMps = stepFirstOrder(
++      this.physical.windSpeedMps,
++      targetWindSpeedMps,
++      safeDtMs,
++      this.config.windTauMs,
++    );
++    const dynamicPressure = calculateDynamicPressure(this.config.airDensityKgM3, nextWindSpeedMps);
++    const nextPressurePa = -dynamicPressure * this.config.pressureCoefficient;
++    const nextLoadN = dynamicPressure * this.config.referenceAreaM2 * this.config.liftCoefficient;
++    const windChange = Math.abs(nextWindSpeedMps - this.previousWindSpeedMps);
++    const isStable = targetRpm > 0
++      && Math.abs(nextRpm - targetRpm) <= targetRpm * 0.03
++      && windChange < 0.03;
++
++    this.physical = {
++      rpm: nextRpm,
++      windSpeedMps: nextWindSpeedMps,
++      underbodyPressurePa: nextPressurePa,
++      verticalLoadN: nextLoadN,
++    };
++    this.previousWindSpeedMps = nextWindSpeedMps;
++    this.simulationTimeMs += safeDtMs;
++
++    const delayedWind = this.shiftDelay(this.windDelay, nextWindSpeedMps);
++    const delayedPressure = this.shiftDelay(this.pressureDelay, nextPressurePa);
++    const delayedLoad = this.shiftDelay(this.loadDelay, nextLoadN);
++    const driftPressure = 0.35 * Math.sin(this.simulationTimeMs / 45000);
++    const driftLoad = 0.006 * Math.sin(this.simulationTimeMs / 60000);
++
++    return {
++      sequence: this.sequence++,
++      simulationTimeMs: this.simulationTimeMs,
++      phase: this.phase,
++      fanPowerPct: this.fanPowerPct,
++      rpm: nextRpm * (1 + this.random.nextSigned() * 0.0035),
++      windSpeedMps: delayedWind * (1 + this.random.nextSigned() * 0.005),
++      underbodyPressurePa: delayedPressure + this.random.nextSigned() * 0.8 + driftPressure,
++      verticalLoadN: delayedLoad + this.random.nextSigned() * 0.015 + driftLoad,
++      quality: isStable ? "stable" : "transient",
++      provenance: "simulated",
++    };
++  }
++
++  reset(): TelemetryFrame {
++    this.fanPowerPct = 0;
++    this.phase = "idle";
++    this.sequence = 0;
++    this.simulationTimeMs = 0;
++    this.physical = { rpm: 0, windSpeedMps: 0, underbodyPressurePa: 0, verticalLoadN: 0 };
++    this.previousWindSpeedMps = 0;
++    this.windDelay.splice(0, this.windDelay.length, 0);
++    this.pressureDelay.splice(0, this.pressureDelay.length, 0, 0);
++    this.loadDelay.splice(0, this.loadDelay.length, 0, 0);
++    return this.step(0);
++  }
++
++  private shiftDelay(values: number[], nextValue: number): number {
++    const delayed = values.shift()!;
++    values.push(nextValue);
++    return delayed;
++  }
++}
++
++export function createDefaultSimulationSource(seed: number): TelemetrySource {
++  return new DefaultSimulationSource(seed);
++}
+diff --git a/src/features/experiment/SimulationSource.test.ts b/src/features/experiment/SimulationSource.test.ts
+new file mode 100644
+index 0000000..92e9501
+--- /dev/null
++++ b/src/features/experiment/SimulationSource.test.ts
+@@ -0,0 +1,19 @@
++import { describe, expect, it } from "vitest";
++import { createDefaultSimulationSource } from "./SimulationSource";
++
++describe("SimulationSource", () => {
++  it("replays identical telemetry for an identical seed and command sequence", () => {
++    const a = createDefaultSimulationSource(42);
++    const b = createDefaultSimulationSource(42);
++    a.setFanPower(60); b.setFanPower(60);
++    const framesA = Array.from({ length: 80 }, () => a.step(50));
++    const framesB = Array.from({ length: 80 }, () => b.step(50));
++    expect(framesA).toEqual(framesB);
++    expect(framesA.at(-1)!.windSpeedMps).toBeGreaterThan(0);
++  });
++
++  it("labels every generated frame as simulated", () => {
++    const source = createDefaultSimulationSource(1);
++    expect(source.step(50).provenance).toBe("simulated");
++  });
++});
+diff --git a/src/features/experiment/experimentMachine.ts b/src/features/experiment/experimentMachine.ts
+new file mode 100644
+index 0000000..bda37b8
+--- /dev/null
++++ b/src/features/experiment/experimentMachine.ts
+@@ -0,0 +1,48 @@
++import type { ActiveRunPhase, RunPhase } from "./model";
++
++export type ExperimentState = {
++  phase: RunPhase;
++  resumePhase: ActiveRunPhase | null;
++};
++
++export type ExperimentEvent =
++  | { type: "start" }
++  | { type: "pause" }
++  | { type: "resume" }
++  | { type: "advance" }
++  | { type: "reset" };
++
++export const initialExperimentState: ExperimentState = { phase: "idle", resumePhase: null };
++
++const nextPhase: Record<ActiveRunPhase, RunPhase> = {
++  ramping: "stabilizing",
++  stabilizing: "sampling",
++  sampling: "completed",
++};
++
++export function experimentReducer(state: ExperimentState, event: ExperimentEvent): ExperimentState {
++  switch (event.type) {
++    case "start":
++      return state.phase === "idle" || state.phase === "completed"
++        ? { phase: "ramping", resumePhase: null }
++        : state;
++    case "pause":
++      return isActiveRunPhase(state.phase)
++        ? { phase: "paused", resumePhase: state.phase }
++        : state;
++    case "resume":
++      return state.phase === "paused" && state.resumePhase
++        ? { phase: state.resumePhase, resumePhase: null }
++        : state;
++    case "advance":
++      return isActiveRunPhase(state.phase)
++        ? { phase: nextPhase[state.phase], resumePhase: null }
++        : state;
++    case "reset":
++      return initialExperimentState;
++  }
++}
++
++function isActiveRunPhase(phase: RunPhase): phase is ActiveRunPhase {
++  return phase === "ramping" || phase === "stabilizing" || phase === "sampling";
++}
+diff --git a/src/features/experiment/experimentMachine.test.ts b/src/features/experiment/experimentMachine.test.ts
+new file mode 100644
+index 0000000..cc81731
+--- /dev/null
++++ b/src/features/experiment/experimentMachine.test.ts
+@@ -0,0 +1,16 @@
++import { describe, expect, it } from "vitest";
++import { experimentReducer, initialExperimentState } from "./experimentMachine";
++
++describe("experimentMachine", () => {
++  it("pauses and resumes the exact prior phase", () => {
++    const running = { ...initialExperimentState, phase: "sampling" as const };
++    const paused = experimentReducer(running, { type: "pause" });
++    expect(paused).toMatchObject({ phase: "paused", resumePhase: "sampling" });
++    expect(experimentReducer(paused, { type: "resume" }).phase).toBe("sampling");
++  });
++
++  it("reset always returns to idle", () => {
++    expect(experimentReducer({ phase: "completed", resumePhase: null }, { type: "reset" }))
++      .toEqual(initialExperimentState);
++  });
++});

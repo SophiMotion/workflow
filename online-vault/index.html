@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>online-vault</title>
+  <script src="online-vault-index.js"></script>
+  <style>
+    :root {
+      --google-blue: #4285f4;
+      --google-red: #db4437;
+      --google-yellow: #f4b400;
+      --google-green: #0f9d58;
+      --ink: #202124;
+      --muted: #5f6368;
+      --line: #dadce0;
+      --surface: #fff;
+      --page: #f8fafd;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--page); }
+    a { color: var(--google-blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    header { position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+    header::before { content: ""; display: block; height: 4px; background: linear-gradient(90deg, var(--google-blue) 0 25%, var(--google-red) 25% 50%, var(--google-yellow) 50% 75%, var(--google-green) 75% 100%); }
+    .topbar { max-width: 1440px; margin: 0 auto; padding: 14px 18px; display: grid; grid-template-columns: 220px minmax(0, 1fr); align-items: center; gap: 14px; }
+    h1 { margin: 0; font-size: 20px; line-height: 1.2; }
+    .subtitle { color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .searchbar { display: grid; grid-template-columns: minmax(220px, 1fr) 160px 150px 140px; gap: 10px; align-items: center; }
+    input, select { width: 100%; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); padding: 9px 10px; font: inherit; }
+    input:focus, select:focus { outline: 2px solid rgba(66, 133, 244, 0.18); border-color: var(--google-blue); }
+    main { max-width: 1440px; margin: 0 auto; padding: 16px 18px 28px; }
+    .dashboard { display: block; margin-bottom: 14px; }
+    .dashboard-panel { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 14px; box-shadow: 0 1px 2px rgba(60, 64, 67, 0.08); }
+    .dashboard-wide { grid-column: 1 / -1; }
+    .panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .panel-head h2 { margin: 0; font-size: 15px; line-height: 1.25; }
+    .panel-note { color: var(--muted); font-size: 12px; }
+    .dashboard-overview { margin-bottom: 16px; }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .stat { position: relative; display: block; overflow: hidden; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 13px; min-height: 110px; color: inherit; }
+    a.stat:hover { text-decoration: none; border-color: #c4d7fb; box-shadow: 0 2px 10px rgba(60, 64, 67, 0.12); transform: translateY(-1px); }
+    a.stat:focus-visible { outline: 2px solid rgba(66, 133, 244, 0.35); outline-offset: 2px; }
+    .stat::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--accent, var(--google-blue)); }
+    .stat .num { font-size: 24px; font-weight: 760; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .stat .label { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .stat .share { color: var(--accent, var(--google-blue)); font-size: 12px; margin-top: 8px; font-weight: 650; }
+    .stat .hint { color: #3c4043; font-size: 12px; margin-top: 10px; }
+    .stat.wechat { --accent: var(--google-green); }
+    .stat.web { --accent: var(--google-blue); }
+    .stat.gemini { --accent: var(--google-yellow); }
+    .stat.chatgpt { --accent: var(--google-red); }
+    .matrix { display: grid; gap: 7px; }
+    .matrix-row { display: grid; grid-template-columns: minmax(92px, 136px) minmax(0, 1fr) 66px; align-items: center; gap: 12px; width: 100%; border: 1px solid transparent; border-radius: 8px; background: transparent; padding: 7px 8px; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+    .matrix-row:hover { background: #f8fafd; border-color: #e8eaed; }
+    .matrix-label { font-weight: 620; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .stack { height: 12px; display: flex; overflow: hidden; border-radius: 999px; background: #edf0f4; }
+    .seg { width: var(--width); min-width: 2px; }
+    .seg.wechat { background: var(--google-green); }
+    .seg.web { background: var(--google-blue); }
+    .seg.gemini { background: var(--google-yellow); }
+    .seg.chatgpt { background: var(--google-red); }
+    .matrix-total { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+    .legend { display: flex; flex-wrap: wrap; gap: 10px; color: var(--muted); font-size: 12px; }
+    .legend span { display: inline-flex; align-items: center; gap: 5px; }
+    .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--color); }
+    .matrix-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 10px; }
+    .matrix-heading h3 { margin: 0; font-size: 14px; }
+    .layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 14px; align-items: start; }
+    aside { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 12px; position: sticky; top: 80px; }
+    aside h2 { margin: 0 0 10px; font-size: 14px; }
+    .facet { display: grid; gap: 6px; margin-bottom: 14px; }
+    .facet button { display: flex; justify-content: space-between; gap: 10px; width: 100%; border: 1px solid transparent; background: transparent; border-radius: 8px; padding: 7px 8px; color: #3c4043; font: inherit; cursor: pointer; text-align: left; }
+    .facet button:hover, .facet button.active { background: #f1f5fe; border-color: #d2e3fc; }
+    .count { color: #667085; font-variant-numeric: tabular-nums; }
+    .result-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 2px 0 10px; color: #667085; }
+    .result-list { display: grid; gap: 9px; }
+    .item { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 13px 14px; }
+    .item-title { font-size: 16px; font-weight: 680; line-height: 1.35; margin: 0 0 7px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 7px; color: #667085; font-size: 12px; }
+    .badge { border: 1px solid var(--line); border-radius: 8px; padding: 2px 7px; background: #fff; }
+    .badge.wechat { border-color: #b7dfca; color: #137333; background: #e6f4ea; }
+    .badge.web { border-color: #d2e3fc; color: #1967d2; background: #e8f0fe; }
+    .badge.gemini { border-color: #fde293; color: #8a5f00; background: #fef7e0; }
+    .badge.chatgpt { border-color: #f4b7ae; color: #a50e0e; background: #fce8e6; }
+    .excerpt { color: #475467; margin: 0 0 8px; }
+    .links { display: flex; flex-wrap: wrap; gap: 10px; font-size: 13px; }
+    .empty { background: #fff; border: 1px dashed var(--line); border-radius: 8px; padding: 20px; color: #667085; }
+    mark { background: #fff1a8; padding: 0 2px; border-radius: 3px; }
+    @media (max-width: 980px) {
+      .topbar { grid-template-columns: 1fr; }
+      .searchbar { grid-template-columns: 1fr 1fr; }
+      .layout { grid-template-columns: 1fr; }
+      aside { position: static; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 620px) {
+      .searchbar, .stats { grid-template-columns: 1fr; }
+      .matrix-row { grid-template-columns: 88px minmax(0, 1fr) 52px; gap: 8px; }
+      main { padding: 12px; }
+      .topbar { padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <div>
+        <h1>online-vault</h1>
+        <div class="subtitle" id="generatedAt">正在载入索引</div>
+      </div>
+      <div class="searchbar" aria-label="筛选">
+        <input id="queryInput" type="search" placeholder="搜索标题、摘要、路径或正文片段">
+        <select id="categorySelect" aria-label="主题">
+          <option value="">全部主题</option>
+        </select>
+        <select id="channelSelect" aria-label="渠道">
+          <option value="">全部渠道</option>
+          <option value="wechat">WeChat</option>
+          <option value="web">Web</option>
+          <option value="gemini">Gemini</option>
+          <option value="chatgpt">ChatGPT</option>
+        </select>
+        <select id="sortSelect" aria-label="排序">
+          <option value="relevance">相关优先</option>
+          <option value="channel">渠道排序</option>
+          <option value="category">主题排序</option>
+          <option value="title">标题排序</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="dashboard" aria-label="仪表盘">
+      <div class="dashboard-panel dashboard-wide">
+        <div class="panel-head">
+          <h2>资料库仪表盘</h2>
+          <span class="panel-note" id="dashboardUpdated">正在载入</span>
+        </div>
+        <div class="dashboard-overview">
+          <div class="stats" aria-label="统计">
+            <a class="stat wechat" href="wechat-vault/html/index.html"><div class="num" id="wechatCount">0</div><div class="label">WeChat</div><div class="share" id="wechatShare">0%</div><div class="hint">点击进入看板</div></a>
+            <a class="stat web" href="web-vault/html/index.html"><div class="num" id="webCount">0</div><div class="label">Web</div><div class="share" id="webShare">0%</div><div class="hint">点击进入看板</div></a>
+            <a class="stat gemini" href="gemini-vault/html/index.html"><div class="num" id="geminiCount">0</div><div class="label">Gemini</div><div class="share" id="geminiShare">0%</div><div class="hint">点击进入看板</div></a>
+            <a class="stat chatgpt" href="chatgpt-vault/html/index.html"><div class="num" id="chatgptCount">0</div><div class="label">ChatGPT</div><div class="share" id="chatgptShare">0%</div><div class="hint">点击进入看板</div></a>
+          </div>
+        </div>
+        <div class="matrix-heading">
+          <h3>主题 × 渠道</h3>
+          <div class="legend">
+            <span><i class="dot" style="--color: var(--google-green)"></i>WeChat</span>
+            <span><i class="dot" style="--color: var(--google-blue)"></i>Web</span>
+            <span><i class="dot" style="--color: var(--google-yellow)"></i>Gemini</span>
+            <span><i class="dot" style="--color: var(--google-red)"></i>ChatGPT</span>
+          </div>
+        </div>
+        <div class="matrix" id="categoryMatrix"></div>
+      </div>
+    </section>
+
+    <div class="layout">
+      <aside>
+        <h2>渠道</h2>
+        <div class="facet" id="channelFacet"></div>
+        <h2>主题</h2>
+        <div class="facet" id="categoryFacet"></div>
+      </aside>
+      <section>
+        <div class="result-head">
+          <div id="resultSummary">0 条结果</div>
+          <div id="limitNote"></div>
+        </div>
+        <div class="result-list" id="results"></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const vault = window.ONLINE_VAULT_INDEX || { documents: [], categories: [], summary: {} };
+    const docs = vault.documents || [];
+    const categories = vault.categories || [];
+    const channelLabels = { wechat: "WeChat", web: "Web", gemini: "Gemini", chatgpt: "ChatGPT" };
+    const queryInput = document.getElementById("queryInput");
+    const categorySelect = document.getElementById("categorySelect");
+    const channelSelect = document.getElementById("channelSelect");
+    const sortSelect = document.getElementById("sortSelect");
+    const results = document.getElementById("results");
+    const resultSummary = document.getElementById("resultSummary");
+    const limitNote = document.getElementById("limitNote");
+    const renderLimit = 350;
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[char]));
+    }
+
+    function normalize(value) {
+      return String(value || "").toLowerCase().replace(/\s+/g, " ").trim();
+    }
+
+    function indexText(doc) {
+      if (!doc._indexText) {
+        doc._indexText = normalize(`${doc.title} ${doc.excerpt} ${doc.source_path} ${doc.search_text}`);
+      }
+      return doc._indexText;
+    }
+
+    function countBy(items, key) {
+      return items.reduce((acc, item) => {
+        acc[item[key]] = (acc[item[key]] || 0) + 1;
+        return acc;
+      }, {});
+    }
+
+    function formatNumber(value) {
+      return Number(value || 0).toLocaleString();
+    }
+
+    function percent(value, total) {
+      if (!total) return "0%";
+      return `${Math.round((value / total) * 100)}%`;
+    }
+
+    function setStats() {
+      const channelCounts = vault.summary?.channel_counts || countBy(docs, "channel");
+      document.getElementById("wechatCount").textContent = formatNumber(channelCounts.wechat || 0);
+      document.getElementById("webCount").textContent = formatNumber(channelCounts.web || 0);
+      document.getElementById("geminiCount").textContent = formatNumber(channelCounts.gemini || 0);
+      document.getElementById("chatgptCount").textContent = formatNumber(channelCounts.chatgpt || 0);
+      document.getElementById("wechatShare").textContent = percent(channelCounts.wechat || 0, docs.length);
+      document.getElementById("webShare").textContent = percent(channelCounts.web || 0, docs.length);
+      document.getElementById("geminiShare").textContent = percent(channelCounts.gemini || 0, docs.length);
+      document.getElementById("chatgptShare").textContent = percent(channelCounts.chatgpt || 0, docs.length);
+      document.getElementById("dashboardUpdated").textContent = vault.generated_at ? `更新于 ${vault.generated_at}` : "索引已载入";
+      document.getElementById("generatedAt").textContent = vault.generated_at ? `更新于 ${vault.generated_at}` : "索引已载入";
+    }
+
+    function setDashboard() {
+      const matrix = vault.summary?.category_channel_counts || {};
+      document.getElementById("categoryMatrix").innerHTML = categories.map(category => {
+        const row = matrix[category] || {};
+        const wechat = row.wechat || 0;
+        const web = row.web || 0;
+        const gemini = row.gemini || 0;
+        const chatgpt = row.chatgpt || 0;
+        const total = wechat + web + gemini + chatgpt;
+        const safeTotal = Math.max(total, 1);
+        return `<button type="button" class="matrix-row" data-category="${escapeHtml(category)}">
+          <span class="matrix-label">${escapeHtml(category)}</span>
+          <span class="stack">
+            <span class="seg wechat" style="--width: ${(wechat / safeTotal) * 100}%"></span>
+            <span class="seg web" style="--width: ${(web / safeTotal) * 100}%"></span>
+            <span class="seg gemini" style="--width: ${(gemini / safeTotal) * 100}%"></span>
+            <span class="seg chatgpt" style="--width: ${(chatgpt / safeTotal) * 100}%"></span>
+          </span>
+          <span class="matrix-total">${formatNumber(total)}</span>
+        </button>`;
+      }).join("");
+
+      document.querySelectorAll("[data-category]").forEach(button => {
+        button.addEventListener("click", () => {
+          categorySelect.value = button.dataset.category || "";
+          render();
+        });
+      });
+    }
+
+    function fillSelects() {
+      categorySelect.innerHTML = '<option value="">全部主题</option>' + categories
+        .map(category => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`)
+        .join("");
+    }
+
+    function renderFacet(containerId, values, activeValue, onPick) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = values.map(row => {
+        const active = row.value === activeValue ? " active" : "";
+        return `<button type="button" class="${active}" data-value="${escapeHtml(row.value)}"><span>${escapeHtml(row.label)}</span><span class="count">${row.count.toLocaleString()}</span></button>`;
+      }).join("");
+      container.querySelectorAll("button").forEach(button => {
+        button.addEventListener("click", () => onPick(button.dataset.value || ""));
+      });
+    }
+
+    function rank(doc, tokens) {
+      if (!tokens.length) return 0;
+      const title = doc._titleText || (doc._titleText = normalize(doc.title));
+      const excerpt = doc._excerptText || (doc._excerptText = normalize(doc.excerpt));
+      const haystack = indexText(doc);
+      let score = 0;
+      tokens.forEach(token => {
+        if (title.includes(token)) score += 8;
+        if (excerpt.includes(token)) score += 3;
+        if (haystack.includes(token)) score += 1;
+      });
+      return score;
+    }
+
+    function filteredDocs(options = {}) {
+      const category = options.ignoreCategory ? "" : categorySelect.value;
+      const channel = options.ignoreChannel ? "" : channelSelect.value;
+      const tokens = normalize(queryInput.value).split(" ").filter(Boolean);
+      let rows = docs.filter(doc => {
+        if (category && doc.category !== category) return false;
+        if (channel && doc.channel !== channel) return false;
+        if (!tokens.length) return true;
+        return tokens.every(token => indexText(doc).includes(token));
+      });
+
+      const sort = sortSelect.value;
+      if (sort === "title") {
+        rows.sort((a, b) => a.title.localeCompare(b.title, "zh-Hans-CN"));
+      } else if (sort === "category") {
+        rows.sort((a, b) => a.category.localeCompare(b.category, "zh-Hans-CN") || a.title.localeCompare(b.title, "zh-Hans-CN"));
+      } else if (sort === "channel") {
+        rows.sort((a, b) => a.channel.localeCompare(b.channel) || a.category.localeCompare(b.category, "zh-Hans-CN"));
+      } else {
+        rows.sort((a, b) => rank(b, tokens) - rank(a, tokens));
+      }
+      return rows;
+    }
+
+    function render() {
+      const rows = filteredDocs();
+      const channelRows = filteredDocs({ ignoreChannel: true });
+      const categoryRows = filteredDocs({ ignoreCategory: true });
+      const channelCounts = countBy(channelRows, "channel");
+      const categoryCounts = countBy(categoryRows, "category");
+      renderFacet("channelFacet", [
+        { value: "", label: "全部渠道", count: channelRows.length },
+        { value: "wechat", label: "WeChat", count: channelCounts.wechat || 0 },
+        { value: "web", label: "Web", count: channelCounts.web || 0 },
+        { value: "gemini", label: "Gemini", count: channelCounts.gemini || 0 },
+        { value: "chatgpt", label: "ChatGPT", count: channelCounts.chatgpt || 0 },
+      ], channelSelect.value, value => { channelSelect.value = value; render(); });
+      renderFacet("categoryFacet", [
+        { value: "", label: "全部主题", count: categoryRows.length },
+        ...categories.map(category => ({ value: category, label: category, count: categoryCounts[category] || 0 }))
+      ], categorySelect.value, value => { categorySelect.value = value; render(); });
+
+      resultSummary.textContent = `${rows.length.toLocaleString()} 条结果`;
+      limitNote.textContent = rows.length > renderLimit ? `显示前 ${renderLimit.toLocaleString()} 条` : "";
+      if (!rows.length) {
+        results.innerHTML = '<div class="empty">没有匹配的资料。调整关键词、主题或渠道再试一次。</div>';
+        return;
+      }
+      results.innerHTML = rows.slice(0, renderLimit).map(doc => {
+        const raw = doc.raw_href && doc.raw_href !== doc.href ? `<a href="${escapeHtml(doc.raw_href)}">原链接/原文件</a>` : "";
+        const chars = Number(doc.text_chars || 0).toLocaleString();
+        const date = doc.date ? `<span class="badge">${escapeHtml(doc.date)}</span>` : "";
+        return `<article class="item">
+          <h2 class="item-title"><a href="${escapeHtml(doc.href)}">${escapeHtml(doc.title)}</a></h2>
+          <div class="meta">
+            <span class="badge ${escapeHtml(doc.channel)}">${escapeHtml(channelLabels[doc.channel] || doc.channel)}</span>
+            <span class="badge">${escapeHtml(doc.category)}</span>
+            <span class="badge">${escapeHtml(doc.source_type || "资料")}</span>
+            ${date}
+            <span class="badge">${chars} 字符</span>
+          </div>
+          <p class="excerpt">${escapeHtml(doc.excerpt || doc.source_path || "")}</p>
+          <div class="links">
+            <a href="${escapeHtml(doc.href)}">打开资料页</a>
+            ${raw}
+          </div>
+        </article>`;
+      }).join("");
+    }
+
+    [queryInput, categorySelect, channelSelect, sortSelect].forEach(control => control.addEventListener("input", render));
+    setStats();
+    setDashboard();
+    fillSelects();
+    render();
+  </script>
+</body>
+</html>

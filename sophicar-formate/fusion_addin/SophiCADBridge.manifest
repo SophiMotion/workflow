@@ -1,0 +1,11 @@
+{
+  "autodeskProduct": "Fusion",
+  "type": "addin",
+  "author": "SophiCar",
+  "description": {
+    "": "Fusion 参数化装配、Three.js 与 URDF 双向桥接"
+  },
+  "version": "0.1.0",
+  "runOnStartup": false,
+  "supportedOS": "windows|mac"
+}

@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<robot name="four_bar">
+  <link name="ground">
+    <inertial>
+      <origin xyz="0.125 0 0" rpy="0 0 0"/>
+      <mass value="0.8"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.005" iyz="0" izz="0.005"/>
+    </inertial>
+    <visual>
+      <geometry><mesh filename="meshes/collision/ground.stl"/></geometry>
+    </visual>
+    <collision>
+      <geometry><mesh filename="meshes/collision/ground.stl"/></geometry>
+    </collision>
+  </link>
+  <link name="input">
+    <inertial>
+      <origin xyz="0.1 0 0" rpy="0 0 0"/>
+      <mass value="0.65"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.003" iyz="0" izz="0.003"/>
+    </inertial>
+    <visual>
+      <geometry><mesh filename="meshes/collision/input.stl"/></geometry>
+    </visual>
+    <collision>
+      <geometry><mesh filename="meshes/collision/input.stl"/></geometry>
+    </collision>
+  </link>
+  <link name="coupler">
+    <inertial>
+      <origin xyz="0.125 0 0" rpy="0 0 0"/>
+      <mass value="0.8"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.005" iyz="0" izz="0.005"/>
+    </inertial>
+    <visual>
+      <geometry><mesh filename="meshes/collision/coupler.stl"/></geometry>
+    </visual>
+    <collision>
+      <geometry><mesh filename="meshes/collision/coupler.stl"/></geometry>
+    </collision>
+  </link>
+  <link name="output">
+    <inertial>
+      <origin xyz="0.1 0 0" rpy="0 0 0"/>
+      <mass value="0.65"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.003" iyz="0" izz="0.003"/>
+    </inertial>
+    <visual>
+      <geometry><mesh filename="meshes/collision/output.stl"/></geometry>
+    </visual>
+    <collision>
+      <geometry><mesh filename="meshes/collision/output.stl"/></geometry>
+    </collision>
+  </link>
+  <joint name="j_ground_input" type="revolute">
+    <parent link="ground"/>
+    <child link="input"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.57079632679" upper="1.57079632679" effort="100" velocity="2"/>
+  </joint>
+  <joint name="j_input_coupler" type="revolute">
+    <parent link="input"/>
+    <child link="coupler"/>
+    <origin xyz="0.2 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159265359" upper="3.14159265359" effort="100" velocity="2"/>
+  </joint>
+  <joint name="j_coupler_output" type="revolute">
+    <parent link="coupler"/>
+    <child link="output"/>
+    <origin xyz="0.25 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159265359" upper="3.14159265359" effort="100" velocity="2"/>
+  </joint>
+</robot>

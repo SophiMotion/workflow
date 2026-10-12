@@ -1,0 +1,533 @@
+# Task 8 fix round 1 current-file snapshots
+
+## Files
+src/features/dashboard/FieldSelector.tsx
+src/features/dashboard/HistoryChart.tsx
+src/features/dashboard/ControlPanel.tsx
+src/features/dashboard/Dashboard.test.tsx
+
+## Current contents
+diff --git a/src/features/dashboard/FieldSelector.tsx b/src/features/dashboard/FieldSelector.tsx
+new file mode 100644
+index 0000000..58fe1a7
+--- /dev/null
++++ b/src/features/dashboard/FieldSelector.tsx
+@@ -0,0 +1,93 @@
++import type { KeyboardEvent as ReactKeyboardEvent } from "react";
++import { useLabStore, type LabState } from "../experiment/labStore";
++import { mapWindToLatticeVelocity } from "../flow/flowRuntime";
++
++export type FieldId = LabState["selectedField"];
++
++type FieldSelectorProps = {
++  onInspect(field: FieldId): void;
++};
++
++const FIELDS: readonly { id: FieldId; label: string; english: string }[] = [
++  { id: "speed", label: "速度", english: "VELOCITY" },
++  { id: "pressure", label: "压力", english: "PRESSURE" },
++  { id: "vorticity", label: "涡量", english: "VORTICITY" },
++  { id: "streamlines", label: "流线", english: "STREAMLINES" },
++];
++
++const FLOW_STATUS: Record<LabState["flowStatus"], string> = {
++  idle: "待机 / IDLE",
++  loading: "求解中 / SOLVING",
++  ready: "流场就绪 / READY",
++  failed: "求解失败 / FAILED",
++};
++
++export function FieldSelector({ onInspect }: FieldSelectorProps) {
++  const selectedField = useLabStore((state) => state.selectedField);
++  const selectField = useLabStore((state) => state.selectField);
++  const flowField = useLabStore((state) => state.flowField);
++  const flowStatus = useLabStore((state) => state.flowStatus);
++  const windSpeedMps = useLabStore((state) => state.telemetry.windSpeedMps);
++  const gridWidth = flowField?.width ?? 240;
++  const gridHeight = flowField?.height ?? 96;
++
++  const select = (field: FieldId) => {
++    selectField(field);
++    onInspect(field);
++  };
++
++  const moveSelection = (event: ReactKeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
++    let nextIndex: number | undefined;
++    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
++      nextIndex = (currentIndex + 1) % FIELDS.length;
++    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
++      nextIndex = (currentIndex - 1 + FIELDS.length) % FIELDS.length;
++    } else if (event.key === "Home") {
++      nextIndex = 0;
++    } else if (event.key === "End") {
++      nextIndex = FIELDS.length - 1;
++    }
++    if (nextIndex === undefined) return;
++
++    event.preventDefault();
++    const buttons = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("[role='radio']");
++    buttons?.[nextIndex]?.focus();
++    select(FIELDS[nextIndex]!.id);
++  };
++
++  return (
++    <section className="dashboard-section field-section" aria-labelledby="field-selector-title">
++      <div className="dashboard-section-heading">
++        <div>
++          <p className="section-kicker">FIELD SELECTOR</p>
++          <h2 id="field-selector-title">场变量选择</h2>
++        </div>
++      </div>
++      <div className="field-options" role="radiogroup" aria-label="场变量选择">
++        {FIELDS.map((field, index) => (
++          <button
++            type="button"
++            role="radio"
++            aria-label={field.label}
++            aria-checked={selectedField === field.id}
++            tabIndex={selectedField === field.id ? 0 : -1}
++            className={selectedField === field.id ? "field-selected" : undefined}
++            key={field.id}
++            onClick={() => select(field.id)}
++            onKeyDown={(event) => moveSelection(event, index)}
++          >
++            <span>{field.label}</span>
++            <small>{field.english}</small>
++          </button>
++        ))}
++      </div>
++      <dl className="solver-status" aria-label="二维求解器状态">
++        <div><dt>求解器</dt><dd>D2Q9 BGK</dd></div>
++        <div><dt>活动网格</dt><dd>{gridWidth} × {gridHeight}</dd></div>
++        <div><dt>格点入口速度</dt><dd>{mapWindToLatticeVelocity(windSpeedMps).toFixed(4)} lu</dd></div>
++        <div><dt>流场状态</dt><dd>{FLOW_STATUS[flowStatus]}</dd></div>
++        <div><dt>模型范围</dt><dd>二维教学近似</dd></div>
++      </dl>
++    </section>
++  );
++}
+diff --git a/src/features/dashboard/HistoryChart.tsx b/src/features/dashboard/HistoryChart.tsx
+new file mode 100644
+index 0000000..925f29a
+--- /dev/null
++++ b/src/features/dashboard/HistoryChart.tsx
+@@ -0,0 +1,125 @@
++import { useMemo, useState } from "react";
++import {
++  CartesianGrid,
++  Line,
++  LineChart,
++  ReferenceArea,
++  ResponsiveContainer,
++  Tooltip,
++  XAxis,
++  YAxis,
++} from "recharts";
++import { useLabStore } from "../experiment/labStore";
++import { mapHistoryToChartData, type ChartPoint } from "./historyMapping";
++
++type SeriesKey = "rpm" | "windSpeedMps" | "pressurePa" | "loadN";
++
++const SERIES: readonly { key: SeriesKey; label: string; color: string }[] = [
++  { key: "windSpeedMps", label: "风速 m/s", color: "#50e3c2" },
++  { key: "rpm", label: "转速 RPM", color: "#7ea9ff" },
++  { key: "pressurePa", label: "压力 Pa", color: "#f2bd4f" },
++  { key: "loadN", label: "载荷 N", color: "#e8685f" },
++];
++
++type HistoryChartProps = {
++  onInspectStableWindow(): void;
++};
++
++export function HistoryChart({ onInspectStableWindow }: HistoryChartProps) {
++  const history = useLabStore((state) => state.history);
++  const data = useMemo(() => mapHistoryToChartData(history), [history]);
++  const stableWindow = useMemo(() => findStableWindow(data), [data]);
++  const [hiddenSeries, setHiddenSeries] = useState<ReadonlySet<SeriesKey>>(() => new Set());
++
++  const toggleSeries = (key: SeriesKey) => {
++    setHiddenSeries((current) => {
++      const next = new Set(current);
++      if (next.has(key)) next.delete(key);
++      else next.add(key);
++      return next;
++    });
++  };
++
++  return (
++    <div className="history-panel">
++      <div className="history-heading">
++        <div>
++          <p className="section-kicker">60 SECOND HISTORY</p>
++          <h2 id="history-title">实验曲线</h2>
++        </div>
++        <div className="chart-legend" aria-label="曲线显示选项">
++          {SERIES.map((series) => (
++            <button
++              type="button"
++              key={series.key}
++              aria-pressed={!hiddenSeries.has(series.key)}
++              onClick={() => toggleSeries(series.key)}
++            >
++              <span style={{ backgroundColor: series.color }} aria-hidden="true" />{series.label}
++            </button>
++          ))}
++        </div>
++      </div>
++
++      <div className="history-chart-plot" aria-label="最近 60 秒遥测曲线">
++        {data.length === 0 && <p className="chart-empty">启动实验后将在此显示最近 60 秒数据。</p>}
++        {data.length > 0 && (
++          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 800, height: 140 }}>
++            <LineChart data={data} margin={{ top: 10, right: 4, bottom: 2, left: 4 }}>
++              <CartesianGrid stroke="#20353d" vertical={false} />
++              <XAxis dataKey="timeSeconds" type="number" domain={["dataMin", "dataMax"]} tickFormatter={(value) => `${Number(value).toFixed(0)}s`} stroke="#80969d" />
++              <YAxis yAxisId="velocity" orientation="left" stroke="#50e3c2" width={38} tickCount={3} fontSize={9} tickMargin={2} label={{ value: "m/s", angle: -90, position: "insideLeft", fill: "#50e3c2", fontSize: 9 }} />
++              <YAxis yAxisId="rpm" orientation="left" stroke="#7ea9ff" width={38} tickCount={3} fontSize={9} tickMargin={2} label={{ value: "RPM", angle: -90, position: "insideLeft", fill: "#7ea9ff", fontSize: 9 }} />
++              <YAxis yAxisId="pressure" orientation="right" stroke="#f2bd4f" width={38} tickCount={3} fontSize={9} tickMargin={2} label={{ value: "Pa", angle: 90, position: "insideRight", fill: "#f2bd4f", fontSize: 9 }} />
++              <YAxis yAxisId="load" orientation="right" stroke="#e8685f" width={38} tickCount={3} fontSize={9} tickMargin={2} label={{ value: "N", angle: 90, position: "insideRight", fill: "#e8685f", fontSize: 9 }} />
++              <Tooltip labelFormatter={(value) => `T+${Number(value).toFixed(2)} s`} />
++              {stableWindow && (
++                <ReferenceArea
++                  x1={stableWindow.start}
++                  x2={stableWindow.end}
++                  yAxisId="velocity"
++                  fill="#50e3c2"
++                  fillOpacity={0.08}
++                  strokeOpacity={0}
++                />
++              )}
++              <Line yAxisId="velocity" dataKey="windSpeedMps" name="风速 m/s" stroke="#50e3c2" dot={false} isAnimationActive={false} hide={hiddenSeries.has("windSpeedMps")} />
++              <Line yAxisId="rpm" dataKey="rpm" name="转速 RPM" stroke="#7ea9ff" dot={false} isAnimationActive={false} hide={hiddenSeries.has("rpm")} />
++              <Line yAxisId="pressure" dataKey="pressurePa" name="压力 Pa" stroke="#f2bd4f" dot={false} isAnimationActive={false} hide={hiddenSeries.has("pressurePa")} />
++              <Line yAxisId="load" dataKey="loadN" name="载荷 N" stroke="#e8685f" dot={false} isAnimationActive={false} hide={hiddenSeries.has("loadN")} />
++            </LineChart>
++          </ResponsiveContainer>
++        )}
++      </div>
++      {stableWindow && (
++        <button type="button" className="stable-window-marker" aria-label="标记稳定窗口" onClick={onInspectStableWindow}>
++          标记稳定窗口
++          <span>{stableWindow.start.toFixed(2)}–{stableWindow.end.toFixed(2)} s</span>
++        </button>
++      )}
++    </div>
++  );
++}
++
++function findStableWindow(data: readonly ChartPoint[]): { start: number; end: number } | null {
++  let bestStart = -1;
++  let bestEnd = -1;
++  let currentStart = -1;
++
++  data.forEach((point, index) => {
++    if (point.quality === "stable") {
++      if (currentStart < 0) currentStart = index;
++      if (bestStart < 0 || index - currentStart > bestEnd - bestStart) {
++        bestStart = currentStart;
++        bestEnd = index;
++      }
++    } else {
++      currentStart = -1;
++    }
++  });
++
++  if (bestStart < 0 || bestEnd <= bestStart) return null;
++  const start = data[bestStart]!.timeSeconds;
++  const end = data[bestEnd]!.timeSeconds;
++  return end > start ? { start, end } : null;
++}
+diff --git a/src/features/dashboard/ControlPanel.tsx b/src/features/dashboard/ControlPanel.tsx
+new file mode 100644
+index 0000000..f21ca7c
+--- /dev/null
++++ b/src/features/dashboard/ControlPanel.tsx
+@@ -0,0 +1,71 @@
++import { useId } from "react";
++import { labStore, useLabStore } from "../experiment/labStore";
++import type { RunPhase } from "../experiment/model";
++
++const PHASE_LABELS: Record<RunPhase, string> = {
++  idle: "待机 / IDLE",
++  ramping: "加速 / RAMPING",
++  stabilizing: "稳定中 / STABILIZING",
++  sampling: "采样 / SAMPLING",
++  paused: "已暂停 / PAUSED",
++  completed: "已完成 / COMPLETED",
++};
++
++const ACTIVE_PHASES: readonly RunPhase[] = ["ramping", "stabilizing", "sampling"];
++
++export function ControlPanel() {
++  const inputId = useId();
++  const phase = useLabStore((state) => state.phase);
++  const fanPowerPct = useLabStore((state) => state.fanPowerPct);
++  const active = ACTIVE_PHASES.includes(phase);
++
++  const startOrResume = () => {
++    if (phase === "paused") {
++      labStore.getState().resumeRun();
++      return;
++    }
++    labStore.getState().startRun();
++  };
++
++  const reset = () => {
++    if (labStore.getState().history.length > 0
++      && !window.confirm("停止实验并清除当前 60 秒遥测历史？")) return;
++    labStore.getState().resetLab();
++  };
++
++  return (
++    <section className="dashboard-section fan-controls" aria-labelledby="fan-control-title">
++      <div className="dashboard-section-heading">
++        <div>
++          <p className="section-kicker">FAN CONTROL</p>
++          <h2 id="fan-control-title">风扇控制</h2>
++        </div>
++        <span className={`phase-badge phase-${phase}`} aria-live="polite">{PHASE_LABELS[phase]}</span>
++      </div>
++
++      <div className="fan-power-row">
++        <label htmlFor={inputId}>风扇功率</label>
++        <output htmlFor={inputId}>{fanPowerPct}%</output>
++      </div>
++      <input
++        id={inputId}
++        className="fan-slider"
++        type="range"
++        min="0"
++        max="100"
++        step="1"
++        value={fanPowerPct}
++        onChange={(event) => labStore.getState().setFanPower(event.currentTarget.valueAsNumber)}
++      />
++      <div className="slider-scale" aria-hidden="true"><span>0</span><span>50</span><span>100</span></div>
++
++      <div className="experiment-actions">
++        <button type="button" className="action-primary" disabled={active} onClick={startOrResume}>
++          {phase === "paused" ? "继续实验" : "启动实验"}
++        </button>
++        <button type="button" disabled={!active} onClick={() => labStore.getState().pauseRun()}>暂停实验</button>
++        <button type="button" onClick={reset}>停止并重置</button>
++      </div>
++    </section>
++  );
++}
+diff --git a/src/features/dashboard/Dashboard.test.tsx b/src/features/dashboard/Dashboard.test.tsx
+new file mode 100644
+index 0000000..2f4211b
+--- /dev/null
++++ b/src/features/dashboard/Dashboard.test.tsx
+@@ -0,0 +1,211 @@
++import { act, fireEvent, render, screen, within } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { beforeEach, expect, it, vi } from "vitest";
++import { labStore } from "../experiment/labStore";
++import type { TelemetryFrame } from "../experiment/model";
++import { ControlPanel } from "./ControlPanel";
++import { FieldSelector } from "./FieldSelector";
++import { HistoryChart } from "./HistoryChart";
++import { TelemetryCards } from "./TelemetryCards";
++import { mapHistoryToChartData } from "./historyMapping";
++import {
++  recordFieldInspection,
++  recordSensorInspection,
++  recordStableTelemetry,
++  recordStableWindowInspection,
++} from "./evidenceRecording";
++import { emptyEvidence } from "../tutorial/tutorialProgress";
++
++function frame(overrides: Partial<TelemetryFrame> = {}): TelemetryFrame {
++  return {
++    sequence: 1,
++    simulationTimeMs: 50,
++    phase: "sampling",
++    fanPowerPct: 30,
++    rpm: 4380.4,
++    windSpeedMps: 8.456,
++    underbodyPressurePa: -32.44,
++    verticalLoadN: 0.1849,
++    quality: "stable",
++    provenance: "simulated",
++    ...overrides,
++  };
++}
++
++beforeEach(() => labStore.getState().resetLab());
++
++it("commands fan power and supports run, pause, resume, and reset", async () => {
++  const user = userEvent.setup();
++  const confirmReset = vi.spyOn(window, "confirm").mockReturnValue(true);
++  render(<ControlPanel />);
++
++  const slider = screen.getByRole("slider", { name: "风扇功率" });
++  fireEvent.change(slider, { target: { value: "100" } });
++  expect(labStore.getState().fanPowerPct).toBe(100);
++  expect(screen.getByText("100%", { selector: "output" })).toBeVisible();
++
++  await user.click(screen.getByRole("button", { name: "启动实验" }));
++  expect(labStore.getState().phase).toBe("ramping");
++  await user.click(screen.getByRole("button", { name: "暂停实验" }));
++  expect(labStore.getState().phase).toBe("paused");
++  await user.click(screen.getByRole("button", { name: "继续实验" }));
++  expect(labStore.getState().phase).toBe("ramping");
++
++  labStore.getState().acceptFrame(frame());
++  await user.click(screen.getByRole("button", { name: "停止并重置" }));
++  expect(confirmReset).toHaveBeenCalledOnce();
++  expect(labStore.getState()).toMatchObject({ phase: "idle", history: [] });
++  confirmReset.mockRestore();
++});
++
++it("checks current history at reset activation time", () => {
++  const confirmReset = vi.spyOn(window, "confirm").mockReturnValue(true);
++  render(<ControlPanel />);
++  const resetButton = screen.getByRole("button", { name: "停止并重置" });
++
++  act(() => {
++    labStore.getState().acceptFrame(frame());
++    resetButton.click();
++  });
++
++  expect(confirmReset).toHaveBeenCalledOnce();
++  expect(labStore.getState().history).toHaveLength(0);
++  confirmReset.mockRestore();
++});
++
++it("shows exact telemetry formats, units, quality, and simulated provenance", () => {
++  labStore.setState({ telemetry: frame() });
++  render(<TelemetryCards onInspect={() => undefined} />);
++
++  expect(screen.getByText("4380")).toBeVisible();
++  expect(screen.getByText("8.46")).toBeVisible();
++  expect(screen.getByText("-32.4")).toBeVisible();
++  expect(screen.getByText("0.185")).toBeVisible();
++  expect(screen.getByText("车底相对压力")).toBeVisible();
++  for (const unit of ["RPM", "m/s", "Pa", "N"]) {
++    expect(screen.getByText(unit)).toBeVisible();
++  }
++  expect(screen.getAllByText("SIMULATED")).toHaveLength(4);
++  expect(screen.getAllByText("稳定 / STABLE")).toHaveLength(4);
++});
++
++it("reports each inspected sensor as tutorial evidence", async () => {
++  const user = userEvent.setup();
++  const onInspect = vi.fn();
++  render(<TelemetryCards onInspect={onInspect} />);
++
++  for (const name of ["查看风扇转速说明", "查看来流速度说明", "查看车底相对压力说明", "查看垂向载荷说明"]) {
++    await user.click(screen.getByRole("button", { name }));
++  }
++  expect(onInspect.mock.calls.map(([sensor]) => sensor)).toEqual(["rpm", "wind", "pressure", "load"]);
++});
++
++it("selects and reports all four teaching field views", async () => {
++  const user = userEvent.setup();
++  const onInspect = vi.fn();
++  render(<FieldSelector onInspect={onInspect} />);
++
++  for (const name of ["压力", "涡量", "流线", "速度"]) {
++    await user.click(screen.getByRole("radio", { name }));
++  }
++  expect(labStore.getState().selectedField).toBe("speed");
++  expect(onInspect.mock.calls.map(([field]) => field)).toEqual(["pressure", "vorticity", "streamlines", "speed"]);
++  expect(screen.getByText("D2Q9 BGK")).toBeVisible();
++  expect(screen.getByText("240 × 96")).toBeVisible();
++  expect(screen.getByText("二维教学近似")).toBeVisible();
++});
++
++it("uses roving tab focus and all arrow keys to select fields cyclically", async () => {
++  const user = userEvent.setup();
++  const onInspect = vi.fn();
++  render(<FieldSelector onInspect={onInspect} />);
++  const radios = screen.getAllByRole("radio");
++
++  expect(radios.map((radio) => radio.tabIndex)).toEqual([0, -1, -1, -1]);
++  radios[0]!.focus();
++  await user.keyboard("{ArrowRight}{ArrowDown}{ArrowLeft}{ArrowUp}{ArrowLeft}");
++
++  expect(screen.getByRole("radio", { name: "流线" })).toHaveFocus();
++  expect(labStore.getState().selectedField).toBe("streamlines");
++  expect(onInspect.mock.calls.map(([field]) => field)).toEqual([
++    "pressure",
++    "vorticity",
++    "pressure",
++    "speed",
++    "streamlines",
++  ]);
++  expect(screen.getAllByRole("radio").map((radio) => radio.tabIndex)).toEqual([-1, -1, -1, 0]);
++});
++
++it("maps only the latest sixty seconds and never more than 1,200 points", () => {
++  const history = Array.from({ length: 1_300 }, (_, sequence) => frame({
++    sequence,
++    simulationTimeMs: sequence * 50,
++  }));
++
++  const mapped = mapHistoryToChartData(history);
++  expect(mapped).toHaveLength(1_200);
++  expect(mapped[0]).toMatchObject({ timeSeconds: 5, rpm: 4380.4, pressurePa: -32.44 });
++  expect(mapped.at(-1)?.timeSeconds).toBe(64.95);
++});
++
++it("marks a stable chart window without changing telemetry history", async () => {
++  const user = userEvent.setup();
++  const history = [
++    frame({ sequence: 1, simulationTimeMs: 50, quality: "transient" }),
++    frame({ sequence: 2, simulationTimeMs: 100, quality: "stable" }),
++    frame({ sequence: 3, simulationTimeMs: 150, quality: "stable" }),
++  ];
++  labStore.setState({ history });
++  const onInspectStableWindow = vi.fn();
++  render(<HistoryChart onInspectStableWindow={onInspectStableWindow} />);
++
++  await user.click(screen.getByRole("button", { name: "标记稳定窗口" }));
++  expect(onInspectStableWindow).toHaveBeenCalledOnce();
++  expect(labStore.getState().history).toBe(history);
++});
++
++it("renders four visible, separately positioned unit axes", () => {
++  labStore.setState({ history: [
++    frame({ sequence: 1, simulationTimeMs: 100, quality: "transient" }),
++    frame({ sequence: 2, simulationTimeMs: 150, quality: "transient" }),
++  ] });
++  render(<HistoryChart onInspectStableWindow={() => undefined} />);
++  const plot = screen.getByLabelText("最近 60 秒遥测曲线");
++  const axes = plot.querySelectorAll(".recharts-yAxis");
++  const axisLines = plot.querySelectorAll<SVGLineElement>(".recharts-yAxis .recharts-cartesian-axis-line");
++
++  expect(axes).toHaveLength(4);
++  for (const unit of ["m/s", "RPM", "Pa", "N"]) {
++    expect(within(plot).getByText(unit)).toBeVisible();
++  }
++  expect(new Set(Array.from(axisLines, (line) => line.getAttribute("x1"))).size).toBe(4);
++});
++
++it("does not expose a zero-duration stable window from one sample", () => {
++  labStore.setState({ history: [frame({ sequence: 1, simulationTimeMs: 100, quality: "stable" })] });
++  render(<HistoryChart onInspectStableWindow={() => undefined} />);
++
++  expect(screen.queryByRole("button", { name: "标记稳定窗口" })).not.toBeInTheDocument();
++});
++
++it("accrues stable evidence only from physical stable quality at exactly 30 percent", () => {
++  const previous = frame({ simulationTimeMs: 1_000, quality: "transient" });
++  const stable = frame({ simulationTimeMs: 3_000, fanPowerPct: 30, quality: "stable", rpm: 99_999 });
++
++  expect(recordStableTelemetry(emptyEvidence, previous, stable, 30).stableSeconds).toBe(2);
++  expect(recordStableTelemetry(emptyEvidence, previous, stable, 31).stableSeconds).toBe(0);
++  expect(recordStableTelemetry(emptyEvidence, previous, { ...stable, quality: "transient" }, 30).stableSeconds).toBe(0);
++});
++
++it("records sensor, field, and stable-window evidence without duplicate identifiers", () => {
++  const withSensor = recordSensorInspection(recordSensorInspection(emptyEvidence, "rpm"), "rpm");
++  const withField = recordFieldInspection(recordFieldInspection(withSensor, "pressure"), "pressure");
++  const complete = recordStableWindowInspection(withField);
++
++  expect(complete).toMatchObject({
++    viewedSensors: ["rpm"],
++    viewedFields: ["pressure"],
++    inspectedStableWindow: true,
++  });
++});

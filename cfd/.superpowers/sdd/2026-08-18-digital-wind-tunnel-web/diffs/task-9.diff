@@ -1,0 +1,2691 @@
+# Review package: Task 9 (changed-file current snapshots; no commits by ruling)
+
+## Files
+src/features/sweep/sweepRunner.ts
+src/features/sweep/sweepRunner.test.ts
+src/features/report/experimentSummary.ts
+src/features/report/experimentSummary.test.ts
+src/features/report/csv.ts
+src/features/report/csv.test.ts
+src/features/report/ExperimentReport.tsx
+src/features/report/ExperimentReport.test.tsx
+src/features/experiment/labStore.ts
+src/features/experiment/labStore.test.ts
+src/features/tutorial/tutorialProgress.ts
+src/features/tutorial/tutorialProgress.test.ts
+src/features/dashboard/ControlPanel.tsx
+src/features/dashboard/Dashboard.test.tsx
+src/App.tsx
+src/App.test.tsx
+src/styles/global.css
+
+## Current contents
+diff --git a/src/features/sweep/sweepRunner.ts b/src/features/sweep/sweepRunner.ts
+new file mode 100644
+index 0000000..d552cad
+--- /dev/null
++++ b/src/features/sweep/sweepRunner.ts
+@@ -0,0 +1,142 @@
++import type { TelemetryFrame } from "../experiment/model";
++
++export const SWEEP_POWERS = [30, 60, 90] as const;
++export const REQUIRED_STABLE_MS = 2_000;
++export const REQUIRED_SAMPLING_MS = 4_000;
++export const CONDITION_TIMEOUT_MS = 15_000;
++
++export type SweepPower = (typeof SWEEP_POWERS)[number];
++export type SweepStatus = "idle" | "ramping" | "stabilizing" | "sampling" | "completed" | "failed";
++
++export type SweepState = {
++  status: SweepStatus;
++  conditionIndex: number;
++  commandedPowerPct: SweepPower;
++  stableMs: number;
++  samplingMs: number;
++  conditionElapsedMs: number;
++  completedPowers: number[];
++  samplesByPower: Partial<Record<SweepPower, TelemetryFrame[]>>;
++  error: string | null;
++};
++
++export type SweepTransition = {
++  state: SweepState;
++  commandPowerPct?: SweepPower;
++};
++
++export function createSweepState(): SweepState {
++  return {
++    status: "ramping",
++    conditionIndex: 0,
++    commandedPowerPct: SWEEP_POWERS[0],
++    stableMs: 0,
++    samplingMs: 0,
++    conditionElapsedMs: 0,
++    completedPowers: [],
++    samplesByPower: {},
++    error: null,
++  };
++}
++
++export function advanceSweep(state: SweepState, frame: TelemetryFrame, dtMs: number): SweepTransition {
++  if (state.status === "idle" || state.status === "completed" || state.status === "failed") {
++    return { state };
++  }
++  if (frame.fanPowerPct !== state.commandedPowerPct) {
++    return { state };
++  }
++
++  const elapsed = Math.max(0, dtMs);
++  const conditionElapsedMs = state.conditionElapsedMs + elapsed;
++
++  if (state.status === "sampling") {
++    const samplingMs = state.samplingMs + elapsed;
++    const samples = [...(state.samplesByPower[state.commandedPowerPct] ?? []), frame];
++    const samplingState: SweepState = {
++      ...state,
++      samplingMs,
++      conditionElapsedMs,
++      samplesByPower: { ...state.samplesByPower, [state.commandedPowerPct]: samples },
++    };
++
++    if (samplingMs < REQUIRED_SAMPLING_MS) return { state: samplingState };
++    return completeCondition(samplingState);
++  }
++
++  const stableMs = frame.quality === "stable" ? state.stableMs + elapsed : 0;
++  if (stableMs >= REQUIRED_STABLE_MS) {
++    return {
++      state: {
++        ...state,
++        status: "sampling",
++        stableMs: REQUIRED_STABLE_MS,
++        conditionElapsedMs,
++      },
++    };
++  }
++
++  if (conditionElapsedMs >= CONDITION_TIMEOUT_MS) {
++    return {
++      state: {
++        ...state,
++        status: "failed",
++        stableMs,
++        conditionElapsedMs,
++        error: `${state.commandedPowerPct}% 工况在 15 秒内未达到连续稳定判据`,
++      },
++    };
++  }
++
++  return {
++    state: {
++      ...state,
++      status: "stabilizing",
++      stableMs,
++      conditionElapsedMs,
++    },
++  };
++}
++
++export function retryFailedCondition(state: SweepState): SweepState {
++  if (state.status !== "failed") return state;
++  return {
++    ...state,
++    status: "ramping",
++    stableMs: 0,
++    samplingMs: 0,
++    conditionElapsedMs: 0,
++    samplesByPower: { ...state.samplesByPower, [state.commandedPowerPct]: [] },
++    error: null,
++  };
++}
++
++function completeCondition(state: SweepState): SweepTransition {
++  const completedPowers = [...state.completedPowers, state.commandedPowerPct];
++  const nextPower = SWEEP_POWERS[state.conditionIndex + 1];
++  if (nextPower === undefined) {
++    return {
++      state: {
++        ...state,
++        status: "completed",
++        completedPowers,
++        error: null,
++      },
++    };
++  }
++
++  return {
++    commandPowerPct: nextPower,
++    state: {
++      ...state,
++      status: "ramping",
++      conditionIndex: state.conditionIndex + 1,
++      commandedPowerPct: nextPower,
++      stableMs: 0,
++      samplingMs: 0,
++      conditionElapsedMs: 0,
++      completedPowers,
++      error: null,
++    },
++  };
++}
+diff --git a/src/features/sweep/sweepRunner.test.ts b/src/features/sweep/sweepRunner.test.ts
+new file mode 100644
+index 0000000..31b87f3
+--- /dev/null
++++ b/src/features/sweep/sweepRunner.test.ts
+@@ -0,0 +1,102 @@
++import { afterEach, describe, expect, it, vi } from "vitest";
++import type { TelemetryFrame } from "../experiment/model";
++import { advanceSweep, createSweepState, retryFailedCondition } from "./sweepRunner";
++
++const frame = (
++  power: number,
++  quality: TelemetryFrame["quality"] = "stable",
++  sequence = power,
++): TelemetryFrame => ({
++  sequence,
++  simulationTimeMs: sequence * 50,
++  phase: quality === "stable" ? "stabilizing" : "ramping",
++  fanPowerPct: power,
++  rpm: power * 62,
++  windSpeedMps: power * 0.12,
++  underbodyPressurePa: -power,
++  verticalLoadN: power / 100,
++  quality,
++  provenance: "simulated",
++});
++
++function advanceFor(state: ReturnType<typeof createSweepState>, power: number, milliseconds: number) {
++  let next = state;
++  for (let elapsed = 0; elapsed < milliseconds; elapsed += 50) {
++    next = advanceSweep(next, frame(power, "stable", elapsed / 50), 50).state;
++  }
++  return next;
++}
++
++describe("three-condition sweep reducer", () => {
++  afterEach(() => vi.useRealTimers());
++
++  it("runs exactly 30, 60, and 90 percent in order", () => {
++    let state = createSweepState();
++    for (const power of [30, 60, 90]) {
++      state = advanceFor(state, power, 6_500);
++    }
++
++    expect(state.completedPowers).toEqual([30, 60, 90]);
++    expect(state.status).toBe("completed");
++    expect(Object.keys(state.samplesByPower).map(Number)).toEqual([30, 60, 90]);
++  });
++
++  it("requires 2,000 consecutive stable milliseconds then samples for 4,000 milliseconds", () => {
++    let state = createSweepState();
++    state = advanceFor(state, 30, 1_950);
++    expect(state).toMatchObject({ status: "stabilizing", stableMs: 1_950, samplingMs: 0 });
++
++    state = advanceSweep(state, frame(30, "transient"), 50).state;
++    expect(state.stableMs).toBe(0);
++    state = advanceFor(state, 30, 2_000);
++    expect(state).toMatchObject({ status: "sampling", stableMs: 2_000, samplingMs: 0 });
++
++    state = advanceFor(state, 30, 3_950);
++    expect(state).toMatchObject({ status: "sampling", samplingMs: 3_950 });
++    const transition = advanceSweep(state, frame(30), 50);
++    expect(transition.state).toMatchObject({ status: "ramping", commandedPowerPct: 60 });
++    expect(transition.commandPowerPct).toBe(60);
++    expect(transition.state.samplesByPower[30]).toHaveLength(80);
++  });
++
++  it("ignores a prior condition trailing frame completely", () => {
++    const state = advanceFor(createSweepState(), 30, 6_000);
++    expect(state.commandedPowerPct).toBe(60);
++    const unchanged = advanceSweep(state, frame(30), 2_000);
++
++    expect(unchanged.state).toBe(state);
++    expect(unchanged.commandPowerPct).toBeUndefined();
++    expect(state.conditionElapsedMs).toBe(0);
++  });
++
++  it("fails at 15,000 simulation milliseconds and retries only that condition", () => {
++    let state = advanceFor(createSweepState(), 30, 6_000);
++    const firstSamples = state.samplesByPower[30];
++    for (let elapsed = 0; elapsed < 15_000; elapsed += 50) {
++      state = advanceSweep(state, frame(60, "transient", elapsed / 50), 50).state;
++    }
++
++    expect(state).toMatchObject({ status: "failed", commandedPowerPct: 60, conditionElapsedMs: 15_000 });
++    expect(state.error).toContain("60%");
++    const retry = retryFailedCondition(state);
++    expect(retry).toMatchObject({
++      status: "ramping",
++      commandedPowerPct: 60,
++      stableMs: 0,
++      samplingMs: 0,
++      conditionElapsedMs: 0,
++      completedPowers: [30],
++    });
++    expect(retry.samplesByPower[30]).toBe(firstSamples);
++  });
++
++  it("is deterministic under fake system-time changes", () => {
++    vi.useFakeTimers();
++    vi.setSystemTime("2031-01-01T00:00:00Z");
++    const first = advanceFor(createSweepState(), 30, 2_000);
++    vi.setSystemTime("2099-12-31T23:59:59Z");
++    const second = advanceFor(createSweepState(), 30, 2_000);
++
++    expect(second).toEqual(first);
++  });
++});
+diff --git a/src/features/report/experimentSummary.ts b/src/features/report/experimentSummary.ts
+new file mode 100644
+index 0000000..70bdc67
+--- /dev/null
++++ b/src/features/report/experimentSummary.ts
+@@ -0,0 +1,65 @@
++import type { TelemetryFrame } from "../experiment/model";
++
++type SummarySample = Pick<
++  TelemetryFrame,
++  "quality" | "windSpeedMps" | "rpm" | "underbodyPressurePa" | "verticalLoadN" | "simulationTimeMs"
++>;
++
++export type MetricStatistics = {
++  mean: number | null;
++  standardDeviation: number | null;
++  min: number | null;
++  max: number | null;
++};
++
++export type RunSummary = {
++  sampleCount: number;
++  valid: boolean;
++  minSimulationTimeMs: number | null;
++  maxSimulationTimeMs: number | null;
++  rpm: MetricStatistics;
++  windSpeedMps: MetricStatistics;
++  underbodyPressurePa: MetricStatistics;
++  verticalLoadN: MetricStatistics;
++  meanRpm: number | null;
++  meanWindSpeedMps: number | null;
++  meanUnderbodyPressurePa: number | null;
++  meanVerticalLoadN: number | null;
++};
++
++const emptyMetric = (): MetricStatistics => ({ mean: null, standardDeviation: null, min: null, max: null });
++
++export function summarizeRun(samples: SummarySample[]): RunSummary {
++  const stable = samples.filter((sample) => sample.quality === "stable");
++  const rpm = summarizeMetric(stable.map((sample) => sample.rpm));
++  const windSpeedMps = summarizeMetric(stable.map((sample) => sample.windSpeedMps));
++  const underbodyPressurePa = summarizeMetric(stable.map((sample) => sample.underbodyPressurePa));
++  const verticalLoadN = summarizeMetric(stable.map((sample) => sample.verticalLoadN));
++
++  return {
++    sampleCount: stable.length,
++    valid: stable.length >= 20,
++    minSimulationTimeMs: stable.length > 0 ? Math.min(...stable.map((sample) => sample.simulationTimeMs)) : null,
++    maxSimulationTimeMs: stable.length > 0 ? Math.max(...stable.map((sample) => sample.simulationTimeMs)) : null,
++    rpm,
++    windSpeedMps,
++    underbodyPressurePa,
++    verticalLoadN,
++    meanRpm: rpm.mean,
++    meanWindSpeedMps: windSpeedMps.mean,
++    meanUnderbodyPressurePa: underbodyPressurePa.mean,
++    meanVerticalLoadN: verticalLoadN.mean,
++  };
++}
++
++function summarizeMetric(values: number[]): MetricStatistics {
++  if (values.length === 0) return emptyMetric();
++  const mean = values.reduce((total, value) => total + value, 0) / values.length;
++  const variance = values.reduce((total, value) => total + (value - mean) ** 2, 0) / values.length;
++  return {
++    mean,
++    standardDeviation: Math.sqrt(variance),
++    min: Math.min(...values),
++    max: Math.max(...values),
++  };
++}
+diff --git a/src/features/report/experimentSummary.test.ts b/src/features/report/experimentSummary.test.ts
+new file mode 100644
+index 0000000..b6e0496
+--- /dev/null
++++ b/src/features/report/experimentSummary.test.ts
+@@ -0,0 +1,35 @@
++import { expect, it } from "vitest";
++import { summarizeRun } from "./experimentSummary";
++
++it("uses only stable samples for run statistics", () => {
++  const summary = summarizeRun([
++    { simulationTimeMs: 0, quality: "transient", windSpeedMps: 99, rpm: 99, underbodyPressurePa: 99, verticalLoadN: 99 },
++    { simulationTimeMs: 50, quality: "stable", windSpeedMps: 4, rpm: 2_000, underbodyPressurePa: -10, verticalLoadN: 0.2 },
++    { simulationTimeMs: 100, quality: "stable", windSpeedMps: 6, rpm: 3_000, underbodyPressurePa: -20, verticalLoadN: 0.4 },
++  ]);
++
++  expect(summary).toMatchObject({
++    sampleCount: 2,
++    valid: false,
++    meanWindSpeedMps: 5,
++    meanRpm: 2_500,
++    meanUnderbodyPressurePa: -15,
++    minSimulationTimeMs: 50,
++    maxSimulationTimeMs: 100,
++  });
++  expect(summary.meanVerticalLoadN).toBeCloseTo(0.3, 8);
++  expect(summary.windSpeedMps).toEqual({ mean: 5, standardDeviation: 1, min: 4, max: 6 });
++  expect(summary.verticalLoadN.standardDeviation).toBeCloseTo(0.1, 8);
++});
++
++it("marks a run valid only from twenty stable samples", () => {
++  const sample = { simulationTimeMs: 50, quality: "stable" as const, windSpeedMps: 4, rpm: 2_000, underbodyPressurePa: -10, verticalLoadN: 0.2 };
++  expect(summarizeRun(Array.from({ length: 19 }, () => sample)).valid).toBe(false);
++  expect(summarizeRun(Array.from({ length: 20 }, () => sample)).valid).toBe(true);
++});
++
++it("returns empty nullable statistics when no stable sample exists", () => {
++  const summary = summarizeRun([]);
++  expect(summary).toMatchObject({ sampleCount: 0, valid: false, minSimulationTimeMs: null, maxSimulationTimeMs: null });
++  expect(summary.windSpeedMps).toEqual({ mean: null, standardDeviation: null, min: null, max: null });
++});
+diff --git a/src/features/report/csv.ts b/src/features/report/csv.ts
+new file mode 100644
+index 0000000..67cfb47
+--- /dev/null
++++ b/src/features/report/csv.ts
+@@ -0,0 +1,122 @@
++import type { TelemetryFrame } from "../experiment/model";
++import { SWEEP_POWERS } from "../sweep/sweepRunner";
++import { summarizeRun } from "./experimentSummary";
++
++export type ExperimentCsvMetadata = {
++  title?: string;
++  generatedTime?: string;
++  provenance: "simulated";
++  solver?: string;
++  gridSize?: string;
++  conclusion: string;
++  disclaimer?: string;
++};
++
++export type ExperimentCsvInput = {
++  metadata: ExperimentCsvMetadata;
++  samples: TelemetryFrame[];
++};
++
++const SAMPLE_HEADERS = [
++  "sequence",
++  "simulationTimeMs",
++  "phase",
++  "fanPowerPct",
++  "rpm",
++  "windSpeedMps",
++  "underbodyPressurePa",
++  "verticalLoadN",
++  "quality",
++  "provenance",
++] as const;
++
++const SUMMARY_HEADERS = [
++  "summaryFanPowerPct",
++  "valid",
++  "sampleCount",
++  "minSimulationTimeMs",
++  "maxSimulationTimeMs",
++  "meanRpm",
++  "stdRpm",
++  "minRpm",
++  "maxRpm",
++  "meanWindSpeedMps",
++  "stdWindSpeedMps",
++  "minWindSpeedMps",
++  "maxWindSpeedMps",
++  "meanUnderbodyPressurePa",
++  "stdUnderbodyPressurePa",
++  "minUnderbodyPressurePa",
++  "maxUnderbodyPressurePa",
++  "meanVerticalLoadN",
++  "stdVerticalLoadN",
++  "minVerticalLoadN",
++  "maxVerticalLoadN",
++] as const;
++
++export function serializeExperimentCsv({ metadata, samples }: ExperimentCsvInput): string {
++  const rows: Array<Array<string | number | boolean | null | undefined>> = [
++    ["title", metadata.title ?? "SophiFlow 三工况数字风洞实验"],
++    ["generatedTime", metadata.generatedTime ?? ""],
++    ["provenance", metadata.provenance],
++    ["solver", metadata.solver ?? "D2Q9 BGK teaching solver"],
++    ["gridSize", metadata.gridSize ?? "240 × 96"],
++    ["conclusion", metadata.conclusion],
++    ["disclaimer", metadata.disclaimer ?? "SIMULATED / 模拟数据；2D TEACHING CFD / 二维教学近似"],
++    ["units", "sequence=count; simulationTimeMs=ms; fanPowerPct=%; rpm=RPM; windSpeedMps=m/s; underbodyPressurePa=Pa; verticalLoadN=N"],
++    [],
++    [...SAMPLE_HEADERS],
++    ...samples.map((sample) => SAMPLE_HEADERS.map((header) => sample[header])),
++    [],
++    [...SUMMARY_HEADERS],
++  ];
++
++  for (const power of SWEEP_POWERS) {
++    const summary = summarizeRun(samples.filter((sample) => sample.fanPowerPct === power));
++    rows.push([
++      power,
++      summary.valid,
++      summary.sampleCount,
++      summary.minSimulationTimeMs,
++      summary.maxSimulationTimeMs,
++      summary.rpm.mean,
++      summary.rpm.standardDeviation,
++      summary.rpm.min,
++      summary.rpm.max,
++      summary.windSpeedMps.mean,
++      summary.windSpeedMps.standardDeviation,
++      summary.windSpeedMps.min,
++      summary.windSpeedMps.max,
++      summary.underbodyPressurePa.mean,
++      summary.underbodyPressurePa.standardDeviation,
++      summary.underbodyPressurePa.min,
++      summary.underbodyPressurePa.max,
++      summary.verticalLoadN.mean,
++      summary.verticalLoadN.standardDeviation,
++      summary.verticalLoadN.min,
++      summary.verticalLoadN.max,
++    ]);
++  }
++
++  return `\uFEFF${rows.map((row) => row.map(escapeCell).join(",")).join("\r\n")}\r\n`;
++}
++
++export function downloadExperimentCsv(csv: string, generatedTime = new Date().toISOString()): string {
++  const timestamp = generatedTime.replace(/\D/g, "").slice(0, 14).padEnd(14, "0");
++  const filename = `sophiflow-cfd-sweep-${timestamp.slice(0, 8)}-${timestamp.slice(8)}.csv`;
++  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
++  const anchor = document.createElement("a");
++  anchor.href = url;
++  anchor.download = filename;
++  try {
++    anchor.click();
++  } finally {
++    URL.revokeObjectURL(url);
++  }
++  return filename;
++}
++
++function escapeCell(value: string | number | boolean | null | undefined): string {
++  const cell = value == null ? "" : String(value).replace(/\r\n|\r|\n/g, "\r\n");
++  return /[",\r\n]/.test(cell) ? `"${cell.replaceAll('"', '""')}"` : cell;
++}
+diff --git a/src/features/report/csv.test.ts b/src/features/report/csv.test.ts
+new file mode 100644
+index 0000000..c1dfa5d
+--- /dev/null
++++ b/src/features/report/csv.test.ts
+@@ -0,0 +1,54 @@
++import { afterEach, expect, it, vi } from "vitest";
++import type { TelemetryFrame } from "../experiment/model";
++import { downloadExperimentCsv, serializeExperimentCsv } from "./csv";
++
++afterEach(() => vi.restoreAllMocks());
++
++it("writes BOM, metadata, units, raw samples, summaries, and RFC4180 escaping", () => {
++  const sample: TelemetryFrame = {
++    sequence: 1,
++    simulationTimeMs: 50,
++    phase: "sampling",
++    fanPowerPct: 30,
++    rpm: 1_860,
++    windSpeedMps: 3.6,
++    underbodyPressurePa: -8,
++    verticalLoadN: 0.1,
++    quality: "stable",
++    provenance: "simulated",
++  };
++  const csv = serializeExperimentCsv({
++    metadata: {
++      generatedTime: "2026-08-18T01:02:03.000Z",
++      conclusion: "速度越高, \"载荷\"越大\n符合趋势",
++      provenance: "simulated",
++    },
++    samples: [sample],
++  });
++
++  expect(csv.startsWith("\uFEFFtitle,SophiFlow 三工况数字风洞实验\r\n")).toBe(true);
++  expect(csv).toContain("generatedTime,2026-08-18T01:02:03.000Z\r\n");
++  expect(csv).toContain("provenance,simulated\r\n");
++  expect(csv).toContain("solver,D2Q9 BGK teaching solver\r\n");
++  expect(csv).toContain("gridSize,240 × 96\r\n");
++  expect(csv).toContain('conclusion,"速度越高, ""载荷""越大\r\n符合趋势"\r\n');
++  expect(csv).toContain("disclaimer,SIMULATED / 模拟数据；2D TEACHING CFD / 二维教学近似\r\n");
++  expect(csv).toContain("sequence,simulationTimeMs,phase,fanPowerPct,rpm,windSpeedMps,underbodyPressurePa,verticalLoadN,quality,provenance\r\n");
++  expect(csv).toContain("summaryFanPowerPct,valid,sampleCount");
++});
++
++it("downloads with the required timestamped filename and always revokes its object URL", () => {
++  const createObjectURL = vi.fn(() => "blob:sweep-report");
++  const revokeObjectURL = vi.fn();
++  Object.defineProperties(URL, {
++    createObjectURL: { configurable: true, value: createObjectURL },
++    revokeObjectURL: { configurable: true, value: revokeObjectURL },
++  });
++  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
++
++  const filename = downloadExperimentCsv("\uFEFFtitle,test\r\n", "2026-08-18T01:02:03.000Z");
++
++  expect(filename).toBe("sophiflow-cfd-sweep-20260818-010203.csv");
++  expect(click).toHaveBeenCalledOnce();
++  expect(revokeObjectURL).toHaveBeenCalledWith("blob:sweep-report");
++});
+diff --git a/src/features/report/ExperimentReport.tsx b/src/features/report/ExperimentReport.tsx
+new file mode 100644
+index 0000000..65ee14f
+--- /dev/null
++++ b/src/features/report/ExperimentReport.tsx
+@@ -0,0 +1,247 @@
++import { useMemo, useState } from "react";
++import type { SweepState, SweepPower } from "../sweep/sweepRunner";
++import { SWEEP_POWERS } from "../sweep/sweepRunner";
++import { downloadExperimentCsv, serializeExperimentCsv } from "./csv";
++import { summarizeRun, type RunSummary } from "./experimentSummary";
++
++type DownloadCsv = (csv: string, generatedTime?: string) => unknown;
++
++export type ExperimentReportProps = {
++  sweep: SweepState | null;
++  conclusion: string;
++  onConclusionChange(value: string): void;
++  onSelectLargestResidual(power: SweepPower, largestPower: SweepPower): void;
++  onStartSweep(): void;
++  onCancelSweep(): void;
++  onRetrySweep(): void;
++  generatedTime?: string;
++  downloadCsv?: DownloadCsv;
++};
++
++type ConditionResult = {
++  power: SweepPower;
++  summary: RunSummary;
++  residual: number | null;
++};
++
++export function ExperimentReport(props: ExperimentReportProps) {
++  const conditions = useMemo(() => buildConditionResults(props.sweep), [props.sweep]);
++  const largestResidualPower = findLargestResidualPower(conditions);
++
++  return (
++    <section className="experiment-report" aria-labelledby="experiment-report-title">
++      <div className="report-heading">
++        <div>
++          <p className="section-kicker">AUTOMATED SWEEP &amp; REPORT</p>
++          <h2 id="experiment-report-title">三工况实验报告</h2>
++        </div>
++        <div className="report-disclaimers">
++          <span>SIMULATED / 模拟数据</span>
++          <span>2D TEACHING CFD / 二维教学近似</span>
++        </div>
++      </div>
++
++      <SweepPanel
++        sweep={props.sweep}
++        onStart={props.onStartSweep}
++        onCancel={props.onCancelSweep}
++        onRetry={props.onRetrySweep}
++      />
++      <div className="condition-summary-grid">
++        {conditions.map(({ power, summary }) => <ConditionCard key={power} power={power} summary={summary} />)}
++      </div>
++      <ComparisonTable
++        conditions={conditions}
++        largestResidualPower={largestResidualPower}
++        onSelect={(power) => {
++          if (largestResidualPower !== null) props.onSelectLargestResidual(power, largestResidualPower);
++        }}
++      />
++      <ReportPanel {...props} />
++    </section>
++  );
++}
++
++export function SweepPanel({
++  sweep,
++  onStart,
++  onCancel,
++  onRetry,
++}: Pick<ExperimentReportProps, "sweep"> & {
++  onStart(): void;
++  onCancel(): void;
++  onRetry(): void;
++}) {
++  const active = sweep !== null && ["ramping", "stabilizing", "sampling"].includes(sweep.status);
++  const label = sweep === null ? "未开始" : statusLabel(sweep);
++
++  return (
++    <div className="sweep-panel">
++      <div>
++        <strong>固定序列 30% → 60% → 90%</strong>
++        <span role="status" aria-live="polite">{label}</span>
++      </div>
++      <div className="sweep-actions">
++        <button type="button" disabled={active} onClick={onStart}>
++          {sweep === null ? "开始自动扫频" : "重新运行扫频"}
++        </button>
++        {active && <button type="button" onClick={onCancel}>取消扫频</button>}
++        {sweep?.status === "failed" && <button type="button" onClick={onRetry}>重试当前工况</button>}
++      </div>
++      {sweep?.error && <p className="sweep-error" role="alert">{sweep.error}</p>}
++    </div>
++  );
++}
++
++export function ComparisonTable({
++  conditions,
++  largestResidualPower,
++  onSelect,
++}: {
++  conditions: ConditionResult[];
++  largestResidualPower: SweepPower | null;
++  onSelect(power: SweepPower): void;
++}) {
++  return (
++    <section className="comparison-panel" aria-labelledby="comparison-title">
++      <div className="comparison-heading">
++        <h3 id="comparison-title">残差对比</h3>
++        <p>观察趋势：风速增大时，动压与垂向载荷近似按 v² 增长。</p>
++      </div>
++      <div className="comparison-table-wrap">
++        <table>
++          <thead><tr><th>工况</th><th>平均风速</th><th>平均载荷</th><th>|v² 基线残差|</th><th>判断</th></tr></thead>
++          <tbody>
++            {conditions.map(({ power, summary, residual }) => (
++              <tr key={power}>
++                <th scope="row">{power}%</th>
++                <td>{format(summary.windSpeedMps.mean, 2)} m/s</td>
++                <td>{format(summary.verticalLoadN.mean, 3)} N</td>
++                <td>{format(residual, 3)} N</td>
++                <td><label><input
++                  type="radio"
++                  name="largest-residual"
++                  disabled={largestResidualPower === null}
++                  aria-label={`${power}% 为最大残差`}
++                  onChange={() => onSelect(power)}
++                /> 选择</label></td>
++              </tr>
++            ))}
++          </tbody>
++        </table>
++      </div>
++    </section>
++  );
++}
++
++export function ReportPanel({
++  sweep,
++  conclusion,
++  onConclusionChange,
++  generatedTime,
++  downloadCsv = downloadExperimentCsv,
++}: ExperimentReportProps) {
++  const [failedSnapshot, setFailedSnapshot] = useState<{ csv: string; generatedTime: string } | null>(null);
++  const remainingCharacters = Math.max(0, 12 - conclusion.trim().length);
++  const canExport = sweep?.status === "completed" && remainingCharacters === 0;
++
++  const runDownload = (snapshot: { csv: string; generatedTime: string }) => {
++    try {
++      downloadCsv(snapshot.csv, snapshot.generatedTime);
++      setFailedSnapshot(null);
++    } catch {
++      setFailedSnapshot(snapshot);
++    }
++  };
++
++  const exportReport = () => {
++    if (!sweep) return;
++    const snapshotTime = generatedTime ?? new Date().toISOString();
++    const samples = SWEEP_POWERS.flatMap((power) => [...(sweep.samplesByPower[power] ?? [])]);
++    const csv = serializeExperimentCsv({
++      metadata: { generatedTime: snapshotTime, conclusion, provenance: "simulated" },
++      samples,
++    });
++    runDownload({ csv, generatedTime: snapshotTime });
++  };
++
++  return (
++    <section className="report-panel" aria-labelledby="conclusion-title">
++      <div>
++        <label id="conclusion-title" htmlFor="experiment-conclusion">实验结论</label>
++        <textarea
++          id="experiment-conclusion"
++          value={conclusion}
++          minLength={12}
++          rows={3}
++          onChange={(event) => onConclusionChange(event.currentTarget.value)}
++        />
++        <small>{remainingCharacters > 0 ? `还需 ${remainingCharacters} 个字符` : "已满足至少 12 个字符"}</small>
++      </div>
++      <div className="report-actions">
++        <button type="button" onClick={() => window.print()}>打印报告</button>
++        <button type="button" disabled={!canExport} onClick={exportReport}>导出 CSV</button>
++        {failedSnapshot && <button type="button" onClick={() => runDownload(failedSnapshot)}>重试导出</button>}
++      </div>
++      {failedSnapshot && <p className="export-error" role="alert">导出失败，实验数据仍保留</p>}
++    </section>
++  );
++}
++
++function ConditionCard({ power, summary }: { power: SweepPower; summary: RunSummary }) {
++  return (
++    <article className="condition-card">
++      <div><h3>{power}%</h3><span className={summary.valid ? "summary-valid" : "summary-invalid"}>{summary.valid ? "有效" : "无效"}</span></div>
++      <dl>
++        <dt>稳定样本</dt><dd>{summary.sampleCount}</dd>
++        <dt>RPM avg ± std</dt><dd>{format(summary.rpm.mean, 0)} ± {format(summary.rpm.standardDeviation, 0)} RPM</dd>
++        <dt>RPM min–max</dt><dd>{format(summary.rpm.min, 0)}–{format(summary.rpm.max, 0)} RPM</dd>
++        <dt>风速 avg ± std</dt><dd>{format(summary.windSpeedMps.mean, 2)} ± {format(summary.windSpeedMps.standardDeviation, 2)} m/s</dd>
++        <dt>风速 min–max</dt><dd>{format(summary.windSpeedMps.min, 2)}–{format(summary.windSpeedMps.max, 2)} m/s</dd>
++        <dt>压力 avg ± std</dt><dd>{format(summary.underbodyPressurePa.mean, 1)} ± {format(summary.underbodyPressurePa.standardDeviation, 1)} Pa</dd>
++        <dt>压力 min–max</dt><dd>{format(summary.underbodyPressurePa.min, 1)}–{format(summary.underbodyPressurePa.max, 1)} Pa</dd>
++        <dt>载荷 avg ± std</dt><dd>{format(summary.verticalLoadN.mean, 3)} ± {format(summary.verticalLoadN.standardDeviation, 3)} N</dd>
++        <dt>载荷 min–max</dt><dd>{format(summary.verticalLoadN.min, 3)}–{format(summary.verticalLoadN.max, 3)} N</dd>
++      </dl>
++    </article>
++  );
++}
++
++function buildConditionResults(sweep: SweepState | null): ConditionResult[] {
++  const baseSummaries = SWEEP_POWERS.map((power) => ({
++    power,
++    summary: summarizeRun(sweep?.samplesByPower[power] ?? []),
++  }));
++  const baseline = baseSummaries[0]!.summary;
++  return baseSummaries.map(({ power, summary }) => {
++    const baselineWind = baseline.windSpeedMps.mean;
++    const baselineLoad = baseline.verticalLoadN.mean;
++    const wind = summary.windSpeedMps.mean;
++    const load = summary.verticalLoadN.mean;
++    const expected = baseline.valid && summary.valid && baselineWind && baselineLoad !== null && wind !== null
++      ? baselineLoad * (wind / baselineWind) ** 2
++      : null;
++    return { power, summary, residual: expected === null || load === null ? null : Math.abs(load - expected) };
++  });
++}
++
++function findLargestResidualPower(conditions: ConditionResult[]): SweepPower | null {
++  const available = conditions.filter((condition) => condition.residual !== null);
++  if (available.length === 0) return null;
++  return available.reduce((largest, condition) => condition.residual! > largest.residual! ? condition : largest).power;
++}
++
++function statusLabel(sweep: SweepState): string {
++  switch (sweep.status) {
++    case "ramping": return `${sweep.commandedPowerPct}%：正在下发功率`;
++    case "stabilizing": return `${sweep.commandedPowerPct}%：稳定 ${sweep.stableMs / 1_000}/2.0 s`;
++    case "sampling": return `${sweep.commandedPowerPct}%：采样 ${sweep.samplingMs / 1_000}/4.0 s`;
++    case "completed": return "30%、60%、90% 均已完成";
++    case "failed": return `${sweep.commandedPowerPct}%：稳定超时`;
++    case "idle": return "未开始";
++  }
++}
++
++function format(value: number | null, digits: number): string {
++  return value === null ? "—" : value.toFixed(digits);
++}
+diff --git a/src/features/report/ExperimentReport.test.tsx b/src/features/report/ExperimentReport.test.tsx
+new file mode 100644
+index 0000000..7c1f261
+--- /dev/null
++++ b/src/features/report/ExperimentReport.test.tsx
+@@ -0,0 +1,152 @@
++import { render, screen } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { expect, it, vi } from "vitest";
++import type { TelemetryFrame } from "../experiment/model";
++import type { SweepState } from "../sweep/sweepRunner";
++import { ExperimentReport } from "./ExperimentReport";
++
++function samples(power: 30 | 60 | 90, wind: number, load: number): TelemetryFrame[] {
++  return Array.from({ length: 80 }, (_, sequence) => ({
++    sequence,
++    simulationTimeMs: power * 1_000 + sequence * 50,
++    phase: "sampling",
++    fanPowerPct: power,
++    rpm: power * 62,
++    windSpeedMps: wind,
++    underbodyPressurePa: -power,
++    verticalLoadN: load,
++    quality: "stable",
++    provenance: "simulated",
++  }));
++}
++
++const completedSweep: SweepState = {
++  status: "completed",
++  conditionIndex: 2,
++  commandedPowerPct: 90,
++  stableMs: 2_000,
++  samplingMs: 4_000,
++  conditionElapsedMs: 6_000,
++  completedPowers: [30, 60, 90],
++  samplesByPower: {
++    30: samples(30, 3, 0.1),
++    60: samples(60, 6, 0.45),
++    90: samples(90, 9, 0.8),
++  },
++  error: null,
++};
++
++it("shows three condition summaries, v-squared guidance, and records the largest residual selection", async () => {
++  const user = userEvent.setup();
++  const onSelectLargestResidual = vi.fn();
++  render(<ExperimentReport
++    sweep={completedSweep}
++    conclusion=""
++    onConclusionChange={() => undefined}
++    onSelectLargestResidual={onSelectLargestResidual}
++    onStartSweep={() => undefined}
++    onCancelSweep={() => undefined}
++    onRetrySweep={() => undefined}
++  />);
++
++  for (const power of ["30%", "60%", "90%"]) {
++    expect(screen.getByRole("heading", { name: power })).toBeVisible();
++  }
++  expect(screen.getAllByText("RPM avg ± std")).toHaveLength(3);
++  expect(screen.getAllByText("压力 avg ± std")).toHaveLength(3);
++  expect(screen.getAllByText(/v²/)).toHaveLength(2);
++  await user.click(screen.getByRole("radio", { name: "90% 为最大残差" }));
++  expect(onSelectLargestResidual).toHaveBeenCalledOnce();
++  expect(screen.getByText("SIMULATED / 模拟数据")).toBeVisible();
++  expect(screen.getByText("2D TEACHING CFD / 二维教学近似")).toBeVisible();
++});
++
++it("enforces a twelve-character conclusion and prints the report", async () => {
++  const user = userEvent.setup();
++  const onConclusionChange = vi.fn();
++  const print = vi.spyOn(window, "print").mockImplementation(() => undefined);
++  const { rerender } = render(<ExperimentReport
++    sweep={completedSweep}
++    conclusion="短结论"
++    onConclusionChange={onConclusionChange}
++    onSelectLargestResidual={() => undefined}
++    onStartSweep={() => undefined}
++    onCancelSweep={() => undefined}
++    onRetrySweep={() => undefined}
++  />);
++
++  expect(screen.getByText("还需 9 个字符")).toBeVisible();
++  expect(screen.getByRole("button", { name: "导出 CSV" })).toBeDisabled();
++  await user.type(screen.getByRole("textbox", { name: "实验结论" }), "abcdefghijkl");
++  expect(onConclusionChange).toHaveBeenCalled();
++
++  rerender(<ExperimentReport
++    sweep={completedSweep}
++    conclusion="这是十二字符以上的有效实验结论"
++    onConclusionChange={onConclusionChange}
++    onSelectLargestResidual={() => undefined}
++    onStartSweep={() => undefined}
++    onCancelSweep={() => undefined}
++    onRetrySweep={() => undefined}
++  />);
++  await user.click(screen.getByRole("button", { name: "打印报告" }));
++  expect(print).toHaveBeenCalledOnce();
++});
++
++it("keeps an immutable CSV snapshot and exposes retry after export failure", async () => {
++  const user = userEvent.setup();
++  const attemptedCsv: string[] = [];
++  const downloadCsv = vi.fn((csv: string) => {
++    attemptedCsv.push(csv);
++    if (attemptedCsv.length === 1) throw new Error("blocked");
++  });
++  const { rerender } = render(<ExperimentReport
++    sweep={completedSweep}
++    conclusion="这是十二字符以上的有效实验结论"
++    generatedTime="2026-08-18T01:02:03.000Z"
++    downloadCsv={downloadCsv}
++    onConclusionChange={() => undefined}
++    onSelectLargestResidual={() => undefined}
++    onStartSweep={() => undefined}
++    onCancelSweep={() => undefined}
++    onRetrySweep={() => undefined}
++  />);
++
++  await user.click(screen.getByRole("button", { name: "导出 CSV" }));
++  expect(screen.getByRole("alert")).toHaveTextContent("导出失败，实验数据仍保留");
++
++  rerender(<ExperimentReport
++    sweep={{ ...completedSweep, samplesByPower: {} }}
++    conclusion="被外部修改但不应进入重试快照"
++    generatedTime="2099-01-01T00:00:00.000Z"
++    downloadCsv={downloadCsv}
++    onConclusionChange={() => undefined}
++    onSelectLargestResidual={() => undefined}
++    onStartSweep={() => undefined}
++    onCancelSweep={() => undefined}
++    onRetrySweep={() => undefined}
++  />);
++  await user.click(screen.getByRole("button", { name: "重试导出" }));
++  expect(attemptedCsv[1]).toBe(attemptedCsv[0]);
++});
++
++it("does not enable residual evidence from invalid condition summaries", () => {
++  render(<ExperimentReport
++    sweep={{
++      ...completedSweep,
++      samplesByPower: {
++        30: samples(30, 3, 0.1).slice(0, 1),
++        60: samples(60, 6, 0.45).slice(0, 1),
++        90: samples(90, 9, 0.8).slice(0, 1),
++      },
++    }}
++    conclusion=""
++    onConclusionChange={() => undefined}
++    onSelectLargestResidual={() => undefined}
++    onStartSweep={() => undefined}
++    onCancelSweep={() => undefined}
++    onRetrySweep={() => undefined}
++  />);
++
++  for (const radio of screen.getAllByRole("radio")) expect(radio).toBeDisabled();
++});
+diff --git a/src/features/experiment/labStore.ts b/src/features/experiment/labStore.ts
+new file mode 100644
+index 0000000..2b8f24e
+--- /dev/null
++++ b/src/features/experiment/labStore.ts
+@@ -0,0 +1,128 @@
++import { useStore } from "zustand";
++import { createStore } from "zustand/vanilla";
++import { createDefaultSimulationSource } from "./SimulationSource";
++import { experimentReducer } from "./experimentMachine";
++import type { ActiveRunPhase, RunPhase, TelemetryFrame } from "./model";
++import type { FlowFieldFrame } from "../flow/types";
++import {
++  advanceSweep,
++  createSweepState,
++  retryFailedCondition,
++  type SweepState,
++} from "../sweep/sweepRunner";
++
++export const MAX_HISTORY = 1200;
++
++export type LabState = {
++  phase: RunPhase;
++  resumePhase: ActiveRunPhase | null;
++  fanPowerPct: number;
++  telemetry: TelemetryFrame;
++  history: TelemetryFrame[];
++  flowField: FlowFieldFrame | null;
++  flowStatus: "idle" | "loading" | "ready" | "failed";
++  flowError: string | null;
++  eventLog: string[];
++  selectedField: "speed" | "pressure" | "vorticity" | "streamlines";
++  sweep: SweepState | null;
++  setFanPower(percent: number): void;
++  acceptFrame(frame: TelemetryFrame): void;
++  startRun(): void;
++  pauseRun(): void;
++  resumeRun(): void;
++  advancePhase(): void;
++  resetLab(): void;
++  selectField(field: LabState["selectedField"]): void;
++  startSweep(): void;
++  cancelSweep(): void;
++  retrySweep(): void;
++};
++
++const initialTelemetry = createDefaultSimulationSource(0).reset();
++
++export const labStore = createStore<LabState>((set) => ({
++  phase: "idle",
++  resumePhase: null,
++  fanPowerPct: 0,
++  telemetry: initialTelemetry,
++  history: [],
++  flowField: null,
++  flowStatus: "idle",
++  flowError: null,
++  eventLog: [],
++  selectedField: "speed",
++  sweep: null,
++  setFanPower: (percent) => set((state) => isSweepActive(state.sweep)
++    ? state
++    : { fanPowerPct: Math.min(100, Math.max(0, percent)) }),
++  acceptFrame: (frame) => set((state) => {
++    const history = [...state.history.slice(-MAX_HISTORY + 1), frame];
++    if (!isSweepActive(state.sweep)) return { telemetry: frame, history };
++
++    const dtMs = Math.max(0, frame.simulationTimeMs - state.telemetry.simulationTimeMs);
++    const transition = advanceSweep(state.sweep, frame, dtMs);
++    return {
++      telemetry: frame,
++      history,
++      sweep: transition.state,
++      fanPowerPct: transition.commandPowerPct ?? state.fanPowerPct,
++      phase: sweepStatusToRunPhase(transition.state),
++      resumePhase: null,
++    };
++  }),
++  startRun: () => set((state) => experimentReducer(state, { type: "start" })),
++  pauseRun: () => set((state) => experimentReducer(state, { type: "pause" })),
++  resumeRun: () => set((state) => experimentReducer(state, { type: "resume" })),
++  advancePhase: () => set((state) => experimentReducer(state, { type: "advance" })),
++  resetLab: () => set({
++    phase: "idle",
++    resumePhase: null,
++    fanPowerPct: 0,
++    telemetry: initialTelemetry,
++    history: [],
++    flowField: null,
++    flowStatus: "idle",
++    flowError: null,
++    eventLog: [],
++    selectedField: "speed",
++    sweep: null,
++  }),
++  selectField: (selectedField) => set({ selectedField }),
++  startSweep: () => set({
++    sweep: createSweepState(),
++    fanPowerPct: 30,
++    phase: "ramping",
++    resumePhase: null,
++  }),
++  cancelSweep: () => set((state) => ({
++    sweep: state.sweep ? { ...state.sweep, status: "idle", error: null } : null,
++    fanPowerPct: 0,
++    phase: "idle",
++    resumePhase: null,
++  })),
++  retrySweep: () => set((state) => {
++    if (!state.sweep || state.sweep.status !== "failed") return state;
++    const sweep = retryFailedCondition(state.sweep);
++    return {
++      sweep,
++      fanPowerPct: sweep.commandedPowerPct,
++      phase: "ramping",
++      resumePhase: null,
++    };
++  }),
++}));
++
++export function useLabStore<T>(selector: (state: LabState) => T): T {
++  return useStore(labStore, selector);
++}
++
++function isSweepActive(sweep: SweepState | null): sweep is SweepState {
++  return sweep !== null && ["ramping", "stabilizing", "sampling"].includes(sweep.status);
++}
++
++function sweepStatusToRunPhase(sweep: SweepState): RunPhase {
++  if (sweep.status === "ramping" || sweep.status === "stabilizing" || sweep.status === "sampling") {
++    return sweep.status;
++  }
++  return "completed";
++}
+diff --git a/src/features/experiment/labStore.test.ts b/src/features/experiment/labStore.test.ts
+new file mode 100644
+index 0000000..425c6c4
+--- /dev/null
++++ b/src/features/experiment/labStore.test.ts
+@@ -0,0 +1,60 @@
++import { beforeEach, describe, expect, it } from "vitest";
++import { labStore, MAX_HISTORY } from "./labStore";
++
++describe("labStore", () => {
++  beforeEach(() => {
++    labStore.getState().resetLab();
++  });
++
++  it("keeps at most sixty seconds of 20 Hz telemetry", () => {
++    const frame = labStore.getState().telemetry;
++    for (let index = 0; index < MAX_HISTORY + 25; index += 1) {
++      labStore.getState().acceptFrame({ ...frame, sequence: index });
++    }
++
++    expect(labStore.getState().history).toHaveLength(MAX_HISTORY);
++    expect(labStore.getState().history[0]!.sequence).toBe(25);
++  });
++
++  it("clamps fan commands and exposes typed control actions", () => {
++    labStore.getState().setFanPower(140);
++    expect(labStore.getState().fanPowerPct).toBe(100);
++    labStore.getState().setFanPower(-4);
++    expect(labStore.getState().fanPowerPct).toBe(0);
++  });
++
++  it("drives phase transitions through the experiment reducer", () => {
++    labStore.getState().startRun();
++    labStore.getState().pauseRun();
++    expect(labStore.getState()).toMatchObject({ phase: "paused", resumePhase: "ramping" });
++    labStore.getState().resumeRun();
++    labStore.getState().advancePhase();
++    expect(labStore.getState().phase).toBe("stabilizing");
++  });
++
++  it("starts, cancels, and reruns a sweep without using wall-clock time", () => {
++    labStore.getState().acceptFrame({ ...labStore.getState().telemetry, sequence: 1 });
++    labStore.getState().startSweep();
++    expect(labStore.getState()).toMatchObject({ fanPowerPct: 30, phase: "ramping" });
++    expect(labStore.getState().sweep?.commandedPowerPct).toBe(30);
++
++    labStore.getState().cancelSweep();
++    expect(labStore.getState()).toMatchObject({ fanPowerPct: 0, phase: "idle", history: [{ sequence: 1 }] });
++    expect(labStore.getState().sweep).toMatchObject({ status: "idle", completedPowers: [] });
++
++    labStore.getState().startRun();
++    labStore.getState().acceptFrame({
++      ...labStore.getState().telemetry,
++      sequence: 2,
++      simulationTimeMs: labStore.getState().telemetry.simulationTimeMs + 50,
++      phase: "ramping",
++    });
++    expect(labStore.getState().phase).toBe("ramping");
++    labStore.getState().resetLab();
++
++    labStore.getState().startSweep();
++    expect(labStore.getState().sweep?.completedPowers).toEqual([]);
++    labStore.getState().resetLab();
++    expect(labStore.getState()).toMatchObject({ sweep: null, history: [] });
++  });
++});
+diff --git a/src/features/tutorial/tutorialProgress.ts b/src/features/tutorial/tutorialProgress.ts
+new file mode 100644
+index 0000000..742e24d
+--- /dev/null
++++ b/src/features/tutorial/tutorialProgress.ts
+@@ -0,0 +1,93 @@
++import { LESSONS, type LessonId } from "./lessonDefinitions";
++
++export type { LessonId, TutorialMode } from "./lessonDefinitions";
++
++export type TutorialEvidence = {
++  viewedHotspots: string[];
++  stableSeconds: number;
++  viewedSensors: string[];
++  inspectedStableWindow: boolean;
++  viewedFields: string[];
++  flowAnswerCorrect: boolean;
++  completedSweepPowers: number[];
++  selectedLargestResidual: boolean;
++  reportConclusion: string;
++};
++
++export const emptyEvidence: TutorialEvidence = {
++  viewedHotspots: [],
++  stableSeconds: 0,
++  viewedSensors: [],
++  inspectedStableWindow: false,
++  viewedFields: [],
++  flowAnswerCorrect: false,
++  completedSweepPowers: [],
++  selectedLargestResidual: false,
++  reportConclusion: "",
++};
++
++const requiredHotspots = ["straightener", "contraction", "test-section", "model-stand", "fan"];
++const requiredSensors = ["rpm", "wind", "pressure", "load"];
++const requiredFields = ["speed", "pressure", "vorticity", "streamlines"];
++const requiredSweepPowers = [30, 60, 90];
++
++function includesAll<T>(values: readonly T[], required: readonly T[]) {
++  return required.every((value) => values.includes(value));
++}
++
++function hasExactSweepPowers(powers: readonly number[]) {
++  return powers.length === requiredSweepPowers.length
++    && requiredSweepPowers.every((power, index) => powers[index] === power);
++}
++
++export function recordSweepCompletion(
++  evidence: TutorialEvidence,
++  completedSweepPowers: readonly number[],
++): TutorialEvidence {
++  return { ...evidence, completedSweepPowers: [...completedSweepPowers] };
++}
++
++export function recordLargestResidualSelection(
++  evidence: TutorialEvidence,
++  selectedPower: number,
++  largestResidualPower: number,
++): TutorialEvidence {
++  return { ...evidence, selectedLargestResidual: selectedPower === largestResidualPower };
++}
++
++export function recordReportConclusion(evidence: TutorialEvidence, reportConclusion: string): TutorialEvidence {
++  return { ...evidence, reportConclusion };
++}
++
++export function canCompleteLesson(lessonId: LessonId, evidence: TutorialEvidence): boolean {
++  switch (lessonId) {
++    case "anatomy":
++      return includesAll(evidence.viewedHotspots, requiredHotspots);
++    case "fan":
++      // The controller only accrues stableSeconds while the command is 30%.
++      return evidence.stableSeconds >= 2;
++    case "sensors":
++      return includesAll(evidence.viewedSensors, requiredSensors) && evidence.inspectedStableWindow;
++    case "flow":
++      return includesAll(evidence.viewedFields, requiredFields) && evidence.flowAnswerCorrect;
++    case "sweep":
++      return hasExactSweepPowers(evidence.completedSweepPowers);
++    case "compare":
++      return evidence.selectedLargestResidual;
++    case "report":
++      return includesAll(evidence.completedSweepPowers, requiredSweepPowers)
++        && evidence.reportConclusion.trim().length >= 12;
++  }
++}
++
++export function advanceLesson(activeLesson: LessonId, evidence: TutorialEvidence): LessonId {
++  const activeIndex = LESSONS.findIndex((lesson) => lesson.id === activeLesson);
++  if (!canCompleteLesson(activeLesson, evidence) || activeIndex < 0 || activeIndex === LESSONS.length - 1) {
++    return activeLesson;
++  }
++  return LESSONS[activeIndex + 1]!.id;
++}
++
++export function completedLessonCount(evidence: TutorialEvidence): number {
++  return LESSONS.filter((lesson) => canCompleteLesson(lesson.id, evidence)).length;
++}
+diff --git a/src/features/tutorial/tutorialProgress.test.ts b/src/features/tutorial/tutorialProgress.test.ts
+new file mode 100644
+index 0000000..2edb719
+--- /dev/null
++++ b/src/features/tutorial/tutorialProgress.test.ts
+@@ -0,0 +1,63 @@
++import {
++  canCompleteLesson,
++  emptyEvidence,
++  recordLargestResidualSelection,
++  recordReportConclusion,
++  recordSweepCompletion,
++} from "./tutorialProgress";
++
++describe("教程完成证据", () => {
++  it("requires all five physical hotspots for the anatomy lesson", () => {
++    expect(canCompleteLesson("anatomy", emptyEvidence)).toBe(false);
++    expect(canCompleteLesson("anatomy", {
++      ...emptyEvidence,
++      viewedHotspots: ["straightener", "contraction", "test-section", "model-stand", "fan"],
++    })).toBe(true);
++  });
++
++  it("requires two credited stable seconds for the fan lesson", () => {
++    expect(canCompleteLesson("fan", { ...emptyEvidence, stableSeconds: 1.99 })).toBe(false);
++    expect(canCompleteLesson("fan", { ...emptyEvidence, stableSeconds: 2 })).toBe(true);
++  });
++
++  it("does not complete the sensors lesson without a stable chart window", () => {
++    expect(canCompleteLesson("sensors", {
++      ...emptyEvidence,
++      viewedSensors: ["rpm", "wind", "pressure", "load"],
++      inspectedStableWindow: false,
++    })).toBe(false);
++  });
++
++  it("does not complete the flow lesson until every view was opened", () => {
++    expect(canCompleteLesson("flow", {
++      ...emptyEvidence,
++      viewedFields: ["speed", "pressure", "vorticity"],
++      flowAnswerCorrect: true,
++    })).toBe(false);
++  });
++
++  it("requires every prescribed sweep power before report completion", () => {
++    expect(canCompleteLesson("report", {
++      ...emptyEvidence,
++      completedSweepPowers: [30, 60, 90],
++      reportConclusion: "这是足够长度的实验结论。",
++    })).toBe(true);
++    expect(canCompleteLesson("report", {
++      ...emptyEvidence,
++      completedSweepPowers: [30, 60],
++      reportConclusion: "这是足够长度的实验结论。",
++    })).toBe(false);
++  });
++
++  it("requires the prescribed sweep order and records comparison/report evidence", () => {
++    expect(canCompleteLesson("sweep", { ...emptyEvidence, completedSweepPowers: [90, 60, 30] })).toBe(false);
++    const swept = recordSweepCompletion(emptyEvidence, [30, 60, 90]);
++    const compared = recordLargestResidualSelection(swept, 90, 90);
++    const reported = recordReportConclusion(compared, "这是足够长度的实验结论。");
++
++    expect(canCompleteLesson("sweep", reported)).toBe(true);
++    expect(canCompleteLesson("compare", reported)).toBe(true);
++    expect(canCompleteLesson("report", reported)).toBe(true);
++    expect(recordLargestResidualSelection(swept, 60, 90).selectedLargestResidual).toBe(false);
++  });
++});
+diff --git a/src/features/dashboard/ControlPanel.tsx b/src/features/dashboard/ControlPanel.tsx
+new file mode 100644
+index 0000000..2090ff8
+--- /dev/null
++++ b/src/features/dashboard/ControlPanel.tsx
+@@ -0,0 +1,74 @@
++import { useId } from "react";
++import { labStore, useLabStore } from "../experiment/labStore";
++import type { RunPhase } from "../experiment/model";
++
++const PHASE_LABELS: Record<RunPhase, string> = {
++  idle: "待机 / IDLE",
++  ramping: "加速 / RAMPING",
++  stabilizing: "稳定中 / STABILIZING",
++  sampling: "采样 / SAMPLING",
++  paused: "已暂停 / PAUSED",
++  completed: "已完成 / COMPLETED",
++};
++
++const ACTIVE_PHASES: readonly RunPhase[] = ["ramping", "stabilizing", "sampling"];
++
++export function ControlPanel() {
++  const inputId = useId();
++  const phase = useLabStore((state) => state.phase);
++  const fanPowerPct = useLabStore((state) => state.fanPowerPct);
++  const sweepStatus = useLabStore((state) => state.sweep?.status);
++  const active = ACTIVE_PHASES.includes(phase);
++  const sweepActive = sweepStatus === "ramping" || sweepStatus === "stabilizing" || sweepStatus === "sampling";
++
++  const startOrResume = () => {
++    if (phase === "paused") {
++      labStore.getState().resumeRun();
++      return;
++    }
++    labStore.getState().startRun();
++  };
++
++  const reset = () => {
++    if (labStore.getState().history.length > 0
++      && !window.confirm("停止实验并清除当前 60 秒遥测历史？")) return;
++    labStore.getState().resetLab();
++  };
++
++  return (
++    <section className="dashboard-section fan-controls" aria-labelledby="fan-control-title">
++      <div className="dashboard-section-heading">
++        <div>
++          <p className="section-kicker">FAN CONTROL</p>
++          <h2 id="fan-control-title">风扇控制</h2>
++        </div>
++        <span className={`phase-badge phase-${phase}`} aria-live="polite">{PHASE_LABELS[phase]}</span>
++      </div>
++
++      <div className="fan-power-row">
++        <label htmlFor={inputId}>风扇功率</label>
++        <output htmlFor={inputId}>{fanPowerPct}%</output>
++      </div>
++      <input
++        id={inputId}
++        className="fan-slider"
++        type="range"
++        min="0"
++        max="100"
++        step="1"
++        value={fanPowerPct}
++        disabled={sweepActive}
++        onChange={(event) => labStore.getState().setFanPower(event.currentTarget.valueAsNumber)}
++      />
++      <div className="slider-scale" aria-hidden="true"><span>0</span><span>50</span><span>100</span></div>
++
++      <div className="experiment-actions">
++        <button type="button" className="action-primary" disabled={active || sweepActive} onClick={startOrResume}>
++          {phase === "paused" ? "继续实验" : "启动实验"}
++        </button>
++        <button type="button" disabled={!active || sweepActive} onClick={() => labStore.getState().pauseRun()}>暂停实验</button>
++        <button type="button" onClick={reset}>停止并重置</button>
++      </div>
++    </section>
++  );
++}
+diff --git a/src/features/dashboard/Dashboard.test.tsx b/src/features/dashboard/Dashboard.test.tsx
+new file mode 100644
+index 0000000..ccfe5bf
+--- /dev/null
++++ b/src/features/dashboard/Dashboard.test.tsx
+@@ -0,0 +1,219 @@
++import { act, fireEvent, render, screen, within } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { beforeEach, expect, it, vi } from "vitest";
++import { labStore } from "../experiment/labStore";
++import type { TelemetryFrame } from "../experiment/model";
++import { ControlPanel } from "./ControlPanel";
++import { FieldSelector } from "./FieldSelector";
++import { HistoryChart } from "./HistoryChart";
++import { TelemetryCards } from "./TelemetryCards";
++import { mapHistoryToChartData } from "./historyMapping";
++import {
++  recordFieldInspection,
++  recordSensorInspection,
++  recordStableTelemetry,
++  recordStableWindowInspection,
++} from "./evidenceRecording";
++import { emptyEvidence } from "../tutorial/tutorialProgress";
++
++function frame(overrides: Partial<TelemetryFrame> = {}): TelemetryFrame {
++  return {
++    sequence: 1,
++    simulationTimeMs: 50,
++    phase: "sampling",
++    fanPowerPct: 30,
++    rpm: 4380.4,
++    windSpeedMps: 8.456,
++    underbodyPressurePa: -32.44,
++    verticalLoadN: 0.1849,
++    quality: "stable",
++    provenance: "simulated",
++    ...overrides,
++  };
++}
++
++beforeEach(() => labStore.getState().resetLab());
++
++it("commands fan power and supports run, pause, resume, and reset", async () => {
++  const user = userEvent.setup();
++  const confirmReset = vi.spyOn(window, "confirm").mockReturnValue(true);
++  render(<ControlPanel />);
++
++  const slider = screen.getByRole("slider", { name: "风扇功率" });
++  fireEvent.change(slider, { target: { value: "100" } });
++  expect(labStore.getState().fanPowerPct).toBe(100);
++  expect(screen.getByText("100%", { selector: "output" })).toBeVisible();
++
++  await user.click(screen.getByRole("button", { name: "启动实验" }));
++  expect(labStore.getState().phase).toBe("ramping");
++  await user.click(screen.getByRole("button", { name: "暂停实验" }));
++  expect(labStore.getState().phase).toBe("paused");
++  await user.click(screen.getByRole("button", { name: "继续实验" }));
++  expect(labStore.getState().phase).toBe("ramping");
++
++  labStore.getState().acceptFrame(frame());
++  await user.click(screen.getByRole("button", { name: "停止并重置" }));
++  expect(confirmReset).toHaveBeenCalledOnce();
++  expect(labStore.getState()).toMatchObject({ phase: "idle", history: [] });
++  confirmReset.mockRestore();
++});
++
++it("locks manual fan and pause controls while the fixed sweep owns the command", () => {
++  labStore.getState().startSweep();
++  render(<ControlPanel />);
++
++  expect(screen.getByRole("slider", { name: "风扇功率" })).toBeDisabled();
++  expect(screen.getByRole("button", { name: "暂停实验" })).toBeDisabled();
++});
++
++it("checks current history at reset activation time", () => {
++  const confirmReset = vi.spyOn(window, "confirm").mockReturnValue(true);
++  render(<ControlPanel />);
++  const resetButton = screen.getByRole("button", { name: "停止并重置" });
++
++  act(() => {
++    labStore.getState().acceptFrame(frame());
++    resetButton.click();
++  });
++
++  expect(confirmReset).toHaveBeenCalledOnce();
++  expect(labStore.getState().history).toHaveLength(0);
++  confirmReset.mockRestore();
++});
++
++it("shows exact telemetry formats, units, quality, and simulated provenance", () => {
++  labStore.setState({ telemetry: frame() });
++  render(<TelemetryCards onInspect={() => undefined} />);
++
++  expect(screen.getByText("4380")).toBeVisible();
++  expect(screen.getByText("8.46")).toBeVisible();
++  expect(screen.getByText("-32.4")).toBeVisible();
++  expect(screen.getByText("0.185")).toBeVisible();
++  expect(screen.getByText("车底相对压力")).toBeVisible();
++  for (const unit of ["RPM", "m/s", "Pa", "N"]) {
++    expect(screen.getByText(unit)).toBeVisible();
++  }
++  expect(screen.getAllByText("SIMULATED")).toHaveLength(4);
++  expect(screen.getAllByText("稳定 / STABLE")).toHaveLength(4);
++});
++
++it("reports each inspected sensor as tutorial evidence", async () => {
++  const user = userEvent.setup();
++  const onInspect = vi.fn();
++  render(<TelemetryCards onInspect={onInspect} />);
++
++  for (const name of ["查看风扇转速说明", "查看来流速度说明", "查看车底相对压力说明", "查看垂向载荷说明"]) {
++    await user.click(screen.getByRole("button", { name }));
++  }
++  expect(onInspect.mock.calls.map(([sensor]) => sensor)).toEqual(["rpm", "wind", "pressure", "load"]);
++});
++
++it("selects and reports all four teaching field views", async () => {
++  const user = userEvent.setup();
++  const onInspect = vi.fn();
++  render(<FieldSelector onInspect={onInspect} />);
++
++  for (const name of ["压力", "涡量", "流线", "速度"]) {
++    await user.click(screen.getByRole("radio", { name }));
++  }
++  expect(labStore.getState().selectedField).toBe("speed");
++  expect(onInspect.mock.calls.map(([field]) => field)).toEqual(["pressure", "vorticity", "streamlines", "speed"]);
++  expect(screen.getByText("D2Q9 BGK")).toBeVisible();
++  expect(screen.getByText("240 × 96")).toBeVisible();
++  expect(screen.getByText("二维教学近似")).toBeVisible();
++});
++
++it("uses roving tab focus and all arrow keys to select fields cyclically", async () => {
++  const user = userEvent.setup();
++  const onInspect = vi.fn();
++  render(<FieldSelector onInspect={onInspect} />);
++  const radios = screen.getAllByRole("radio");
++
++  expect(radios.map((radio) => radio.tabIndex)).toEqual([0, -1, -1, -1]);
++  radios[0]!.focus();
++  await user.keyboard("{ArrowRight}{ArrowDown}{ArrowLeft}{ArrowUp}{ArrowLeft}");
++
++  expect(screen.getByRole("radio", { name: "流线" })).toHaveFocus();
++  expect(labStore.getState().selectedField).toBe("streamlines");
++  expect(onInspect.mock.calls.map(([field]) => field)).toEqual([
++    "pressure",
++    "vorticity",
++    "pressure",
++    "speed",
++    "streamlines",
++  ]);
++  expect(screen.getAllByRole("radio").map((radio) => radio.tabIndex)).toEqual([-1, -1, -1, 0]);
++});
++
++it("maps only the latest sixty seconds and never more than 1,200 points", () => {
++  const history = Array.from({ length: 1_300 }, (_, sequence) => frame({
++    sequence,
++    simulationTimeMs: sequence * 50,
++  }));
++
++  const mapped = mapHistoryToChartData(history);
++  expect(mapped).toHaveLength(1_200);
++  expect(mapped[0]).toMatchObject({ timeSeconds: 5, rpm: 4380.4, pressurePa: -32.44 });
++  expect(mapped.at(-1)?.timeSeconds).toBe(64.95);
++});
++
++it("marks a stable chart window without changing telemetry history", async () => {
++  const user = userEvent.setup();
++  const history = [
++    frame({ sequence: 1, simulationTimeMs: 50, quality: "transient" }),
++    frame({ sequence: 2, simulationTimeMs: 100, quality: "stable" }),
++    frame({ sequence: 3, simulationTimeMs: 150, quality: "stable" }),
++  ];
++  labStore.setState({ history });
++  const onInspectStableWindow = vi.fn();
++  render(<HistoryChart onInspectStableWindow={onInspectStableWindow} />);
++
++  await user.click(screen.getByRole("button", { name: "标记稳定窗口" }));
++  expect(onInspectStableWindow).toHaveBeenCalledOnce();
++  expect(labStore.getState().history).toBe(history);
++});
++
++it("renders four visible, separately positioned unit axes", () => {
++  labStore.setState({ history: [
++    frame({ sequence: 1, simulationTimeMs: 100, quality: "transient" }),
++    frame({ sequence: 2, simulationTimeMs: 150, quality: "transient" }),
++  ] });
++  render(<HistoryChart onInspectStableWindow={() => undefined} />);
++  const plot = screen.getByLabelText("最近 60 秒遥测曲线");
++  const axes = plot.querySelectorAll(".recharts-yAxis");
++  const axisLines = plot.querySelectorAll<SVGLineElement>(".recharts-yAxis .recharts-cartesian-axis-line");
++
++  expect(axes).toHaveLength(4);
++  for (const unit of ["m/s", "RPM", "Pa", "N"]) {
++    expect(within(plot).getByText(unit)).toBeVisible();
++  }
++  expect(new Set(Array.from(axisLines, (line) => line.getAttribute("x1"))).size).toBe(4);
++});
++
++it("does not expose a zero-duration stable window from one sample", () => {
++  labStore.setState({ history: [frame({ sequence: 1, simulationTimeMs: 100, quality: "stable" })] });
++  render(<HistoryChart onInspectStableWindow={() => undefined} />);
++
++  expect(screen.queryByRole("button", { name: "标记稳定窗口" })).not.toBeInTheDocument();
++});
++
++it("accrues stable evidence only from physical stable quality at exactly 30 percent", () => {
++  const previous = frame({ simulationTimeMs: 1_000, quality: "transient" });
++  const stable = frame({ simulationTimeMs: 3_000, fanPowerPct: 30, quality: "stable", rpm: 99_999 });
++
++  expect(recordStableTelemetry(emptyEvidence, previous, stable, 30).stableSeconds).toBe(2);
++  expect(recordStableTelemetry(emptyEvidence, previous, stable, 31).stableSeconds).toBe(0);
++  expect(recordStableTelemetry(emptyEvidence, previous, { ...stable, quality: "transient" }, 30).stableSeconds).toBe(0);
++});
++
++it("records sensor, field, and stable-window evidence without duplicate identifiers", () => {
++  const withSensor = recordSensorInspection(recordSensorInspection(emptyEvidence, "rpm"), "rpm");
++  const withField = recordFieldInspection(recordFieldInspection(withSensor, "pressure"), "pressure");
++  const complete = recordStableWindowInspection(withField);
++
++  expect(complete).toMatchObject({
++    viewedSensors: ["rpm"],
++    viewedFields: ["pressure"],
++    inspectedStableWindow: true,
++  });
++});
+diff --git a/src/App.tsx b/src/App.tsx
+new file mode 100644
+index 0000000..eab50b5
+--- /dev/null
++++ b/src/App.tsx
+@@ -0,0 +1,121 @@
++import { lazy, Suspense, useEffect, useState } from "react";
++import { ControlPanel } from "./features/dashboard/ControlPanel";
++import { FieldSelector, type FieldId } from "./features/dashboard/FieldSelector";
++import { TelemetryCards, type SensorId } from "./features/dashboard/TelemetryCards";
++import {
++  recordFieldInspection,
++  recordSensorInspection,
++  recordStableTelemetry,
++  recordStableWindowInspection,
++} from "./features/dashboard/evidenceRecording";
++import { createDefaultSimulationSource } from "./features/experiment/SimulationSource";
++import { labStore, useLabStore } from "./features/experiment/labStore";
++import { startSimulationRuntime } from "./features/experiment/simulationRuntime";
++import { ExperimentReport } from "./features/report/ExperimentReport";
++import { AppShell } from "./features/shell/AppShell";
++import { TutorialModeToggle } from "./features/tutorial/TutorialModeToggle";
++import { TutorialRail } from "./features/tutorial/TutorialRail";
++import {
++  advanceLesson,
++  emptyEvidence,
++  recordLargestResidualSelection,
++  recordReportConclusion,
++  recordSweepCompletion,
++} from "./features/tutorial/tutorialProgress";
++import { LESSONS, type LessonId, type TutorialMode } from "./features/tutorial/lessonDefinitions";
++
++const LazyWindTunnelScene = lazy(() => import("./features/scene/WindTunnelScene").then((module) => ({ default: module.WindTunnelScene })));
++const LazyHistoryChart = lazy(() => import("./features/dashboard/HistoryChart").then((module) => ({ default: module.HistoryChart })));
++
++export function App() {
++  const [mode, setMode] = useState<TutorialMode>("guided");
++  const [activeLesson, setActiveLesson] = useState<LessonId>("anatomy");
++  const [evidence, setEvidence] = useState(emptyEvidence);
++  const sweep = useLabStore((state) => state.sweep);
++
++  useEffect(() => {
++    const source = createDefaultSimulationSource(20260818);
++    const stopSimulation = startSimulationRuntime({ source, tickMs: 50 });
++    const unsubscribe = labStore.subscribe((state, previous) => {
++      if (state.phase === "idle" && state.history.length === 0
++        && (previous.phase !== "idle" || previous.history.length > 0)) {
++        source.reset();
++      }
++
++      if (state.telemetry === previous.telemetry) return;
++      setEvidence((current) => recordStableTelemetry(
++        current,
++        previous.telemetry,
++        state.telemetry,
++        state.fanPowerPct,
++      ));
++      if (state.sweep?.completedPowers !== previous.sweep?.completedPowers) {
++        setEvidence((current) => recordSweepCompletion(current, state.sweep?.completedPowers ?? []));
++      }
++    });
++
++    return () => {
++      unsubscribe();
++      stopSimulation();
++    };
++  }, []);
++
++  const inspectSensor = (sensor: SensorId) => setEvidence((current) => recordSensorInspection(current, sensor));
++  const inspectField = (field: FieldId) => setEvidence((current) => recordFieldInspection(current, field));
++
++  return (
++    <AppShell
++      headerActions={<TutorialModeToggle mode={mode} onModeChange={setMode} />}
++      left={<TutorialRail
++        activeLesson={activeLesson}
++        evidence={evidence}
++        mode={mode}
++        onLessonChange={setActiveLesson}
++        onAdvance={() => setActiveLesson((currentLesson) => {
++          if (mode === "guided") return advanceLesson(currentLesson, evidence);
++          const currentIndex = LESSONS.findIndex((lesson) => lesson.id === currentLesson);
++          return LESSONS[Math.min(currentIndex + 1, LESSONS.length - 1)]!.id;
++        })}
++      />}
++      scene={
++        <Suspense fallback={<p className="scene-loading" role="status">正在初始化数字风洞…</p>}>
++          <LazyWindTunnelScene onHotspot={(id) => setEvidence((current) => current.viewedHotspots.includes(id)
++            ? current
++            : { ...current, viewedHotspots: [...current.viewedHotspots, id] })} />
++        </Suspense>
++      }
++      right={(
++        <div className="dashboard-sidebar">
++          <ControlPanel />
++          <FieldSelector onInspect={inspectField} />
++          <TelemetryCards onInspect={inspectSensor} />
++        </div>
++      )}
++      bottom={(
++        <div className="experiment-lower-deck">
++          <Suspense fallback={<p className="chart-empty" role="status">正在准备实验曲线…</p>}>
++            <LazyHistoryChart onInspectStableWindow={() => setEvidence(recordStableWindowInspection)} />
++          </Suspense>
++          <ExperimentReport
++            sweep={sweep}
++            conclusion={evidence.reportConclusion}
++            onConclusionChange={(conclusion) => setEvidence((current) => recordReportConclusion(current, conclusion))}
++            onSelectLargestResidual={(power, largestPower) => setEvidence((current) => (
++              recordLargestResidualSelection(current, power, largestPower)
++            ))}
++            onStartSweep={() => {
++              setEvidence((current) => ({
++                ...recordSweepCompletion(current, []),
++                selectedLargestResidual: false,
++                reportConclusion: "",
++              }));
++              labStore.getState().startSweep();
++            }}
++            onCancelSweep={() => labStore.getState().cancelSweep()}
++            onRetrySweep={() => labStore.getState().retrySweep()}
++          />
++        </div>
++      )}
++    />
++  );
++}
+diff --git a/src/App.test.tsx b/src/App.test.tsx
+new file mode 100644
+index 0000000..8bbb35f
+--- /dev/null
++++ b/src/App.test.tsx
+@@ -0,0 +1,44 @@
++import { render, screen } from "@testing-library/react";
++import "@testing-library/jest-dom/vitest";
++import userEvent from "@testing-library/user-event";
++import { App } from "./App";
++import { labStore } from "./features/experiment/labStore";
++
++it("renders the five digital wind-tunnel workbench regions", () => {
++  render(<App />);
++  expect(screen.getByRole("banner")).toHaveTextContent("SophiFlow Lab");
++  expect(screen.getByRole("navigation", { name: "教学章节" })).toBeInTheDocument();
++  expect(screen.getByRole("main", { name: "数字风洞" })).toBeInTheDocument();
++  expect(screen.getByRole("complementary", { name: "实验控制" })).toBeInTheDocument();
++  expect(screen.getByRole("region", { name: "实验曲线" })).toBeInTheDocument();
++});
++
++it("identifies the CFD model as a two-dimensional teaching approximation", () => {
++  render(<App />);
++  expect(screen.getAllByText("2D TEACHING CFD / 二维教学近似")).toHaveLength(2);
++});
++
++it("advances freely without evidence and restores the chosen lesson in guided mode", async () => {
++  const user = userEvent.setup();
++  render(<App />);
++
++  await user.click(screen.getByRole("button", { name: "自由实验" }));
++  await user.click(screen.getByRole("button", { name: "进入下一章" }));
++  expect(screen.getByRole("heading", { name: "第 2 章：启动虚拟风扇" })).toBeInTheDocument();
++
++  await user.click(screen.getByRole("button", { name: "教学模式" }));
++  expect(screen.getByRole("heading", { name: "第 2 章：启动虚拟风扇" })).toBeInTheDocument();
++  expect(screen.getByRole("button", { name: /第 1 章.*认识风洞/ })).toHaveClass("lesson-available");
++});
++
++it("assembles the automatic sweep report and starts the fixed sequence", async () => {
++  const user = userEvent.setup();
++  labStore.getState().resetLab();
++  render(<App />);
++
++  expect(screen.getByRole("heading", { name: "三工况实验报告" })).toBeVisible();
++  await user.click(screen.getByRole("button", { name: "开始自动扫频" }));
++  expect(labStore.getState().fanPowerPct).toBe(30);
++  expect(["ramping", "stabilizing"]).toContain(labStore.getState().phase);
++  expect(labStore.getState().sweep?.commandedPowerPct).toBe(30);
++});
+diff --git a/src/styles/global.css b/src/styles/global.css
+new file mode 100644
+index 0000000..f36cef0
+--- /dev/null
++++ b/src/styles/global.css
+@@ -0,0 +1,846 @@
++:root {
++  --bg: #071014;
++  --panel: #0d181d;
++  --panel-raised: #132229;
++  --tunnel: #e9e6df;
++  --ink: #e9f2f3;
++  --muted: #8da3aa;
++  --flow: #50e3c2;
++  --warning: #f2bd4f;
++  --danger: #e44b43;
++  color: var(--ink);
++  background: var(--bg);
++  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
++}
++
++* {
++  box-sizing: border-box;
++}
++
++body {
++  margin: 0;
++  min-width: 320px;
++  min-height: 100vh;
++  background: var(--bg);
++}
++
++button,
++input,
++select,
++textarea {
++  font: inherit;
++}
++
++.app-shell {
++  display: grid;
++  grid-template-areas:
++    "header header header"
++    "left scene right"
++    "left bottom right";
++  grid-template-columns: 240px minmax(0, 1fr) 320px;
++  grid-template-rows: auto minmax(30rem, 1fr) auto;
++  min-height: 100vh;
++  background: var(--bg);
++}
++
++.topbar {
++  grid-area: header;
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 1rem;
++  padding: 0.85rem 1.25rem;
++  border-bottom: 1px solid var(--panel-raised);
++  background: var(--panel);
++}
++
++.eyebrow {
++  color: var(--flow);
++  font-size: 0.7rem;
++  font-weight: 700;
++  letter-spacing: 0.12em;
++}
++
++h1 {
++  margin: 0.15rem 0 0;
++  font-size: 1.15rem;
++}
++
++.topbar-actions {
++  display: flex;
++  align-items: center;
++  gap: 0.75rem;
++}
++
++.provenance-badge {
++  color: var(--warning);
++  font-size: 0.72rem;
++  font-weight: 700;
++  letter-spacing: 0.04em;
++}
++
++.model-scope-badge {
++  color: var(--muted);
++  font-size: 0.72rem;
++  font-weight: 700;
++  letter-spacing: 0.04em;
++}
++
++.tutorial-rail,
++.control-panel,
++.chart-drawer {
++  padding: 1rem;
++  background: var(--panel);
++}
++
++.tutorial-rail {
++  grid-area: left;
++  border-right: 1px solid var(--panel-raised);
++}
++
++.scene-panel {
++  grid-area: scene;
++  min-height: 0;
++  padding: 0;
++  background: var(--panel-raised);
++  overflow: auto;
++}
++
++.experiment-lower-deck {
++  display: grid;
++  gap: 1rem;
++}
++
++.experiment-lower-deck > .history-panel {
++  height: 200px;
++}
++
++.wind-tunnel-scene {
++  position: relative;
++  display: grid;
++  grid-template-rows: auto minmax(18rem, 1fr) auto;
++  width: 100%;
++  height: 100%;
++  min-height: 30rem;
++  overflow: hidden;
++  background: #09151a;
++}
++
++.scene-hud {
++  z-index: 3;
++  display: flex;
++  justify-content: space-between;
++  gap: 1rem;
++  padding: 0.7rem 0.9rem;
++  border-bottom: 1px solid #294049;
++  color: #9db1b7;
++  background: rgb(7 16 20 / 88%);
++  font: 700 0.66rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
++  letter-spacing: 0.08em;
++}
++
++.scene-hud span:last-child {
++  color: var(--flow);
++}
++
++.scene-canvas {
++  min-height: 18rem;
++}
++
++.scene-canvas canvas {
++  display: block;
++}
++
++.scene-hotspots {
++  z-index: 3;
++  display: grid;
++  grid-template-columns: minmax(0, 1fr) minmax(13rem, 0.58fr);
++  gap: 0.75rem;
++  padding: 0.75rem;
++  border-top: 1px solid #294049;
++  background: rgb(7 16 20 / 94%);
++}
++
++.scene-hotspot-buttons {
++  display: grid;
++  grid-template-columns: repeat(5, minmax(0, 1fr));
++  gap: 0.4rem;
++}
++
++.scene-hotspot {
++  min-width: 0;
++  padding: 0.52rem 0.44rem;
++  overflow: hidden;
++  border: 1px solid #314b54;
++  color: #b9c8cb;
++  background: #0d1b20;
++  text-align: left;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++  cursor: pointer;
++}
++
++.scene-hotspot span {
++  margin-right: 0.38rem;
++  color: var(--flow);
++  font: 700 0.62rem ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.scene-hotspot:hover,
++.scene-hotspot:focus-visible,
++.scene-hotspot[aria-pressed="true"] {
++  border-color: var(--flow);
++  outline: none;
++  color: #f4f7f5;
++  background: #123238;
++  box-shadow: inset 0 -2px 0 var(--flow);
++}
++
++.scene-hotspot-card {
++  display: flex;
++  flex-direction: column;
++  justify-content: center;
++  min-height: 3.4rem;
++  padding-left: 0.75rem;
++  border-left: 2px solid #314b54;
++  color: #9db1b7;
++  font-size: 0.72rem;
++}
++
++.scene-hotspot-card strong {
++  color: #eef3f1;
++}
++
++.scene-hotspot-card em {
++  margin-top: 0.18rem;
++  color: var(--flow);
++  font-style: normal;
++}
++
++.scene-fallback {
++  display: grid;
++  place-items: center;
++  min-height: 18rem;
++  padding: 1rem;
++}
++
++.scene-fallback-diagram {
++  width: min(100%, 70rem);
++  height: auto;
++  border: 1px solid #294049;
++}
++
++.scene-fallback p,
++.scene-loading {
++  color: #9db1b7;
++  font-size: 0.76rem;
++}
++
++.scene-fallback strong {
++  color: var(--warning);
++}
++
++.control-panel {
++  grid-area: right;
++  border-left: 1px solid var(--panel-raised);
++}
++
++.chart-drawer {
++  grid-area: bottom;
++  border-top: 1px solid var(--panel-raised);
++  min-width: 0;
++  min-height: 0;
++  padding: 0.75rem 1rem;
++  overflow: hidden;
++}
++
++.dashboard-sidebar {
++  display: flex;
++  flex-direction: column;
++  gap: 0.85rem;
++}
++
++.dashboard-section {
++  border-bottom: 1px solid #294049;
++  padding-bottom: 0.85rem;
++}
++
++.dashboard-section-heading,
++.history-heading,
++.fan-power-row,
++.telemetry-meta,
++.telemetry-quality {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 0.75rem;
++}
++
++.dashboard-section-heading {
++  align-items: flex-start;
++  margin-bottom: 0.7rem;
++}
++
++.dashboard-section h2,
++.history-panel h2 {
++  margin: 0.08rem 0 0;
++  color: #eef4f3;
++  font-size: 0.9rem;
++}
++
++.section-kicker {
++  margin: 0;
++  color: var(--muted);
++  font: 700 0.61rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
++  letter-spacing: 0.09em;
++}
++
++.phase-badge,
++.sample-time {
++  color: var(--muted);
++  font: 700 0.62rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.phase-ramping,
++.phase-stabilizing,
++.phase-sampling {
++  color: var(--flow);
++}
++
++.phase-paused {
++  color: var(--warning);
++}
++
++.fan-power-row label {
++  color: #b8c8cb;
++  font-size: 0.75rem;
++}
++
++.fan-power-row output {
++  color: var(--flow);
++  font: 700 1.35rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.fan-slider {
++  width: 100%;
++  margin: 0.7rem 0 0;
++  accent-color: var(--flow);
++}
++
++.slider-scale {
++  display: flex;
++  justify-content: space-between;
++  color: #738990;
++  font: 0.58rem ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.experiment-actions {
++  display: grid;
++  grid-template-columns: repeat(3, minmax(0, 1fr));
++  gap: 0.35rem;
++  margin-top: 0.75rem;
++}
++
++.experiment-actions button,
++.field-options button,
++.telemetry-quality button,
++.chart-legend button,
++.stable-window-marker {
++  border: 1px solid #34505a;
++  color: #c8d5d7;
++  background: #0a151a;
++  cursor: pointer;
++}
++
++.experiment-actions button {
++  min-height: 2.35rem;
++  padding: 0.42rem 0.25rem;
++  font-size: 0.68rem;
++}
++
++.experiment-actions .action-primary,
++.field-options .field-selected {
++  border-color: var(--flow);
++  color: var(--flow);
++  box-shadow: inset 0 -2px 0 var(--flow);
++}
++
++.experiment-actions button:disabled {
++  border-color: #24373e;
++  color: #53686e;
++  cursor: not-allowed;
++}
++
++.field-options {
++  display: grid;
++  grid-template-columns: repeat(4, minmax(0, 1fr));
++  gap: 0.3rem;
++}
++
++.field-options button {
++  min-width: 0;
++  padding: 0.48rem 0.15rem;
++}
++
++.field-options button span,
++.field-options button small {
++  display: block;
++}
++
++.field-options button span {
++  font-size: 0.72rem;
++}
++
++.field-options button small {
++  margin-top: 0.2rem;
++  overflow: hidden;
++  color: #789097;
++  font: 0.5rem ui-monospace, SFMono-Regular, Menlo, monospace;
++  text-overflow: ellipsis;
++}
++
++.solver-status {
++  margin: 0.75rem 0 0;
++  border-top: 1px solid #243940;
++  font-size: 0.63rem;
++}
++
++.solver-status div {
++  display: flex;
++  justify-content: space-between;
++  gap: 0.65rem;
++  padding: 0.28rem 0;
++  border-bottom: 1px solid #1d3037;
++}
++
++.solver-status dt {
++  color: #789097;
++}
++
++.solver-status dd {
++  margin: 0;
++  color: #c7d3d5;
++  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
++  text-align: right;
++}
++
++.telemetry-grid {
++  display: grid;
++  grid-template-columns: repeat(2, minmax(0, 1fr));
++  border-top: 1px solid #294049;
++  border-left: 1px solid #294049;
++}
++
++.telemetry-card {
++  min-width: 0;
++  padding: 0.55rem;
++  border-right: 1px solid #294049;
++  border-bottom: 1px solid #294049;
++}
++
++.telemetry-meta h3 {
++  margin: 0;
++  overflow: hidden;
++  color: #aebfc2;
++  font-size: 0.64rem;
++  font-weight: 600;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.telemetry-meta span {
++  color: var(--warning);
++  font: 0.48rem ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.telemetry-reading {
++  display: flex;
++  align-items: baseline;
++  gap: 0.32rem;
++  margin: 0.48rem 0;
++}
++
++.telemetry-reading strong {
++  min-width: 0;
++  color: var(--flow);
++  font: 700 1.18rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.telemetry-reading span {
++  color: #b2c0c3;
++  font-size: 0.58rem;
++}
++
++.telemetry-quality span {
++  overflow: hidden;
++  color: #758b92;
++  font: 0.46rem ui-monospace, SFMono-Regular, Menlo, monospace;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.telemetry-quality button {
++  padding: 0.12rem 0.25rem;
++  font-size: 0.52rem;
++}
++
++.history-panel {
++  display: grid;
++  grid-template-rows: auto minmax(0, 1fr) auto;
++  height: 100%;
++  min-height: 0;
++}
++
++.history-heading {
++  align-items: flex-start;
++  margin-bottom: 0.35rem;
++}
++
++.chart-legend {
++  display: flex;
++  flex-wrap: wrap;
++  justify-content: flex-end;
++  gap: 0.3rem;
++}
++
++.chart-legend button {
++  padding: 0.2rem 0.38rem;
++  color: #71868d;
++  font-size: 0.58rem;
++}
++
++.chart-legend button[aria-pressed="true"] {
++  color: #c8d5d7;
++}
++
++.chart-legend button span {
++  display: inline-block;
++  width: 0.55rem;
++  height: 2px;
++  margin-right: 0.25rem;
++  vertical-align: middle;
++}
++
++.history-chart-plot {
++  position: relative;
++  min-width: 0;
++  min-height: 7rem;
++}
++
++.chart-empty {
++  display: grid;
++  place-items: center;
++  height: 100%;
++  margin: 0;
++  color: #72888f;
++  font-size: 0.7rem;
++}
++
++.stable-window-marker {
++  justify-self: end;
++  padding: 0.25rem 0.45rem;
++  color: var(--flow);
++  font-size: 0.62rem;
++}
++
++.stable-window-marker span {
++  margin-left: 0.35rem;
++  color: #789097;
++  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.experiment-report {
++  display: grid;
++  gap: 0.75rem;
++  padding-top: 0.85rem;
++  border-top: 1px solid #294049;
++}
++
++.report-heading,
++.report-disclaimers,
++.sweep-panel > div,
++.sweep-actions,
++.comparison-heading,
++.report-panel,
++.report-actions,
++.condition-card > div {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 0.65rem;
++}
++
++.report-heading {
++  align-items: flex-start;
++}
++
++.report-heading h2,
++.comparison-heading h3,
++.condition-card h3 {
++  margin: 0.1rem 0 0;
++  font-size: 0.88rem;
++}
++
++.report-disclaimers {
++  flex-wrap: wrap;
++  justify-content: flex-end;
++  color: var(--warning);
++  font: 700 0.58rem ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.report-disclaimers span:last-child {
++  color: var(--muted);
++}
++
++.sweep-panel,
++.comparison-panel,
++.report-panel,
++.condition-card {
++  border: 1px solid #294049;
++  background: #0a151a;
++}
++
++.sweep-panel,
++.report-panel {
++  padding: 0.65rem;
++}
++
++.sweep-panel strong,
++.sweep-panel span {
++  display: block;
++}
++
++.sweep-panel strong {
++  color: var(--flow);
++  font-size: 0.72rem;
++}
++
++.sweep-panel span {
++  margin-top: 0.2rem;
++  color: var(--muted);
++  font: 0.62rem ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.sweep-actions button,
++.report-actions button {
++  padding: 0.38rem 0.55rem;
++  border: 1px solid #34505a;
++  color: #c8d5d7;
++  background: #0d1b20;
++  font-size: 0.64rem;
++  cursor: pointer;
++}
++
++.sweep-actions button:first-child,
++.report-actions button:nth-child(2) {
++  border-color: var(--flow);
++  color: var(--flow);
++}
++
++.sweep-actions button:disabled,
++.report-actions button:disabled {
++  border-color: #24373e;
++  color: #53686e;
++  cursor: not-allowed;
++}
++
++.sweep-error,
++.export-error {
++  margin: 0.5rem 0 0;
++  color: var(--danger);
++  font-size: 0.66rem;
++}
++
++.condition-summary-grid {
++  display: grid;
++  grid-template-columns: repeat(3, minmax(0, 1fr));
++  gap: 0.55rem;
++}
++
++.condition-card {
++  padding: 0.6rem;
++}
++
++.condition-card h3 {
++  color: var(--flow);
++}
++
++.summary-valid,
++.summary-invalid {
++  font: 700 0.55rem ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.summary-valid {
++  color: var(--flow);
++}
++
++.summary-invalid {
++  color: var(--warning);
++}
++
++.condition-card dl {
++  display: grid;
++  grid-template-columns: minmax(7rem, 1fr) auto;
++  gap: 0.25rem 0.65rem;
++  margin: 0.5rem 0 0;
++  font-size: 0.62rem;
++}
++
++.condition-card dt {
++  color: var(--muted);
++}
++
++.condition-card dd {
++  margin: 0;
++  color: #d4dfe0;
++  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
++  text-align: right;
++}
++
++.comparison-heading {
++  padding: 0.55rem 0.65rem;
++}
++
++.comparison-heading p {
++  margin: 0;
++  color: var(--muted);
++  font-size: 0.64rem;
++}
++
++.comparison-table-wrap {
++  overflow-x: auto;
++}
++
++.comparison-panel table {
++  width: 100%;
++  border-collapse: collapse;
++  font-size: 0.62rem;
++}
++
++.comparison-panel th,
++.comparison-panel td {
++  padding: 0.42rem 0.55rem;
++  border-top: 1px solid #20353c;
++  color: #c5d1d3;
++  text-align: right;
++  white-space: nowrap;
++}
++
++.comparison-panel th:first-child,
++.comparison-panel td:first-child {
++  text-align: left;
++}
++
++.comparison-panel thead th {
++  color: var(--muted);
++  font-weight: 600;
++}
++
++.comparison-panel input {
++  accent-color: var(--flow);
++}
++
++.report-panel {
++  align-items: flex-end;
++}
++
++.report-panel > div:first-child {
++  flex: 1;
++}
++
++.report-panel label,
++.report-panel small {
++  display: block;
++  color: var(--muted);
++  font-size: 0.62rem;
++}
++
++.report-panel textarea {
++  width: 100%;
++  margin: 0.3rem 0;
++  padding: 0.45rem;
++  border: 1px solid #34505a;
++  color: var(--ink);
++  background: #071014;
++  resize: vertical;
++}
++
++@media print {
++  .topbar,
++  .tutorial-rail,
++  .scene-panel,
++  .control-panel,
++  .history-panel,
++  .sweep-actions,
++  .report-actions {
++    display: none !important;
++  }
++
++  .app-shell,
++  .chart-drawer {
++    display: block;
++    color: #111;
++    background: #fff;
++  }
++
++  .experiment-report,
++  .condition-card,
++  .comparison-panel,
++  .report-panel {
++    border-color: #aaa;
++    color: #111;
++    background: #fff;
++  }
++}
++
++.experiment-actions button:hover:not(:disabled),
++.field-options button:hover,
++.telemetry-quality button:hover,
++.chart-legend button:hover,
++.stable-window-marker:hover,
++.experiment-actions button:focus-visible,
++.field-options button:focus-visible,
++.telemetry-quality button:focus-visible,
++.chart-legend button:focus-visible,
++.stable-window-marker:focus-visible {
++  border-color: var(--flow);
++  outline: 2px solid #1e5c58;
++  outline-offset: 1px;
++}
++
++@media (max-width: 900px) {
++  .app-shell {
++    grid-template-areas:
++      "header"
++      "scene"
++      "left"
++      "right"
++      "bottom";
++    grid-template-columns: minmax(0, 1fr);
++    grid-template-rows: auto minmax(18rem, 1fr) auto auto 220px;
++  }
++
++  .tutorial-rail,
++  .control-panel {
++    border: 0;
++    border-top: 1px solid var(--panel-raised);
++  }
++
++  .scene-hotspots {
++    grid-template-columns: 1fr;
++  }
++
++  .scene-hotspot-buttons {
++    grid-template-columns: repeat(2, minmax(0, 1fr));
++  }
++
++  .condition-summary-grid {
++    grid-template-columns: 1fr;
++  }
++
++  .report-heading,
++  .report-panel {
++    align-items: stretch;
++    flex-direction: column;
++  }
++}

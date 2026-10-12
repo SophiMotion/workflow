@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0.0",
+  "packageId": "four-bar-fixture",
+  "createdAt": "2026-08-28T00:00:00.000Z",
+  "producer": "SophiCAD fixture",
+  "producerVersion": "0.1.0",
+  "source": {
+    "designGuid": "test1-four-bar-fixture",
+    "documentName": "test1.f3d",
+    "dataFileId": null,
+    "versionId": null,
+    "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "coordinateSystem": {
+    "frameName": "root",
+    "convention": "x-forward-y-left-z-up",
+    "sourceToRobot": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+  },
+  "files": []
+}

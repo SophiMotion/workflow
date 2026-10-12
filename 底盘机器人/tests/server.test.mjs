@@ -1,0 +1,30 @@
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+let server,dir,credentials;
+const base='http://127.0.0.1:44173';
+const request=async(url,options={})=>{const r=await fetch(base+url,{...options,headers:{'Content-Type':'application/json',...(credentials?{Authorization:`Bearer ${credentials.token}`} :{}),...options.headers}});let body;try{body=await r.json();}catch{body=null;}return {status:r.status,body};};
+before(async()=>{dir=await mkdtemp(path.join(tmpdir(),'skate-test-'));server=spawn(process.execPath,['server/index.mjs'],{cwd:process.cwd(),env:{...process.env,PORT:'44173',NODE_ENV:'production',DATA_DIR:dir},stdio:['ignore','pipe','pipe']});await new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error('server startup timeout')),7000);server.stdout.on('data',d=>{if(d.toString().includes('SkateChassis:')){clearTimeout(t);resolve();}});server.on('error',reject);server.stderr.on('data',d=>{clearTimeout(t);reject(Error(d.toString()));});});});
+after(async()=>{if(server&&!server.killed){server.kill();await new Promise(resolve=>server.once('exit',resolve));}if(dir)await rm(dir,{recursive:true,force:true});});
+test('project API: create, authorization, independent concurrent edits, conflict and persistence',async()=>{
+  const made=await request('/api/skate/projects',{method:'POST',body:'{}'});assert.equal(made.status,201);credentials=made.body;const endpoint=`/api/skate/projects/${credentials.id}`;
+  assert.equal((await request(endpoint,{headers:{Authorization:''}})).status,403);
+  const posts=await Promise.all([['length',600,700],['width',480,550]].map(([key,expected,value])=>request(endpoint+'/ops',{method:'POST',body:JSON.stringify({type:'set',actor:key,path:`config.${key}`,expected,value})})));assert(posts.every(x=>x.status===200));
+  const current=await request(endpoint);assert.equal(current.body.project.config.length,700);assert.equal(current.body.project.config.width,550);assert.equal(current.body.project.revision,2);
+  const stale=await request(endpoint+'/ops',{method:'POST',body:JSON.stringify({type:'set',actor:'stale',path:'config.length',expected:600,value:800})});assert.equal(stale.status,409);
+  const corrupt=await request(endpoint+'/ops',{method:'POST',body:JSON.stringify({type:'set',actor:'invalid',path:'rules.margin',expected:20,value:100})});assert.equal(corrupt.status,400);
+  assert.equal((await request(endpoint)).body.project.rules.margin,20);
+  assert.equal((await request(endpoint+'/ops',{method:'POST',headers:{Origin:'https://evil.example'},body:'{}'})).status,403);
+  const presence=await request(endpoint+'/presence',{method:'POST',body:JSON.stringify({client:'qa-a',name:'QA'})});assert.deepEqual(presence.body.members,['QA']);
+});
+test('static mount cannot expose project records or server source',async()=>{for(const url of ['/studio/底盘机器人/data/test.json','/studio/底盘机器人/server/index.mjs','/studio/unit/server.py','/studio/.env'])assert.equal((await request(url)).status,404);});
+test('Fusion endpoints reject requests without local-origin intent and validate configuration',async()=>{
+  const endpoint='/api/skate/fusion/open';
+  assert.equal((await request(endpoint,{method:'POST',body:'{}'})).status,403);
+  const headers={Origin:base,'X-Skate-Fusion':'1'};
+  assert.equal((await request(endpoint,{method:'POST',headers,body:JSON.stringify({config:{length:1}})})).status,400);
+  assert.equal((await request('/api/skate/fusion/status',{method:'POST',headers,body:JSON.stringify({id:'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'})})).body.state,'superseded');
+});

@@ -1,0 +1,97 @@
+# macOS and editor files
+.DS_Store
+._*
+*.swp
+*.swo
+*.tmp
+
+# Local secrets and environment overrides
+.env
+.env.*
+!.env.template
+config/feishu.env
+config/feishu-ai.env
+feishu/.state/
+feishu/vault/
+feishu/local-connection.js
+*.pem
+*.key
+
+# Dependencies and caches
+**/node_modules/
+**/__pycache__/
+*.py[cod]
+**/.cache/
+**/.vite/
+
+# Test and coverage output
+**/coverage/
+**/test-results/
+**/playwright-report/
+
+# Runtime logs
+*.log
+online-vault/logs/
+online-vault/**/logs/
+
+# Local archives
+cfd.zip
+
+# Knowledge-vault source data and generated search indexes.
+# These remain on disk but are intentionally excluded from the root history.
+online-vault/gemini-vault/
+online-vault/feishu-vault/
+online-vault/chatgpt-vault/
+online-vault/wechat-vault/
+online-vault/obsidian-workspace.legacy-*/
+online-vault/web-vault/html/
+online-vault/web-vault/md/
+online-vault/web-vault/web_pages_archive_manifest.csv
+online-vault/web-vault/bookmarks_*.html
+online-vault/online-vault-index.js
+online-vault/online-vault-index.json
+online-vault/v2/v2-index-light.js
+online-vault/v2/v2-index-light.json
+
+# Want runtime: personnel-derived state and private local settings
+boss/want/
+want/.env
+want/*.local.json
+
+# Local archived versions; do not upload.
+/备份/
+
+# Local recruitment data and generated archives
+boss/**/boss/
+boss/**/want/data/
+boss/**/want/state/
+boss/**/backups/
+*.zip
+
+# Local knowledge-library contents; retain application source only.
+online-vault/AIPM/content/
+online-vault/AIPM/site/assets/
+online-vault/AIPM/site/articles/
+online-vault/AIPM/site/data/
+online-vault/AIPM/docs/migration-report.md
+online-vault/AIPM/docs/remaining-migration-audit.md
+online-vault/AIPM/docs/source-inventory.md
+online-vault/**/data/
+
+# Generated session output, local credentials, and working archives.
+worldlabstest/runs/
+boss/**/执行结果*.html
+**/*.tsbuildinfo
+**/.testenv/
+**/.pytest_cache/
+**/.git/
+
+# Historical CAD source not referenced by the current configurator.
+/SophiStudio-SophiRobot-Website/V2 Full assembly.step
+
+# Small runtime packages required by the shipped modules.
+!/SophiStudio-SophiRobot-Website/public/fusion/SophiRobot-Fusion-Export.zip
+!/SophiStudio-SophiRobot-Website/dist/fusion/SophiRobot-Fusion-Export.zip
+!/sophicar-formate/fixtures/generated/four-bar.sophicad.zip
+!/sophicar-formate/web/public/four-bar.sophicad.zip
+!/sophicar-formate/web/dist/four-bar.sophicad.zip

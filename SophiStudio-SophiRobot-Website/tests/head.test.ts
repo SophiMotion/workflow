@@ -1,0 +1,10 @@
+import {expect,it} from 'vitest';
+import {Matrix4,Vector3} from 'three';
+import {defaults} from '../src/parameters';
+import {headMatrix,headPivots,neutralHead,parseHeadConfig} from '../src/head';
+it('accepts limits and defaults old configurations to a fixed neutral head',()=>{expect(parseHeadConfig(undefined)).toEqual({pose:neutralHead(),movable:false});for(const rotation of [-90,0,90])for(const tilt of [-30,0,30])expect(parseHeadConfig({pose:{rotation,tilt},movable:true}).pose).toEqual({rotation,tilt})});
+it('rejects invalid head state',()=>{for(const pose of [{rotation:91,tilt:0},{rotation:0,tilt:-31},{rotation:NaN,tilt:0},{rotation:'0',tilt:0},{}])expect(()=>parseHeadConfig({pose,movable:true})).toThrow()});
+it('keeps all geometry unchanged at neutral',()=>{for(let id=0;id<506;id++)expect(headMatrix(id,defaults,neutralHead())).toEqual(new Matrix4())});
+it('moves the upper neck with rotation and only the head output with tilt',()=>{const yaw={rotation:40,tilt:0},pitch={rotation:0,tilt:20};for(const id of [194,196,261,153,299])expect(headMatrix(id,defaults,yaw)).toEqual(new Matrix4());for(const id of [201,258,259,260,262,263,264,265,266])expect(headMatrix(id,defaults,yaw).equals(new Matrix4())).toBe(false);for(const id of [259,260,262,263,264,266])expect(headMatrix(id,defaults,pitch)).toEqual(new Matrix4());expect(headMatrix(265,defaults,pitch).equals(new Matrix4())).toBe(false)});
+it('keeps the tilt hinge attached after yaw and height changes',()=>{const p={...defaults,total_height:2000},q=new Vector3(...headPivots(p).tilt),pose={rotation:70,tilt:25};expect(q.clone().applyMatrix4(headMatrix(265,p,pose)).distanceTo(q.clone().applyMatrix4(headMatrix(260,p,pose)))).toBeLessThan(1e-8)});
+it('positive tilt looks upward toward the front (-Y)',()=>{const q=headPivots(defaults).tilt;const point=new Vector3(q[0],q[1]-50,q[2]).applyMatrix4(headMatrix(265,defaults,{rotation:0,tilt:30}));expect(point.z).toBeCloseTo(q[2]+25)});

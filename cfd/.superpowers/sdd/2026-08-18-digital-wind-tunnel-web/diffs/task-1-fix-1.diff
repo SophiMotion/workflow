@@ -1,0 +1,67 @@
+# Fix review package: Task 1 round 1 (current-file snapshot; no commits by controller ruling)
+
+## Changed files
+src/features/shell/AppShell.tsx
+src/App.test.tsx
+
+## Current contents as additions
+diff --git a/src/features/shell/AppShell.tsx b/src/features/shell/AppShell.tsx
+new file mode 100644
+index 0000000..e5f90e7
+--- /dev/null
++++ b/src/features/shell/AppShell.tsx
+@@ -0,0 +1,31 @@
++import type { ReactNode } from "react";
++
++export type AppShellProps = {
++  left: ReactNode;
++  scene: ReactNode;
++  right: ReactNode;
++  bottom: ReactNode;
++  headerActions?: ReactNode;
++};
++
++export function AppShell({ left, scene, right, bottom, headerActions }: AppShellProps) {
++  return (
++    <div className="app-shell">
++      <header className="topbar" role="banner">
++        <div>
++          <span className="eyebrow">CFD TEACHING CONSOLE</span>
++          <h1>SophiFlow Lab</h1>
++        </div>
++        <div className="topbar-actions">
++          {headerActions}
++          <span className="model-scope-badge">2D TEACHING CFD / 二维教学近似</span>
++          <span className="provenance-badge">SIMULATED / 模拟数据</span>
++        </div>
++      </header>
++      <nav className="tutorial-rail" aria-label="教学章节">{left}</nav>
++      <main className="scene-panel" aria-label="数字风洞">{scene}</main>
++      <aside className="control-panel" aria-label="实验控制">{right}</aside>
++      <section className="chart-drawer" aria-label="实验曲线">{bottom}</section>
++    </div>
++  );
++}
+diff --git a/src/App.test.tsx b/src/App.test.tsx
+new file mode 100644
+index 0000000..2022fa2
+--- /dev/null
++++ b/src/App.test.tsx
+@@ -0,0 +1,17 @@
++import { render, screen } from "@testing-library/react";
++import "@testing-library/jest-dom/vitest";
++import { App } from "./App";
++
++it("renders the five digital wind-tunnel workbench regions", () => {
++  render(<App />);
++  expect(screen.getByRole("banner")).toHaveTextContent("SophiFlow Lab");
++  expect(screen.getByRole("navigation", { name: "教学章节" })).toBeInTheDocument();
++  expect(screen.getByRole("main", { name: "数字风洞" })).toBeInTheDocument();
++  expect(screen.getByRole("complementary", { name: "实验控制" })).toBeInTheDocument();
++  expect(screen.getByRole("region", { name: "实验曲线" })).toBeInTheDocument();
++});
++
++it("identifies the CFD model as a two-dimensional teaching approximation", () => {
++  render(<App />);
++  expect(screen.getByText("2D TEACHING CFD / 二维教学近似")).toBeVisible();
++});

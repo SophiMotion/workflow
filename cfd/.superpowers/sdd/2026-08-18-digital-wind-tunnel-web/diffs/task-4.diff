@@ -1,0 +1,311 @@
+# Review package: Task 4 (changed-file current snapshots; no commits by ruling)
+
+## Files changed
+src/App.tsx
+src/features/tutorial/lessonDefinitions.ts
+src/features/tutorial/tutorialProgress.ts
+src/features/tutorial/tutorialProgress.test.ts
+src/features/tutorial/TutorialRail.tsx
+src/features/tutorial/TutorialRail.test.tsx
+src/features/tutorial/TutorialModeToggle.tsx
+
+## Current changed-file contents
+diff --git a/src/App.tsx b/src/App.tsx
+new file mode 100644
+index 0000000..9df096c
+--- /dev/null
++++ b/src/App.tsx
+@@ -0,0 +1,22 @@
++import { useState } from "react";
++import { AppShell } from "./features/shell/AppShell";
++import { TutorialModeToggle } from "./features/tutorial/TutorialModeToggle";
++import { TutorialRail } from "./features/tutorial/TutorialRail";
++import { advanceLesson, emptyEvidence } from "./features/tutorial/tutorialProgress";
++import type { LessonId, TutorialMode } from "./features/tutorial/lessonDefinitions";
++
++export function App() {
++  const [mode, setMode] = useState<TutorialMode>("guided");
++  const [activeLesson, setActiveLesson] = useState<LessonId>("anatomy");
++  const [evidence] = useState(emptyEvidence);
++
++  return (
++    <AppShell
++      headerActions={<TutorialModeToggle mode={mode} onModeChange={setMode} />}
++      left={<TutorialRail activeLesson={activeLesson} evidence={evidence} mode={mode} onLessonChange={setActiveLesson} onAdvance={() => setActiveLesson(advanceLesson(activeLesson, evidence))} />}
++      scene={<p>数字风洞场景将在此处呈现。</p>}
++      right={<p>实验控制将在此处呈现。</p>}
++      bottom={<p>实验曲线将在此处呈现。</p>}
++    />
++  );
++}
+diff --git a/src/features/tutorial/lessonDefinitions.ts b/src/features/tutorial/lessonDefinitions.ts
+new file mode 100644
+index 0000000..cd24d86
+--- /dev/null
++++ b/src/features/tutorial/lessonDefinitions.ts
+@@ -0,0 +1,21 @@
++export type LessonId = "anatomy" | "fan" | "sensors" | "flow" | "sweep" | "compare" | "report";
++
++export type TutorialMode = "guided" | "free";
++
++export type LessonDefinition = {
++  id: LessonId;
++  ordinal: number;
++  title: string;
++  goal: string;
++  completionHint: string;
++};
++
++export const LESSONS: readonly LessonDefinition[] = [
++  { id: "anatomy", ordinal: 1, title: "认识风洞", goal: "识别风洞中的五个主要模块。", completionHint: "查看 5 个风洞模块：整流段、收缩段、测试段、模型台和风扇段。" },
++  { id: "fan", ordinal: 2, title: "启动虚拟风扇", goal: "观察目标功率与实际 RPM 的动态差异。", completionHint: "在 30% 功率下，让 RPM 连续稳定 2 秒。" },
++  { id: "sensors", ordinal: 3, title: "读取传感器", goal: "区分 RPM、风速、压力和载荷。", completionHint: "阅读 4 张传感器说明卡，并在曲线上查看稳定段。" },
++  { id: "flow", ordinal: 4, title: "观察 CFD 场", goal: "理解速度、压力、涡量与流线。", completionHint: "查看全部 4 种场变量，并答对判断题。" },
++  { id: "sweep", ordinal: 5, title: "风速扫描", goal: "建立速度与动压及载荷的关系。", completionHint: "完成 30%、60% 与 90% 的稳定扫描。" },
++  { id: "compare", ordinal: 6, title: "比较与解释", goal: "理解 CFD 预测与虚拟传感器之间的偏差。", completionHint: "选出残差最大的工况并记录原因。" },
++  { id: "report", ordinal: 7, title: "形成报告", goal: "完成可复现的实验记录。", completionHint: "保留 3 个工况，并填写至少 12 个字符的结论。" },
++];
+diff --git a/src/features/tutorial/tutorialProgress.ts b/src/features/tutorial/tutorialProgress.ts
+new file mode 100644
+index 0000000..03ec2f2
+--- /dev/null
++++ b/src/features/tutorial/tutorialProgress.ts
+@@ -0,0 +1,75 @@
++import { LESSONS, type LessonId } from "./lessonDefinitions";
++
++export type { LessonId, TutorialMode } from "./lessonDefinitions";
++
++export type TutorialEvidence = {
++  viewedHotspots: string[];
++  stableSeconds: number;
++  viewedSensors: string[];
++  inspectedStableWindow: boolean;
++  viewedFields: string[];
++  flowAnswerCorrect: boolean;
++  completedSweepPowers: number[];
++  selectedLargestResidual: boolean;
++  reportConclusion: string;
++};
++
++export const emptyEvidence: TutorialEvidence = {
++  viewedHotspots: [],
++  stableSeconds: 0,
++  viewedSensors: [],
++  inspectedStableWindow: false,
++  viewedFields: [],
++  flowAnswerCorrect: false,
++  completedSweepPowers: [],
++  selectedLargestResidual: false,
++  reportConclusion: "",
++};
++
++const requiredHotspots = ["straightener", "contraction", "test-section", "model-stand", "fan"];
++const requiredSensors = ["rpm", "wind", "pressure", "load"];
++const requiredFields = ["speed", "pressure", "vorticity", "streamlines"];
++const requiredSweepPowers = [30, 60, 90];
++
++function includesAll<T>(values: readonly T[], required: readonly T[]) {
++  return required.every((value) => values.includes(value));
++}
++
++function hasExactSweepPowers(powers: readonly number[]) {
++  return new Set(powers).size === requiredSweepPowers.length
++    && powers.length === requiredSweepPowers.length
++    && includesAll(powers, requiredSweepPowers);
++}
++
++export function canCompleteLesson(lessonId: LessonId, evidence: TutorialEvidence): boolean {
++  switch (lessonId) {
++    case "anatomy":
++      return includesAll(evidence.viewedHotspots, requiredHotspots);
++    case "fan":
++      // The controller only accrues stableSeconds while the command is 30%.
++      return evidence.stableSeconds >= 2;
++    case "sensors":
++      return includesAll(evidence.viewedSensors, requiredSensors) && evidence.inspectedStableWindow;
++    case "flow":
++      return includesAll(evidence.viewedFields, requiredFields) && evidence.flowAnswerCorrect;
++    case "sweep":
++      return hasExactSweepPowers(evidence.completedSweepPowers);
++    case "compare":
++      return evidence.selectedLargestResidual;
++    case "report":
++      return includesAll(evidence.completedSweepPowers, requiredSweepPowers)
++        && evidence.reportConclusion.trim().length >= 12;
++  }
++}
++
++export function advanceLesson(activeLesson: LessonId, evidence: TutorialEvidence): LessonId {
++  const activeIndex = LESSONS.findIndex((lesson) => lesson.id === activeLesson);
++  if (!canCompleteLesson(activeLesson, evidence) || activeIndex < 0 || activeIndex === LESSONS.length - 1) {
++    return activeLesson;
++  }
++  return LESSONS[activeIndex + 1]!.id;
++}
++
++export function completedLessonCount(evidence: TutorialEvidence): number {
++  return LESSONS.filter((lesson) => canCompleteLesson(lesson.id, evidence)).length;
++}
+diff --git a/src/features/tutorial/tutorialProgress.test.ts b/src/features/tutorial/tutorialProgress.test.ts
+new file mode 100644
+index 0000000..08f3a2c
+--- /dev/null
++++ b/src/features/tutorial/tutorialProgress.test.ts
+@@ -0,0 +1,45 @@
++import { canCompleteLesson, emptyEvidence } from "./tutorialProgress";
++
++describe("教程完成证据", () => {
++  it("requires all five physical hotspots for the anatomy lesson", () => {
++    expect(canCompleteLesson("anatomy", emptyEvidence)).toBe(false);
++    expect(canCompleteLesson("anatomy", {
++      ...emptyEvidence,
++      viewedHotspots: ["straightener", "contraction", "test-section", "model-stand", "fan"],
++    })).toBe(true);
++  });
++
++  it("requires two credited stable seconds for the fan lesson", () => {
++    expect(canCompleteLesson("fan", { ...emptyEvidence, stableSeconds: 1.99 })).toBe(false);
++    expect(canCompleteLesson("fan", { ...emptyEvidence, stableSeconds: 2 })).toBe(true);
++  });
++
++  it("does not complete the sensors lesson without a stable chart window", () => {
++    expect(canCompleteLesson("sensors", {
++      ...emptyEvidence,
++      viewedSensors: ["rpm", "wind", "pressure", "load"],
++      inspectedStableWindow: false,
++    })).toBe(false);
++  });
++
++  it("does not complete the flow lesson until every view was opened", () => {
++    expect(canCompleteLesson("flow", {
++      ...emptyEvidence,
++      viewedFields: ["speed", "pressure", "vorticity"],
++      flowAnswerCorrect: true,
++    })).toBe(false);
++  });
++
++  it("requires every prescribed sweep power before report completion", () => {
++    expect(canCompleteLesson("report", {
++      ...emptyEvidence,
++      completedSweepPowers: [30, 60, 90],
++      reportConclusion: "这是足够长度的实验结论。",
++    })).toBe(true);
++    expect(canCompleteLesson("report", {
++      ...emptyEvidence,
++      completedSweepPowers: [30, 60],
++      reportConclusion: "这是足够长度的实验结论。",
++    })).toBe(false);
++  });
++});
+diff --git a/src/features/tutorial/TutorialRail.tsx b/src/features/tutorial/TutorialRail.tsx
+new file mode 100644
+index 0000000..c2c9b75
+--- /dev/null
++++ b/src/features/tutorial/TutorialRail.tsx
+@@ -0,0 +1,53 @@
++import { LESSONS, type LessonId, type TutorialMode } from "./lessonDefinitions";
++import { canCompleteLesson, completedLessonCount, type TutorialEvidence } from "./tutorialProgress";
++
++type TutorialRailProps = {
++  activeLesson: LessonId;
++  evidence: TutorialEvidence;
++  onAdvance(): void;
++  mode?: TutorialMode;
++  onLessonChange?(lesson: LessonId): void;
++};
++
++export function TutorialRail({ activeLesson, evidence, onAdvance, mode = "guided", onLessonChange }: TutorialRailProps) {
++  const activeIndex = LESSONS.findIndex((lesson) => lesson.id === activeLesson);
++  const activeDefinition = LESSONS[activeIndex] ?? LESSONS[0]!;
++  const complete = canCompleteLesson(activeLesson, evidence);
++  const isFinalLesson = activeIndex === LESSONS.length - 1;
++
++  return (
++    <div className="tutorial-rail-content">
++      <p className="eyebrow">七章教学路径</p>
++      <p aria-live="polite">进度 {completedLessonCount(evidence)} / {LESSONS.length}</p>
++      <ol>
++        {LESSONS.map((lesson, index) => {
++          const isComplete = canCompleteLesson(lesson.id, evidence);
++          const isLocked = mode === "guided" && !isComplete && index > activeIndex;
++          const isCurrent = lesson.id === activeLesson;
++          return (
++            <li key={lesson.id}>
++              <button
++                type="button"
++                className={isLocked ? "lesson-locked" : isComplete ? "lesson-complete" : "lesson-current"}
++                aria-current={isCurrent ? "step" : undefined}
++                aria-disabled={isLocked || undefined}
++                onClick={() => !isLocked && onLessonChange?.(lesson.id)}
++              >
++                第 {lesson.ordinal} 章：{lesson.title}{isComplete ? "（已完成）" : isLocked ? "（未解锁）" : ""}
++              </button>
++            </li>
++          );
++        })}
++      </ol>
++      <section aria-labelledby="lesson-goal">
++        <h2 id="lesson-goal">第 {activeDefinition.ordinal} 章：{activeDefinition.title}</h2>
++        <p>{activeDefinition.goal}</p>
++        <p>{activeDefinition.completionHint}</p>
++        {!complete && <p role="status">完成当前目标后可进入下一章。</p>}
++        {!isFinalLesson && <button type="button" disabled={!complete && mode === "guided"} onClick={onAdvance}>进入下一章</button>}
++        {isFinalLesson && <p>{complete ? "七章教程已完成。" : "完成本章目标即可完成教程。"}</p>}
++        {mode === "free" && <p role="status">自由实验已开启，章节限制已解除。</p>}
++      </section>
++    </div>
++  );
++}
+diff --git a/src/features/tutorial/TutorialRail.test.tsx b/src/features/tutorial/TutorialRail.test.tsx
+new file mode 100644
+index 0000000..aeca00a
+--- /dev/null
++++ b/src/features/tutorial/TutorialRail.test.tsx
+@@ -0,0 +1,26 @@
++import { render, screen } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { vi } from "vitest";
++import { TutorialRail } from "./TutorialRail";
++import { TutorialModeToggle } from "./TutorialModeToggle";
++import { emptyEvidence } from "./tutorialProgress";
++
++it("lists all seven chapters and explains why next is locked", () => {
++  render(<TutorialRail activeLesson="anatomy" evidence={emptyEvidence} onAdvance={() => undefined} />);
++  expect(screen.getAllByRole("listitem")).toHaveLength(7);
++  expect(screen.getByRole("button", { name: "进入下一章" })).toBeDisabled();
++  expect(screen.getByText(/查看 5 个风洞模块/)).toBeInTheDocument();
++});
++
++it("keeps future chapters readable but marks them unavailable", () => {
++  render(<TutorialRail activeLesson="anatomy" evidence={emptyEvidence} onAdvance={() => undefined} />);
++  expect(screen.getByRole("button", { name: /第 2 章.*启动虚拟风扇/ })).toHaveAttribute("aria-disabled", "true");
++});
++
++it("switches to free mode without mutating tutorial evidence", async () => {
++  const user = userEvent.setup();
++  const onModeChange = vi.fn();
++  render(<TutorialModeToggle mode="guided" onModeChange={onModeChange} />);
++  await user.click(screen.getByRole("button", { name: "自由实验" }));
++  expect(onModeChange).toHaveBeenCalledWith("free");
++});
+diff --git a/src/features/tutorial/TutorialModeToggle.tsx b/src/features/tutorial/TutorialModeToggle.tsx
+new file mode 100644
+index 0000000..0d2ae90
+--- /dev/null
++++ b/src/features/tutorial/TutorialModeToggle.tsx
+@@ -0,0 +1,15 @@
++import type { TutorialMode } from "./lessonDefinitions";
++
++type TutorialModeToggleProps = {
++  mode: TutorialMode;
++  onModeChange(mode: TutorialMode): void;
++};
++
++export function TutorialModeToggle({ mode, onModeChange }: TutorialModeToggleProps) {
++  return (
++    <div className="tutorial-mode-toggle" role="group" aria-label="教学模式">
++      <button type="button" aria-pressed={mode === "guided"} onClick={() => onModeChange("guided")}>教学模式</button>
++      <button type="button" aria-pressed={mode === "free"} onClick={() => onModeChange("free")}>自由实验</button>
++    </div>
++  );
++}

@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.0.0",
+  "rootOccurrenceId": "ground",
+  "loopClosures": [
+    {
+      "sourceJointId": "j-output-ground",
+      "type": "revolute",
+      "parentOccurrenceId": "output",
+      "childOccurrenceId": "ground",
+      "origin": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "limit": {
+        "lower": -1.5707963267948966,
+        "upper": 1.5707963267948966,
+        "effort": 100,
+        "velocity": 2
+      }
+    }
+  ]
+}

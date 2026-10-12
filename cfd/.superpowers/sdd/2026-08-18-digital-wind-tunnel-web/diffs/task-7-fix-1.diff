@@ -1,0 +1,852 @@
+# Task 7 fix round 1 current-file snapshots
+
+## Files
+src/features/scene/WindTunnelScene.tsx
+src/features/scene/WindTunnelScene.test.tsx
+src/features/scene/sceneCoordinates.ts
+src/features/scene/sceneCoordinates.test.ts
+src/features/scene/sceneVisibility.ts
+src/features/scene/sceneVisibility.test.ts
+src/features/scene/flowSampling.ts
+src/features/scene/flowSampling.test.ts
+src/features/scene/FlowParticles.tsx
+src/features/scene/FieldSlice.tsx
+src/features/scene/VehicleModel.tsx
+src/features/scene/WindTunnelGeometry.tsx
+
+## Current contents
+diff --git a/src/features/scene/WindTunnelScene.tsx b/src/features/scene/WindTunnelScene.tsx
+new file mode 100644
+index 0000000..8a49c48
+--- /dev/null
++++ b/src/features/scene/WindTunnelScene.tsx
+@@ -0,0 +1,93 @@
++import { OrbitControls } from "@react-three/drei";
++import { Canvas } from "@react-three/fiber";
++import { useEffect, useState } from "react";
++import { useLabStore } from "../experiment/labStore";
++import { FieldSlice } from "./FieldSlice";
++import { FlowParticles } from "./FlowParticles";
++import { Hotspots } from "./Hotspots";
++import type { HotspotId } from "./hotspotTypes";
++import { SceneFallback } from "./SceneFallback";
++import { VehicleModel } from "./VehicleModel";
++import { WindTunnelGeometry } from "./WindTunnelGeometry";
++
++export type WindTunnelSceneProps = {
++  webglAvailable?: boolean;
++  onHotspot(id: HotspotId): void;
++};
++
++function detectWebgl() {
++  if (typeof window === "undefined" || typeof window.WebGLRenderingContext === "undefined") return false;
++  try {
++    const canvas = document.createElement("canvas");
++    const context = canvas.getContext("webgl2") || canvas.getContext("webgl");
++    if (!context) return false;
++    const loseContext = context.getExtension("WEBGL_lose_context") as { loseContext?(): void } | null;
++    loseContext?.loseContext?.();
++    return true;
++  } catch {
++    return false;
++  }
++}
++
++let cachedWebglAvailability: boolean | undefined;
++
++function getWebglAvailability() {
++  if (cachedWebglAvailability === undefined) cachedWebglAvailability = detectWebgl();
++  return cachedWebglAvailability;
++}
++
++function useReducedMotion() {
++  const [reduced, setReduced] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true);
++  useEffect(() => {
++    const query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
++    if (!query) return;
++    const update = () => setReduced(query.matches);
++    query.addEventListener("change", update);
++    return () => query.removeEventListener("change", update);
++  }, []);
++  return reduced;
++}
++
++export function WindTunnelScene({ webglAvailable, onHotspot }: WindTunnelSceneProps) {
++  const resolvedWebglAvailable = webglAvailable ?? getWebglAvailability();
++  const [selected, setSelected] = useState<HotspotId | null>(null);
++  const frame = useLabStore((state) => state.flowField);
++  const fieldMode = useLabStore((state) => state.selectedField);
++  const phase = useLabStore((state) => state.phase);
++  const windSpeedMps = useLabStore((state) => state.telemetry.windSpeedMps);
++  const reducedMotion = useReducedMotion();
++  const selectHotspot = (id: HotspotId) => {
++    const next = selected === id ? null : id;
++    setSelected(next);
++    if (next) onHotspot(next);
++  };
++
++  return (
++    <section className="wind-tunnel-scene" aria-label="三维数字风洞工作区">
++      <div className="scene-hud">
++        <span><span>2D TEACHING CFD</span><span> / 二维教学近似</span></span>
++        <span>{resolvedWebglAvailable ? `${fieldMode.toUpperCase()} / ${frame ? "实时场" : "示意流场"}` : "DIAGRAM MODE / 示意模式"}</span>
++      </div>
++      {resolvedWebglAvailable && (
++        <div className="scene-canvas" aria-label="交互式三维风洞">
++          <Canvas camera={{ position: [7.8, 4.6, 10.4], fov: 38 }} dpr={[1, 1.65]} fallback={<SceneFallback />}>
++            <color attach="background" args={["#09151a"]} />
++            <fog attach="fog" args={["#09151a", 13, 24]} />
++            <ambientLight intensity={1.5} />
++            <directionalLight position={[-4, 7, 8]} intensity={3.2} color="#f8f2df" />
++            <directionalLight position={[7, 2, -4]} intensity={1.5} color="#50e3d0" />
++            <WindTunnelGeometry selected={selected} cutaway={selected === "test-section"} />
++            <FieldSlice frame={frame} mode={fieldMode} reducedMotion={reducedMotion} />
++            <VehicleModel frame={frame} selected={selected} />
++            {!reducedMotion && <FlowParticles frame={frame} phase={phase} windSpeedMps={windSpeedMps} />}
++            <gridHelper args={[18, 36, "#34505a", "#193038"]} position={[0, -1.56, 0]} />
++            <axesHelper args={[1.05]} position={[-6.1, -1.42, 1.55]} />
++            <OrbitControls makeDefault target={[0, -0.05, 0]} minDistance={7} maxDistance={18} enableDamping dampingFactor={0.08} />
++          </Canvas>
++        </div>
++      )}
++      {!resolvedWebglAvailable && <SceneFallback />}
++      <Hotspots selected={selected} onSelect={selectHotspot} />
++    </section>
++  );
++}
+diff --git a/src/features/scene/WindTunnelScene.test.tsx b/src/features/scene/WindTunnelScene.test.tsx
+new file mode 100644
+index 0000000..655f817
+--- /dev/null
++++ b/src/features/scene/WindTunnelScene.test.tsx
+@@ -0,0 +1,41 @@
++import { render, screen } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { WindTunnelScene } from "./WindTunnelScene";
++
++it("renders an explanatory fallback when WebGL is unavailable", () => {
++  render(<WindTunnelScene webglAvailable={false} onHotspot={() => undefined} />);
++
++  expect(screen.getByRole("img", { name: "模块化数字风洞示意图" })).toBeInTheDocument();
++  expect(screen.getByText(/浏览器无法初始化 WebGL/)).toBeInTheDocument();
++});
++
++it("exposes the five physical modules and records hotspot evidence", async () => {
++  const user = userEvent.setup();
++  const viewed: string[] = [];
++  render(<WindTunnelScene webglAvailable={false} onHotspot={(id) => viewed.push(id)} />);
++
++  const hotspotIds = ["straightener", "contraction", "test-section", "model-stand", "fan"];
++  for (const id of hotspotIds) {
++    expect(screen.getByRole("button", { name: new RegExp(id) })).toBeInTheDocument();
++  }
++
++  const testSection = screen.getByRole("button", { name: /test-section/ });
++  await user.click(testSection);
++
++  expect(viewed).toEqual(["test-section"]);
++  expect(testSection).toHaveAttribute("aria-pressed", "true");
++  expect(screen.getByRole("status")).toHaveTextContent("剖视已开启");
++});
++
++it("probes WebGL only once across rerenders", () => {
++  vi.stubGlobal("WebGLRenderingContext", class WebGLRenderingContext {});
++  const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
++  const { rerender } = render(<WindTunnelScene onHotspot={() => undefined} />);
++
++  rerender(<WindTunnelScene onHotspot={() => undefined} />);
++  rerender(<WindTunnelScene onHotspot={() => undefined} />);
++
++  expect(getContext).toHaveBeenCalledTimes(2);
++  getContext.mockRestore();
++  vi.unstubAllGlobals();
++});
+diff --git a/src/features/scene/sceneCoordinates.ts b/src/features/scene/sceneCoordinates.ts
+new file mode 100644
+index 0000000..5fca9cb
+--- /dev/null
++++ b/src/features/scene/sceneCoordinates.ts
+@@ -0,0 +1,31 @@
++export const SCENE_FLOW_X_MIN = -2.9;
++export const SCENE_FLOW_X_MAX = 2.9;
++export const SCENE_FLOW_WIDTH = SCENE_FLOW_X_MAX - SCENE_FLOW_X_MIN;
++
++export const SCENE_FLOW_CENTER_Y = -0.58;
++export const SCENE_FLOW_HEIGHT = 1.8;
++export const SCENE_FLOW_Y_MIN = SCENE_FLOW_CENTER_Y - SCENE_FLOW_HEIGHT / 2;
++export const SCENE_FLOW_Y_MAX = SCENE_FLOW_CENTER_Y + SCENE_FLOW_HEIGHT / 2;
++
++// Center of the solver obstacle's documented y = 0.43…0.66 envelope.
++export const SOLVER_VEHICLE_BODY_CENTER_V = (0.43 + 0.66) / 2;
++export const SCENE_VEHICLE_BODY_CENTER_Y = SCENE_FLOW_CENTER_Y
++  + (SOLVER_VEHICLE_BODY_CENTER_V - 0.5) * SCENE_FLOW_HEIGHT;
++
++const clamp01 = (value: number) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
++
++export function solverUToSceneX(u: number) {
++  return SCENE_FLOW_X_MIN + clamp01(u) * SCENE_FLOW_WIDTH;
++}
++
++export function sceneXToSolverU(x: number) {
++  return clamp01((x - SCENE_FLOW_X_MIN) / SCENE_FLOW_WIDTH);
++}
++
++export function solverVToSceneY(v: number) {
++  return SCENE_FLOW_Y_MIN + clamp01(v) * SCENE_FLOW_HEIGHT;
++}
++
++export function sceneYToSolverV(y: number) {
++  return clamp01((y - SCENE_FLOW_Y_MIN) / SCENE_FLOW_HEIGHT);
++}
+diff --git a/src/features/scene/sceneCoordinates.test.ts b/src/features/scene/sceneCoordinates.test.ts
+new file mode 100644
+index 0000000..52fa963
+--- /dev/null
++++ b/src/features/scene/sceneCoordinates.test.ts
+@@ -0,0 +1,16 @@
++import {
++  SCENE_VEHICLE_BODY_CENTER_Y,
++  SOLVER_VEHICLE_BODY_CENTER_V,
++  sceneYToSolverV,
++  solverVToSceneY,
++} from "./sceneCoordinates";
++
++it("aligns the solver obstacle center with the visible vehicle body center", () => {
++  expect(solverVToSceneY(SOLVER_VEHICLE_BODY_CENTER_V)).toBeCloseTo(SCENE_VEHICLE_BODY_CENTER_Y, 6);
++  expect(sceneYToSolverV(SCENE_VEHICLE_BODY_CENTER_Y)).toBeCloseTo(SOLVER_VEHICLE_BODY_CENTER_V, 6);
++});
++
++it("clamps scene coordinates to the solver field", () => {
++  expect(sceneYToSolverV(-99)).toBe(0);
++  expect(sceneYToSolverV(99)).toBe(1);
++});
+diff --git a/src/features/scene/sceneVisibility.ts b/src/features/scene/sceneVisibility.ts
+new file mode 100644
+index 0000000..4dd538c
+--- /dev/null
++++ b/src/features/scene/sceneVisibility.ts
+@@ -0,0 +1,9 @@
++import type { HotspotId } from "./hotspotTypes";
++
++export function vehicleModuleOpacities(selected: HotspotId | null) {
++  if (!selected) return { stand: 1, car: 1 };
++  return {
++    stand: selected === "model-stand" ? 1 : 0.2,
++    car: selected === "test-section" ? 1 : 0.2,
++  };
++}
+diff --git a/src/features/scene/sceneVisibility.test.ts b/src/features/scene/sceneVisibility.test.ts
+new file mode 100644
+index 0000000..97ebcf1
+--- /dev/null
++++ b/src/features/scene/sceneVisibility.test.ts
+@@ -0,0 +1,9 @@
++import { vehicleModuleOpacities } from "./sceneVisibility";
++
++it("highlights only the stand when model-stand is selected", () => {
++  expect(vehicleModuleOpacities("model-stand")).toEqual({ stand: 1, car: 0.2 });
++});
++
++it("keeps the vehicle visible for the test-section cutaway", () => {
++  expect(vehicleModuleOpacities("test-section")).toEqual({ stand: 0.2, car: 1 });
++});
+diff --git a/src/features/scene/flowSampling.ts b/src/features/scene/flowSampling.ts
+new file mode 100644
+index 0000000..0fb5172
+--- /dev/null
++++ b/src/features/scene/flowSampling.ts
+@@ -0,0 +1,55 @@
++type VelocityField = {
++  width: number;
++  height: number;
++  velocityX: Float32Array;
++  velocityY: Float32Array;
++};
++
++export type FlowVelocity = { x: number; y: number };
++
++function clamp01(value: number) {
++  return Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
++}
++
++function bilinearAt(
++  values: Float32Array,
++  width: number,
++  x0: number,
++  y0: number,
++  x1: number,
++  y1: number,
++  tx: number,
++  ty: number,
++) {
++  const topLeft = values[y0 * width + x0] ?? 0;
++  const topRight = values[y0 * width + x1] ?? 0;
++  const bottomLeft = values[y1 * width + x0] ?? 0;
++  const bottomRight = values[y1 * width + x1] ?? 0;
++  const top = topLeft * (1 - tx) + topRight * tx;
++  const bottom = bottomLeft * (1 - tx) + bottomRight * tx;
++  return top * (1 - ty) + bottom * ty;
++}
++
++export function sampleFlowVelocityInto(frame: VelocityField, u: number, v: number, output: FlowVelocity): FlowVelocity {
++  if (frame.width <= 0 || frame.height <= 0 || frame.velocityX.length === 0 || frame.velocityY.length === 0) {
++    output.x = 0;
++    output.y = 0;
++    return output;
++  }
++
++  const x = clamp01(u) * Math.max(0, frame.width - 1);
++  const y = clamp01(v) * Math.max(0, frame.height - 1);
++  const x0 = Math.floor(x);
++  const y0 = Math.floor(y);
++  const x1 = Math.min(frame.width - 1, x0 + 1);
++  const y1 = Math.min(frame.height - 1, y0 + 1);
++  const tx = x - x0;
++  const ty = y - y0;
++  output.x = bilinearAt(frame.velocityX, frame.width, x0, y0, x1, y1, tx, ty);
++  output.y = bilinearAt(frame.velocityY, frame.width, x0, y0, x1, y1, tx, ty);
++  return output;
++}
++
++export function sampleFlowVelocity(frame: VelocityField, u: number, v: number): FlowVelocity {
++  return sampleFlowVelocityInto(frame, u, v, { x: 0, y: 0 });
++}
+diff --git a/src/features/scene/flowSampling.test.ts b/src/features/scene/flowSampling.test.ts
+new file mode 100644
+index 0000000..5b4e3e0
+--- /dev/null
++++ b/src/features/scene/flowSampling.test.ts
+@@ -0,0 +1,36 @@
++import { sampleFlowVelocity, sampleFlowVelocityInto } from "./flowSampling";
++
++it("bilinearly samples a normalized flow coordinate", () => {
++  const frame = {
++    width: 2,
++    height: 2,
++    velocityX: new Float32Array([0, 2, 4, 6]),
++    velocityY: new Float32Array([0, 0, 2, 2]),
++  };
++
++  expect(sampleFlowVelocity(frame, 0.5, 0.5)).toEqual({ x: 3, y: 1 });
++});
++
++it("clamps samples to the field boundary", () => {
++  const frame = {
++    width: 2,
++    height: 1,
++    velocityX: new Float32Array([1, 2]),
++    velocityY: new Float32Array([0, 0]),
++  };
++
++  expect(sampleFlowVelocity(frame, 9, 0).x).toBe(2);
++});
++
++it("samples into a reusable output object without replacing it", () => {
++  const frame = {
++    width: 2,
++    height: 2,
++    velocityX: new Float32Array([0, 2, 4, 6]),
++    velocityY: new Float32Array([0, 0, 2, 2]),
++  };
++  const output = { x: -1, y: -1 };
++
++  expect(sampleFlowVelocityInto(frame, 0.5, 0.5, output)).toBe(output);
++  expect(output).toEqual({ x: 3, y: 1 });
++});
+diff --git a/src/features/scene/FlowParticles.tsx b/src/features/scene/FlowParticles.tsx
+new file mode 100644
+index 0000000..fc4d2ac
+--- /dev/null
++++ b/src/features/scene/FlowParticles.tsx
+@@ -0,0 +1,124 @@
++import { useFrame } from "@react-three/fiber";
++import { useEffect, useLayoutEffect, useRef, useState } from "react";
++import * as THREE from "three";
++import type { RunPhase } from "../experiment/model";
++import type { FlowFieldFrame } from "../flow/types";
++import { sampleFlowVelocityInto, type FlowVelocity } from "./flowSampling";
++import {
++  SCENE_FLOW_Y_MAX,
++  SCENE_FLOW_Y_MIN,
++  sceneXToSolverU,
++  sceneYToSolverV,
++  solverVToSceneY,
++} from "./sceneCoordinates";
++
++type FlowParticlesProps = {
++  frame: FlowFieldFrame | null;
++  phase: RunPhase;
++  windSpeedMps: number;
++  count?: number;
++};
++
++function seeded(index: number, salt: number) {
++  const value = Math.sin(index * 91.73 + salt * 17.11) * 43758.5453;
++  return value - Math.floor(value);
++}
++
++function createPositions(count: number) {
++  const positions = new Float32Array(count * 3);
++  for (let index = 0; index < count; index += 1) {
++    positions[index * 3] = -2.8 + seeded(index, 1) * 5.6;
++    positions[index * 3 + 1] = solverVToSceneY(0.04 + seeded(index, 2) * 0.92);
++    positions[index * 3 + 2] = -0.92 + seeded(index, 3) * 1.84;
++  }
++  return positions;
++}
++
++type ParticleBuffers = {
++  positions: Float32Array;
++  stalledFor: Float32Array;
++  velocity: FlowVelocity;
++  transform: THREE.Object3D;
++  count: number;
++};
++
++function createParticleBuffers(count: number): ParticleBuffers {
++  return {
++    positions: createPositions(count),
++    stalledFor: new Float32Array(count),
++    velocity: { x: 0, y: 0 },
++    transform: new THREE.Object3D(),
++    count,
++  };
++}
++
++function writeParticleMatrices(mesh: THREE.InstancedMesh | null, buffers: ParticleBuffers) {
++  if (!mesh) return;
++  for (let index = 0; index < buffers.count; index += 1) {
++    const offset = index * 3;
++    buffers.transform.position.set(
++      buffers.positions[offset] ?? 0,
++      buffers.positions[offset + 1] ?? 0,
++      buffers.positions[offset + 2] ?? 0,
++    );
++    buffers.transform.updateMatrix();
++    mesh.setMatrixAt(index, buffers.transform.matrix);
++  }
++  mesh.instanceMatrix.needsUpdate = true;
++}
++
++export function FlowParticles({ frame, phase, windSpeedMps, count = 900 }: FlowParticlesProps) {
++  const meshRef = useRef<THREE.InstancedMesh>(null);
++  const frameRef = useRef(frame);
++  const phaseRef = useRef(phase);
++  const windRef = useRef(windSpeedMps);
++  const [initialBuffers] = useState(() => createParticleBuffers(count));
++  const particleBuffersRef = useRef(initialBuffers);
++
++  useEffect(() => { frameRef.current = frame; }, [frame]);
++  useEffect(() => { phaseRef.current = phase; }, [phase]);
++  useEffect(() => { windRef.current = windSpeedMps; }, [windSpeedMps]);
++
++  useLayoutEffect(() => writeParticleMatrices(meshRef.current, particleBuffersRef.current), []);
++
++  useFrame((_, delta) => {
++    if (phaseRef.current === "paused") return;
++    const activeFrame = frameRef.current;
++    const buffers = particleBuffersRef.current;
++    const { positions, stalledFor, velocity } = buffers;
++    for (let index = 0; index < buffers.count; index += 1) {
++      const offset = index * 3;
++      let x = positions[offset] ?? -2.8;
++      let y = positions[offset + 1] ?? 0;
++      let z = positions[offset + 2] ?? 0;
++      if (activeFrame) {
++        sampleFlowVelocityInto(activeFrame, sceneXToSolverU(x), sceneYToSolverV(y), velocity);
++      } else {
++        velocity.x = Math.max(0.018, windRef.current / 240);
++        velocity.y = Math.sin(x * 1.8 + index) * 0.0012;
++      }
++      const forwardSpeed = Math.max(0, velocity.x * 17 + windRef.current * 0.016);
++      stalledFor[index] = forwardSpeed < 0.018 ? (stalledFor[index] ?? 0) + delta : 0;
++      x += forwardSpeed * delta;
++      y += velocity.y * delta * 5;
++      z += Math.sin(index * 0.37 + x) * delta * 0.006;
++      if (x > 2.8 || x < -2.8 || y < SCENE_FLOW_Y_MIN || y > SCENE_FLOW_Y_MAX || (stalledFor[index] ?? 0) > 1.5) {
++        x = -2.8;
++        y = solverVToSceneY(0.04 + seeded(index, 4) * 0.92);
++        z = -0.92 + seeded(index, 5) * 1.84;
++        stalledFor[index] = 0;
++      }
++      positions[offset] = x;
++      positions[offset + 1] = y;
++      positions[offset + 2] = z;
++    }
++    writeParticleMatrices(meshRef.current, buffers);
++  });
++
++  return (
++    <instancedMesh ref={meshRef} args={[undefined, undefined, count]} frustumCulled={false}>
++      <sphereGeometry args={[0.024, 4, 4]} />
++      <meshBasicMaterial color="#55e5d3" transparent opacity={0.82} />
++    </instancedMesh>
++  );
++}
+diff --git a/src/features/scene/FieldSlice.tsx b/src/features/scene/FieldSlice.tsx
+new file mode 100644
+index 0000000..ff43ae5
+--- /dev/null
++++ b/src/features/scene/FieldSlice.tsx
+@@ -0,0 +1,129 @@
++import { Line } from "@react-three/drei";
++import { useEffect, useMemo } from "react";
++import * as THREE from "three";
++import type { LabState } from "../experiment/labStore";
++import type { FlowFieldFrame } from "../flow/types";
++import {
++  SCENE_FLOW_CENTER_Y,
++  SCENE_FLOW_HEIGHT,
++  SCENE_FLOW_WIDTH,
++  SOLVER_VEHICLE_BODY_CENTER_V,
++  solverVToSceneY,
++} from "./sceneCoordinates";
++
++type FieldMode = LabState["selectedField"];
++
++type FieldSliceProps = {
++  frame: FlowFieldFrame | null;
++  mode: FieldMode;
++  reducedMotion: boolean;
++};
++
++const TEXTURE_WIDTH = 120;
++const TEXTURE_HEIGHT = 48;
++
++type Rgb = readonly [number, number, number];
++
++function makePaletteLut(low: Rgb, middle: Rgb, high: Rgb, midpoint = 0.5) {
++  const lut = new Uint8Array(256 * 3);
++  for (let index = 0; index < 256; index += 1) {
++    const normalized = index / 255;
++    const lowerHalf = normalized <= midpoint;
++    const amount = lowerHalf ? normalized / midpoint : (normalized - midpoint) / (1 - midpoint);
++    const from = lowerHalf ? low : middle;
++    const to = lowerHalf ? middle : high;
++    const offset = index * 3;
++    lut[offset] = Math.round(from[0] + (to[0] - from[0]) * amount);
++    lut[offset + 1] = Math.round(from[1] + (to[1] - from[1]) * amount);
++    lut[offset + 2] = Math.round(from[2] + (to[2] - from[2]) * amount);
++  }
++  return lut;
++}
++
++const PALETTE_LUTS: Record<FieldMode, Uint8Array> = {
++  speed: makePaletteLut([6, 59, 67], [49, 214, 219], [240, 238, 231], 0.58),
++  pressure: makePaletteLut([37, 101, 182], [128, 137, 140], [217, 75, 67]),
++  vorticity: makePaletteLut([101, 55, 166], [128, 137, 140], [227, 166, 63]),
++  streamlines: makePaletteLut([80, 227, 208], [80, 227, 208], [80, 227, 208]),
++};
++
++function fieldValues(frame: FlowFieldFrame | null, mode: FieldMode) {
++  if (!frame) return null;
++  if (mode === "pressure") return frame.pressure;
++  if (mode === "vorticity") return frame.vorticity;
++  return frame.speed;
++}
++
++function makeTexture(frame: FlowFieldFrame | null, mode: FieldMode) {
++  const rgba = new Uint8Array(TEXTURE_WIDTH * TEXTURE_HEIGHT * 4);
++  const values = fieldValues(frame, mode);
++  const palette = PALETTE_LUTS[mode];
++  let minimum = Infinity;
++  let maximum = -Infinity;
++  if (values) {
++    for (const value of values) {
++      minimum = Math.min(minimum, value);
++      maximum = Math.max(maximum, value);
++    }
++  }
++
++  for (let row = 0; row < TEXTURE_HEIGHT; row += 1) {
++    for (let column = 0; column < TEXTURE_WIDTH; column += 1) {
++      const u = column / (TEXTURE_WIDTH - 1);
++      const v = row / (TEXTURE_HEIGHT - 1);
++      let normalized = 0.25 + u * 0.6 + Math.sin(u * 11 + v * 4) * 0.04;
++      if (frame && values) {
++        const sourceX = Math.round(u * (frame.width - 1));
++        const sourceY = Math.round(v * (frame.height - 1));
++        const value = values[sourceY * frame.width + sourceX] ?? minimum;
++        normalized = maximum > minimum ? (value - minimum) / (maximum - minimum) : 0.5;
++      }
++      const paletteOffset = Math.round(Math.min(1, Math.max(0, normalized)) * 255) * 3;
++      const offset = (row * TEXTURE_WIDTH + column) * 4;
++      rgba[offset] = palette[paletteOffset] ?? 0;
++      rgba[offset + 1] = palette[paletteOffset + 1] ?? 0;
++      rgba[offset + 2] = palette[paletteOffset + 2] ?? 0;
++      rgba[offset + 3] = mode === "streamlines" ? 0 : Math.round((frame ? 0.54 : 0.28) * 255);
++    }
++  }
++
++  const texture = new THREE.DataTexture(rgba, TEXTURE_WIDTH, TEXTURE_HEIGHT, THREE.RGBAFormat);
++  texture.colorSpace = THREE.SRGBColorSpace;
++  texture.magFilter = THREE.LinearFilter;
++  texture.minFilter = THREE.LinearFilter;
++  texture.needsUpdate = true;
++  return texture;
++}
++
++function StaticStreamlines({ muted }: { muted: boolean }) {
++  const paths = useMemo(() => Array.from({ length: 24 }, (_, row) => {
++    const baseV = 0.08 + row * (0.84 / 23);
++    const baseY = solverVToSceneY(baseV);
++    return Array.from({ length: 34 }, (__, column) => {
++      const x = -2.9 + column * (5.8 / 33);
++      const vehicleWake = Math.exp(-Math.pow((x - 0.15) / 1.25, 2));
++      const side = baseV >= SOLVER_VEHICLE_BODY_CENTER_V ? 1 : -1;
++      const y = baseY + side * vehicleWake * 0.09 + Math.sin(x * 2.2 + row) * 0.008;
++      return new THREE.Vector3(x, y, 0.08);
++    });
++  }), []);
++
++  return <>{paths.map((points, index) => <Line key={index} points={points} color="#50e3d0" transparent opacity={muted ? 0.34 : 0.76} lineWidth={0.75} />)}</>;
++}
++
++export function FieldSlice({ frame, mode, reducedMotion }: FieldSliceProps) {
++  const texture = useMemo(() => makeTexture(frame, mode), [frame, mode]);
++  useEffect(() => () => texture.dispose(), [texture]);
++
++  return (
++    <group>
++      {mode !== "streamlines" && (
++        <mesh position={[0, SCENE_FLOW_CENTER_Y, 0.06]} renderOrder={-1}>
++          <planeGeometry args={[SCENE_FLOW_WIDTH, SCENE_FLOW_HEIGHT]} />
++          <meshBasicMaterial map={texture} transparent opacity={1} depthWrite={false} side={THREE.DoubleSide} />
++        </mesh>
++      )}
++      {(mode === "streamlines" || reducedMotion) && <StaticStreamlines muted={mode !== "streamlines"} />}
++    </group>
++  );
++}
+diff --git a/src/features/scene/VehicleModel.tsx b/src/features/scene/VehicleModel.tsx
+new file mode 100644
+index 0000000..9a3a753
+--- /dev/null
++++ b/src/features/scene/VehicleModel.tsx
+@@ -0,0 +1,79 @@
++import { RoundedBox } from "@react-three/drei";
++import { useMemo } from "react";
++import * as THREE from "three";
++import type { FlowFieldFrame } from "../flow/types";
++import type { HotspotId } from "./hotspotTypes";
++import { SCENE_VEHICLE_BODY_CENTER_Y, SOLVER_VEHICLE_BODY_CENTER_V } from "./sceneCoordinates";
++import { vehicleModuleOpacities } from "./sceneVisibility";
++
++type VehicleModelProps = {
++  frame: FlowFieldFrame | null;
++  selected: HotspotId | null;
++};
++
++function pressureColor(value: number, minimum: number, maximum: number) {
++  if (!Number.isFinite(value) || maximum <= minimum) return "#879194";
++  const t = THREE.MathUtils.clamp((value - minimum) / (maximum - minimum), 0, 1);
++  const low = new THREE.Color("#2366bc");
++  const middle = new THREE.Color("#879194");
++  const high = new THREE.Color("#d94a43");
++  return (t < 0.5 ? low.lerp(middle, t * 2) : middle.lerp(high, (t - 0.5) * 2)).getStyle();
++}
++
++export function VehicleModel({ frame, selected }: VehicleModelProps) {
++  const { stand: standOpacity, car: carOpacity } = vehicleModuleOpacities(selected);
++  const pressureBands = useMemo(() => {
++    if (!frame?.pressure.length) return ["#718083", "#879194", "#718083"];
++    let minimum = Infinity;
++    let maximum = -Infinity;
++    for (const value of frame.pressure) {
++      minimum = Math.min(minimum, value);
++      maximum = Math.max(maximum, value);
++    }
++    return [0.34, 0.5, 0.66].map((u) => {
++      const x = Math.round(u * (frame.width - 1));
++      const y = Math.round((frame.height - 1) * SOLVER_VEHICLE_BODY_CENTER_V);
++      return pressureColor(frame.pressure[y * frame.width + x] ?? 0, minimum, maximum);
++    });
++  }, [frame]);
++
++  return (
++    <group position={[0, SCENE_VEHICLE_BODY_CENTER_Y - 0.1 * 0.82, 0]}>
++      <group>
++        <mesh position={[0, -0.52, 0]}><boxGeometry args={[2.35, 0.12, 1.18]} /><meshStandardMaterial color="#d84940" transparent opacity={standOpacity} /></mesh>
++        <mesh position={[-0.72, -0.3, 0]}><boxGeometry args={[0.12, 0.5, 0.12]} /><meshStandardMaterial color="#d84940" transparent opacity={standOpacity} /></mesh>
++        <mesh position={[0.72, -0.3, 0]}><boxGeometry args={[0.12, 0.5, 0.12]} /><meshStandardMaterial color="#d84940" transparent opacity={standOpacity} /></mesh>
++      </group>
++
++      <group scale={0.82}>
++        <RoundedBox args={[2.3, 0.48, 1.02]} radius={0.15} smoothness={3} position={[0, 0.1, 0]}>
++          <meshStandardMaterial color="#e8e5dc" emissive="#e8e5dc" emissiveIntensity={0.08} metalness={0.25} roughness={0.34} transparent opacity={carOpacity} />
++        </RoundedBox>
++        <mesh position={[-1.18, 0.1, 0]} rotation={[0, 0, -0.16]}>
++          <boxGeometry args={[0.36, 0.36, 0.92]} />
++          <meshStandardMaterial color="#e8e5dc" transparent opacity={carOpacity} />
++        </mesh>
++        <mesh position={[0.18, 0.57, 0]} rotation={[0, 0, -0.05]}>
++          <boxGeometry args={[1.18, 0.48, 0.86]} />
++          <meshStandardMaterial color="#789398" metalness={0.18} roughness={0.28} transparent opacity={0.9 * carOpacity} />
++        </mesh>
++        {pressureBands.map((color, index) => (
++          <mesh key={index} position={[-0.67 + index * 0.66, 0.35, 0.515]}>
++            <boxGeometry args={[0.46, 0.18, 0.025]} />
++            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.14} transparent opacity={0.78 * carOpacity} />
++          </mesh>
++        ))}
++        {[-0.72, 0.75].flatMap((x) => [-0.52, 0.52].map((z) => (
++          <mesh key={`${x}-${z}`} position={[x, -0.1, z]} rotation={[Math.PI / 2, 0, 0]}>
++            <cylinderGeometry args={[0.28, 0.28, 0.18, 18]} />
++            <meshStandardMaterial color="#20272a" transparent opacity={carOpacity} />
++          </mesh>
++        )))}
++        <group position={[0.9, 0.68, 0]}>
++          <mesh><boxGeometry args={[0.08, 0.36, 0.08]} /><meshStandardMaterial color="#d84940" transparent opacity={carOpacity} /></mesh>
++          <mesh position={[0, 0.18, 0]}><boxGeometry args={[0.38, 0.06, 1.12]} /><meshStandardMaterial color="#252d30" transparent opacity={carOpacity} /></mesh>
++        </group>
++      </group>
++    </group>
++  );
++}
+diff --git a/src/features/scene/WindTunnelGeometry.tsx b/src/features/scene/WindTunnelGeometry.tsx
+new file mode 100644
+index 0000000..4546f7b
+--- /dev/null
++++ b/src/features/scene/WindTunnelGeometry.tsx
+@@ -0,0 +1,141 @@
++import { useLayoutEffect, useMemo, useRef } from "react";
++import * as THREE from "three";
++import type { HotspotId } from "./hotspotTypes";
++
++type WindTunnelGeometryProps = {
++  selected: HotspotId | null;
++  cutaway: boolean;
++};
++
++const OFF_WHITE = "#ebe8df";
++const CHARCOAL = "#252d30";
++const RED = "#d84940";
++
++function moduleOpacity(selected: HotspotId | null, id: HotspotId) {
++  return selected && selected !== id ? 0.2 : 1;
++}
++
++function makeTaperGeometry() {
++  const geometry = new THREE.BufferGeometry();
++  const vertices = new Float32Array([
++    -0.8, -1.25, -1.35, -0.8, -1.25, 1.35, -0.8, 1.25, 1.35, -0.8, 1.25, -1.35,
++    0.8, -0.92, -1.02, 0.8, -0.92, 1.02, 0.8, 0.92, 1.02, 0.8, 0.92, -1.02,
++  ]);
++  geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
++  geometry.setIndex([
++    0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6,
++    0, 4, 5, 0, 5, 1, 3, 2, 6, 3, 6, 7,
++    1, 5, 6, 1, 6, 2, 0, 3, 7, 0, 7, 4,
++  ]);
++  geometry.computeVertexNormals();
++  return geometry;
++}
++
++function HoneycombPlane({ x, opacity }: { x: number; opacity: number }) {
++  const columns = 8;
++  const rows = 7;
++  const cells = useMemo(() => Array.from({ length: columns * rows }, (_, index) => ({
++    x: (index % columns - (columns - 1) / 2) * 0.25 + (Math.floor(index / columns) % 2) * 0.125,
++    y: (Math.floor(index / columns) - (rows - 1) / 2) * 0.27,
++  })), []);
++  const geometry = useMemo(() => new THREE.RingGeometry(0.09, 0.115, 6), []);
++  const material = useMemo(() => new THREE.MeshStandardMaterial({ color: CHARCOAL, side: THREE.DoubleSide }), []);
++  const meshRef = useRef<THREE.InstancedMesh>(null);
++
++  useLayoutEffect(() => {
++    if (!meshRef.current) return;
++    const matrix = new THREE.Matrix4();
++    cells.forEach((cell, index) => {
++      matrix.makeTranslation(cell.x, cell.y, 0);
++      meshRef.current?.setMatrixAt(index, matrix);
++    });
++    meshRef.current.instanceMatrix.needsUpdate = true;
++  }, [cells]);
++
++  return (
++    <group position={[x, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
++      <instancedMesh ref={meshRef} args={[geometry, material, cells.length]}>
++        <meshStandardMaterial color={CHARCOAL} transparent opacity={opacity} side={THREE.DoubleSide} />
++      </instancedMesh>
++      <mesh>
++        <boxGeometry args={[2.35, 2.35, 0.06]} />
++        <meshStandardMaterial color={CHARCOAL} wireframe transparent opacity={opacity} />
++      </mesh>
++    </group>
++  );
++}
++
++function StructuralHoop({ x, opacity }: { x: number; opacity: number }) {
++  return (
++    <group position={[x, 0, 0]}>
++      <mesh position={[0, 1.18, 0]}><boxGeometry args={[0.16, 0.14, 2.42]} /><meshStandardMaterial color={CHARCOAL} transparent opacity={opacity} /></mesh>
++      <mesh position={[0, -1.18, 0]}><boxGeometry args={[0.16, 0.14, 2.42]} /><meshStandardMaterial color={CHARCOAL} transparent opacity={opacity} /></mesh>
++      <mesh position={[0, 0, 1.14]}><boxGeometry args={[0.16, 2.22, 0.14]} /><meshStandardMaterial color={CHARCOAL} transparent opacity={opacity} /></mesh>
++      <mesh position={[0, 0, -1.14]}><boxGeometry args={[0.16, 2.22, 0.14]} /><meshStandardMaterial color={CHARCOAL} transparent opacity={opacity} /></mesh>
++    </group>
++  );
++}
++
++export function WindTunnelGeometry({ selected, cutaway }: WindTunnelGeometryProps) {
++  const taper = useMemo(() => makeTaperGeometry(), []);
++  const straightenerOpacity = moduleOpacity(selected, "straightener");
++  const contractionOpacity = moduleOpacity(selected, "contraction");
++  const testOpacity = moduleOpacity(selected, "test-section");
++  const fanOpacity = moduleOpacity(selected, "fan");
++
++  return (
++    <group>
++      <group>
++        <HoneycombPlane x={-5.1} opacity={straightenerOpacity} />
++        <HoneycombPlane x={-4.6} opacity={straightenerOpacity} />
++        <mesh position={[-4.86, 0, 0]}>
++          <boxGeometry args={[0.8, 2.7, 2.9]} />
++          <meshStandardMaterial color={OFF_WHITE} side={THREE.BackSide} transparent opacity={0.82 * straightenerOpacity} />
++        </mesh>
++      </group>
++
++      <group position={[-3.55, 0, 0]}>
++        <mesh geometry={taper}>
++          <meshStandardMaterial color={OFF_WHITE} transparent opacity={0.86 * contractionOpacity} side={THREE.DoubleSide} />
++        </mesh>
++        <StructuralHoop x={-0.76} opacity={contractionOpacity} />
++        <StructuralHoop x={0.76} opacity={contractionOpacity} />
++      </group>
++
++      <group>
++        <mesh position={[0, cutaway ? -0.55 : 0, 0]}>
++          <boxGeometry args={[5.2, cutaway ? 1.1 : 2.2, 2.15]} />
++          <meshPhysicalMaterial color="#b8e2df" transmission={0.42} transparent opacity={0.055 * testOpacity} roughness={0.12} thickness={0.04} depthWrite={false} side={THREE.DoubleSide} />
++        </mesh>
++        <StructuralHoop x={-2.55} opacity={testOpacity} />
++        <StructuralHoop x={0} opacity={testOpacity} />
++        <StructuralHoop x={2.55} opacity={testOpacity} />
++      </group>
++
++      <group position={[3.65, 0, 0]}>
++        <mesh geometry={taper} rotation={[0, Math.PI, 0]}>
++          <meshStandardMaterial color={OFF_WHITE} transparent opacity={0.86 * fanOpacity} side={THREE.DoubleSide} />
++        </mesh>
++      </group>
++
++      <group position={[5.15, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
++        <mesh><cylinderGeometry args={[1.33, 1.33, 0.75, 32, 1, true]} /><meshStandardMaterial color={OFF_WHITE} transparent opacity={fanOpacity} side={THREE.DoubleSide} /></mesh>
++        <mesh><cylinderGeometry args={[0.23, 0.23, 0.88, 20]} /><meshStandardMaterial color={RED} transparent opacity={fanOpacity} /></mesh>
++        {Array.from({ length: 6 }, (_, index) => (
++          <group key={index} rotation={[0, index * Math.PI / 3, 0]}>
++            <mesh position={[0.48, 0, 0]} rotation={[0, 0, 0.34]}>
++              <boxGeometry args={[0.7, 0.06, 0.22]} />
++              <meshStandardMaterial color={RED} transparent opacity={fanOpacity} />
++            </mesh>
++          </group>
++        ))}
++        <mesh position={[0, 0.42, 0]}><cylinderGeometry args={[1.25, 1.25, 0.05, 32]} /><meshStandardMaterial color={RED} wireframe transparent opacity={fanOpacity} /></mesh>
++      </group>
++
++      <group position={[0, -1.47, 0]}>
++        <mesh><boxGeometry args={[12, 0.12, 3.2]} /><meshStandardMaterial color="#17242a" metalness={0.4} roughness={0.62} /></mesh>
++        {[-5, -2.5, 0, 2.5, 5].map((x) => <mesh key={x} position={[x, -0.16, 0]}><boxGeometry args={[0.18, 0.22, 3]} /><meshStandardMaterial color={CHARCOAL} /></mesh>)}
++      </group>
++    </group>
++  );
++}

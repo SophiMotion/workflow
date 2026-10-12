@@ -1,0 +1,99 @@
+{
+  "source_page": "https://sophicar.com/parametric-modeling",
+  "source_module": "https://sophicar.com/assets/SkateChassis-B11XLj9G.js",
+  "retrieved": "2026-10-02",
+  "module_sha256": "e78017a70f49e5d44aef7d654c487ca48db24ef70ce29717ec8039824b5385f6",
+  "use": "User-requested local integration; no third-party redistribution license asserted.",
+  "assets": [
+    {
+      "source": "https://sophicar.com/models/Linecontor/Airy.glb",
+      "file": "assets/sophicar/Linecontor/Airy.glb",
+      "bytes": 2441752,
+      "sha256": "f9b4ea48ed36f52159ad3924537f04b02b503e57e89b3a23012587d4e86dc4f3"
+    },
+    {
+      "source": "https://sophicar.com/models/Linecontor/Astra.glb",
+      "file": "assets/sophicar/Linecontor/Astra.glb",
+      "bytes": 8200,
+      "sha256": "835bb317d18c13bcfc50e71a7f79687b630911f79460e9a61dc460f55694cb81"
+    },
+    {
+      "source": "https://sophicar.com/models/Linecontor/MV-DB300S.glb",
+      "file": "assets/sophicar/Linecontor/MV-DB300S.glb",
+      "bytes": 1850120,
+      "sha256": "f22ce3f2139325041da983d72b6d539dc6a9c5d927d03d3a764c71f66e20bbb3"
+    },
+    {
+      "source": "https://sophicar.com/models/Linecontor/MaixCAM.glb",
+      "file": "assets/sophicar/Linecontor/MaixCAM.glb",
+      "bytes": 1640860,
+      "sha256": "2fae1bee68527a6911bb1eae69dab6761dc776dc916700cbe05c59ce1a245358"
+    },
+    {
+      "source": "https://sophicar.com/models/Linecontor/Mid360.glb",
+      "file": "assets/sophicar/Linecontor/Mid360.glb",
+      "bytes": 3682408,
+      "sha256": "0a2b6d6d40a7940f0f97619810b558d49f5e91d57e91728a9a5cf15a79960ea8"
+    },
+    {
+      "source": "https://sophicar.com/models/Linecontor/S3.glb",
+      "file": "assets/sophicar/Linecontor/S3.glb",
+      "bytes": 2857772,
+      "sha256": "661bd3253b38d9023592a749686365c8badf44ddb1f457f45048445c86072931"
+    },
+    {
+      "source": "https://sophicar.com/models/Linecontor/axielshelf.glb",
+      "file": "assets/sophicar/Linecontor/axielshelf.glb",
+      "bytes": 64864,
+      "sha256": "bc2dafbf016573a1ceb073e9c59b37df9a0fa381d4daddf1009f5c452023fd92"
+    },
+    {
+      "source": "https://sophicar.com/models/Linecontor/camera-shelf.glb",
+      "file": "assets/sophicar/Linecontor/camera-shelf.glb",
+      "bytes": 57032,
+      "sha256": "c6c35de60f282ed80657139e64e83c520ec9f95722aea21e4afb24a672a85a0d"
+    },
+    {
+      "source": "https://sophicar.com/models/Linecontor/motor.glb",
+      "file": "assets/sophicar/Linecontor/motor.glb",
+      "bytes": 2527228,
+      "sha256": "2753abaaafccf11749769f38c4bc20850820bd355ec7ea8a57b0c56a48b4b45b"
+    },
+    {
+      "source": "https://sophicar.com/models/Linecontor/radar-shelf.glb",
+      "file": "assets/sophicar/Linecontor/radar-shelf.glb",
+      "bytes": 2624,
+      "sha256": "79fbffdcbb0e1bdb5fd2b70da417c9ac0c4af0900edf53081b98e600f849330f"
+    },
+    {
+      "source": "https://sophicar.com/models/Linecontor/seat.glb",
+      "file": "assets/sophicar/Linecontor/seat.glb",
+      "bytes": 316940,
+      "sha256": "b414068a7aa8090d514e8d55ab8beebe1b95c6d3715085572ffc8ebdadb05633"
+    },
+    {
+      "source": "https://sophicar.com/models/Linecontor/steer.glb",
+      "file": "assets/sophicar/Linecontor/steer.glb",
+      "bytes": 897672,
+      "sha256": "122e31fdac5fb2cc9375dd03a5ddf6a482ccb473392aef12758aaa6b9e5f22fc"
+    },
+    {
+      "source": "https://sophicar.com/models/Linecontor/steering_motor.glb",
+      "file": "assets/sophicar/Linecontor/steering_motor.glb",
+      "bytes": 142456,
+      "sha256": "00277dc087edc9f06272b48dbc1b77c22f66e943c4aecfad3144acec5399b5e2"
+    },
+    {
+      "source": "https://sophicar.com/models/Linecontor/steering_wheel_1.glb",
+      "file": "assets/sophicar/Linecontor/steering_wheel_1.glb",
+      "bytes": 1851016,
+      "sha256": "5e81902e0a5b6b920dfe3eeac2d4e8c8f2e38c0cf08e102c371ea901a21434aa"
+    },
+    {
+      "source": "https://sophicar.com/models/Linecontor/steering_wheel_2.glb",
+      "file": "assets/sophicar/Linecontor/steering_wheel_2.glb",
+      "bytes": 1849952,
+      "sha256": "27bc2576c9da3a699790508040fbfa0f781066ce63e1250173eb8262430a5c93"
+    }
+  ]
+}

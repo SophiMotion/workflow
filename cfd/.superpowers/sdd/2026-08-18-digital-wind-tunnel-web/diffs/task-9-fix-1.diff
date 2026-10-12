@@ -1,0 +1,1582 @@
+# Task 9 fix round 1 current-file snapshots
+
+## Files
+src/features/report/ExperimentReport.tsx
+src/features/report/ExperimentReport.test.tsx
+src/features/report/csv.ts
+src/features/report/csv.test.ts
+src/features/report/experimentSummary.ts
+src/features/report/experimentSummary.test.ts
+src/features/sweep/sweepRunner.ts
+src/features/sweep/sweepRunner.test.ts
+src/features/experiment/labStore.ts
+src/features/experiment/labStore.test.ts
+
+## Current contents
+diff --git a/src/features/report/ExperimentReport.tsx b/src/features/report/ExperimentReport.tsx
+new file mode 100644
+index 0000000..d828ade
+--- /dev/null
++++ b/src/features/report/ExperimentReport.tsx
+@@ -0,0 +1,287 @@
++import { useMemo, useState } from "react";
++import type { SweepState, SweepPower } from "../sweep/sweepRunner";
++import { SWEEP_POWERS } from "../sweep/sweepRunner";
++import {
++  downloadExperimentCsv,
++  serializeExperimentCsv,
++  type ExperimentCsvInput,
++} from "./csv";
++import { summarizeRun, type RunSummary } from "./experimentSummary";
++
++type DownloadCsv = (csv: string, generatedTime?: string) => unknown;
++
++export type ExperimentReportProps = {
++  sweep: SweepState | null;
++  conclusion: string;
++  onConclusionChange(value: string): void;
++  onSelectLargestResidual(power: SweepPower, largestPower: SweepPower): void;
++  onStartSweep(): void;
++  onCancelSweep(): void;
++  onRetrySweep(): void;
++  generatedTime?: string;
++  downloadCsv?: DownloadCsv;
++  serializeCsv?: (input: ExperimentCsvInput) => string;
++};
++
++type ConditionResult = {
++  power: SweepPower;
++  summary: RunSummary;
++  residual: number | null;
++};
++
++export function ExperimentReport(props: ExperimentReportProps) {
++  const conditions = useMemo(() => buildConditionResults(props.sweep), [props.sweep]);
++  const largestResidualPower = findLargestResidualPower(conditions);
++
++  return (
++    <section className="experiment-report" aria-labelledby="experiment-report-title">
++      <div className="report-heading">
++        <div>
++          <p className="section-kicker">AUTOMATED SWEEP &amp; REPORT</p>
++          <h2 id="experiment-report-title">三工况实验报告</h2>
++        </div>
++        <div className="report-disclaimers">
++          <span>SIMULATED / 模拟数据</span>
++          <span>2D TEACHING CFD / 二维教学近似</span>
++        </div>
++      </div>
++
++      <SweepPanel
++        sweep={props.sweep}
++        onStart={props.onStartSweep}
++        onCancel={props.onCancelSweep}
++        onRetry={props.onRetrySweep}
++      />
++      <div className="condition-summary-grid">
++        {conditions.map(({ power, summary }) => <ConditionCard key={power} power={power} summary={summary} />)}
++      </div>
++      <ComparisonTable
++        conditions={conditions}
++        largestResidualPower={largestResidualPower}
++        onSelect={(power) => {
++          if (largestResidualPower !== null) props.onSelectLargestResidual(power, largestResidualPower);
++        }}
++      />
++      <ReportPanel {...props} />
++    </section>
++  );
++}
++
++export function SweepPanel({
++  sweep,
++  onStart,
++  onCancel,
++  onRetry,
++}: Pick<ExperimentReportProps, "sweep"> & {
++  onStart(): void;
++  onCancel(): void;
++  onRetry(): void;
++}) {
++  const active = sweep !== null && ["ramping", "stabilizing", "sampling"].includes(sweep.status);
++  const label = sweep === null ? "未开始" : statusLabel(sweep);
++
++  return (
++    <div className="sweep-panel">
++      <div>
++        <strong>固定序列 30% → 60% → 90%</strong>
++        <span role="status" aria-live="polite">{label}</span>
++      </div>
++      <div className="sweep-actions">
++        <button type="button" disabled={active} onClick={onStart}>
++          {sweep === null ? "开始自动扫频" : "重新运行扫频"}
++        </button>
++        {active && <button type="button" onClick={onCancel}>取消扫频</button>}
++        {sweep?.status === "failed" && <button type="button" onClick={onRetry}>重试当前工况</button>}
++      </div>
++      {sweep?.error && <p className="sweep-error" role="alert">{sweep.error}</p>}
++    </div>
++  );
++}
++
++export function ComparisonTable({
++  conditions,
++  largestResidualPower,
++  onSelect,
++}: {
++  conditions: ConditionResult[];
++  largestResidualPower: SweepPower | null;
++  onSelect(power: SweepPower): void;
++}) {
++  return (
++    <section className="comparison-panel" aria-labelledby="comparison-title">
++      <div className="comparison-heading">
++        <h3 id="comparison-title">残差对比</h3>
++        <p>观察趋势：风速增大时，动压与垂向载荷近似按 v² 增长。</p>
++      </div>
++      <div className="comparison-table-wrap">
++        <table>
++          <thead><tr><th>工况</th><th>平均风速</th><th>平均载荷</th><th>|v² 基线残差|</th><th>判断</th></tr></thead>
++          <tbody>
++            {conditions.map(({ power, summary, residual }) => (
++              <tr key={power}>
++                <th scope="row">{power}%</th>
++                <td>{format(summary.windSpeedMps.mean, 2)} m/s</td>
++                <td>{format(summary.verticalLoadN.mean, 3)} N</td>
++                <td>{format(residual, 3)} N</td>
++                <td><label><input
++                  type="radio"
++                  name="largest-residual"
++                  disabled={largestResidualPower === null}
++                  aria-label={`${power}% 为最大残差`}
++                  onChange={() => onSelect(power)}
++                /> 选择</label></td>
++              </tr>
++            ))}
++          </tbody>
++        </table>
++      </div>
++    </section>
++  );
++}
++
++export function ReportPanel({
++  sweep,
++  conclusion,
++  onConclusionChange,
++  generatedTime,
++  downloadCsv = downloadExperimentCsv,
++  serializeCsv = serializeExperimentCsv,
++}: ExperimentReportProps) {
++  const [failedSnapshot, setFailedSnapshot] = useState<ExportSnapshot | null>(null);
++  const remainingCharacters = Math.max(0, 12 - conclusion.trim().length);
++  const canExport = sweep?.status === "completed" && remainingCharacters === 0;
++
++  const runExport = (snapshot: ExportSnapshot) => {
++    let csv = snapshot.csv;
++    if (csv === undefined) {
++      try {
++        csv = serializeCsv(snapshot.input);
++      } catch {
++        setFailedSnapshot(snapshot);
++        return;
++      }
++    }
++    const serializedSnapshot = { ...snapshot, csv };
++    try {
++      downloadCsv(csv, snapshot.generatedTime);
++      setFailedSnapshot(null);
++    } catch {
++      setFailedSnapshot(serializedSnapshot);
++    }
++  };
++
++  const exportReport = () => {
++    if (!sweep) return;
++    const snapshotTime = generatedTime ?? new Date().toISOString();
++    const samples = SWEEP_POWERS.flatMap((power) => (
++      (sweep.samplesByPower[power] ?? []).map((sample) => ({ ...sample }))
++    ));
++    const input: ExperimentCsvInput = {
++      metadata: { generatedTime: snapshotTime, conclusion, provenance: "simulated" },
++      samples,
++    };
++    runExport({ input, generatedTime: snapshotTime });
++  };
++
++  return (
++    <section className="report-panel" aria-labelledby="conclusion-title">
++      <div>
++        <label id="conclusion-title" htmlFor="experiment-conclusion">实验结论</label>
++        <textarea
++          id="experiment-conclusion"
++          value={conclusion}
++          minLength={12}
++          rows={3}
++          onChange={(event) => onConclusionChange(event.currentTarget.value)}
++        />
++        <small>{remainingCharacters > 0 ? `还需 ${remainingCharacters} 个字符` : "已满足至少 12 个字符"}</small>
++      </div>
++      <div className="report-actions">
++        <button type="button" onClick={() => window.print()}>打印报告</button>
++        <button type="button" disabled={!canExport} onClick={exportReport}>导出 CSV</button>
++        {failedSnapshot && <button type="button" onClick={() => runExport(failedSnapshot)}>重试导出</button>}
++      </div>
++      {failedSnapshot && <p className="export-error" role="alert">导出失败，实验数据仍保留</p>}
++    </section>
++  );
++}
++
++type ExportSnapshot = {
++  input: ExperimentCsvInput;
++  generatedTime: string;
++  csv?: string;
++};
++
++function ConditionCard({ power, summary }: { power: SweepPower; summary: RunSummary }) {
++  return (
++    <article className="condition-card">
++      <div><h3>{power}%</h3><span className={summary.valid ? "summary-valid" : "summary-invalid"}>{summary.valid ? "有效" : "无效"}</span></div>
++      <dl>
++        <dt>稳定样本</dt><dd>{summary.sampleCount}</dd>
++        <dt>RPM avg ± std</dt><dd>{format(summary.rpm.mean, 0)} ± {format(summary.rpm.standardDeviation, 0)} RPM</dd>
++        <dt>RPM min–max</dt><dd>{format(summary.rpm.min, 0)}–{format(summary.rpm.max, 0)} RPM</dd>
++        <dt>风速 avg ± std</dt><dd>{format(summary.windSpeedMps.mean, 2)} ± {format(summary.windSpeedMps.standardDeviation, 2)} m/s</dd>
++        <dt>风速 min–max</dt><dd>{format(summary.windSpeedMps.min, 2)}–{format(summary.windSpeedMps.max, 2)} m/s</dd>
++        <dt>压力 avg ± std</dt><dd>{format(summary.underbodyPressurePa.mean, 1)} ± {format(summary.underbodyPressurePa.standardDeviation, 1)} Pa</dd>
++        <dt>压力 min–max</dt><dd>{format(summary.underbodyPressurePa.min, 1)}–{format(summary.underbodyPressurePa.max, 1)} Pa</dd>
++        <dt>载荷 avg ± std</dt><dd>{format(summary.verticalLoadN.mean, 3)} ± {format(summary.verticalLoadN.standardDeviation, 3)} N</dd>
++        <dt>载荷 min–max</dt><dd>{format(summary.verticalLoadN.min, 3)}–{format(summary.verticalLoadN.max, 3)} N</dd>
++      </dl>
++    </article>
++  );
++}
++
++function buildConditionResults(sweep: SweepState | null): ConditionResult[] {
++  const baseSummaries = SWEEP_POWERS.map((power) => ({
++    power,
++    summary: summarizeRun(sweep?.samplesByPower[power] ?? []),
++  }));
++  const comparisonReady = sweep?.status === "completed"
++    && baseSummaries.every(({ summary }) => summary.valid);
++  const baseline = baseSummaries[0]!.summary;
++  const baselineWind = baseline.windSpeedMps.mean;
++  const baselineLoad = baseline.verticalLoadN.mean;
++  if (!comparisonReady
++    || !isFiniteNumber(baselineWind)
++    || !isFiniteNumber(baselineLoad)
++    || baselineWind === 0) {
++    return baseSummaries.map(({ power, summary }) => ({ power, summary, residual: null }));
++  }
++
++  const compared = baseSummaries.map(({ power, summary }) => {
++    const wind = summary.windSpeedMps.mean;
++    const load = summary.verticalLoadN.mean;
++    if (!isFiniteNumber(wind) || !isFiniteNumber(load)) return { power, summary, residual: null };
++    const expected = baselineLoad * (wind / baselineWind) ** 2;
++    const residual = Math.abs(load - expected);
++    return { power, summary, residual: Number.isFinite(residual) ? residual : null };
++  });
++  return compared.every(({ residual }) => residual !== null)
++    ? compared
++    : compared.map(({ power, summary }) => ({ power, summary, residual: null }));
++}
++
++function findLargestResidualPower(conditions: ConditionResult[]): SweepPower | null {
++  const available = conditions.filter((condition) => condition.residual !== null);
++  if (available.length === 0) return null;
++  return available.reduce((largest, condition) => condition.residual! > largest.residual! ? condition : largest).power;
++}
++
++function statusLabel(sweep: SweepState): string {
++  switch (sweep.status) {
++    case "ramping": return `${sweep.commandedPowerPct}%：正在下发功率`;
++    case "stabilizing": return `${sweep.commandedPowerPct}%：稳定 ${sweep.stableMs / 1_000}/2.0 s`;
++    case "sampling": return `${sweep.commandedPowerPct}%：采样 ${sweep.samplingMs / 1_000}/4.0 s`;
++    case "completed": return "30%、60%、90% 均已完成";
++    case "failed": return `${sweep.commandedPowerPct}%：稳定超时`;
++    case "idle": return "未开始";
++  }
++}
++
++function format(value: number | null, digits: number): string {
++  return value === null ? "—" : value.toFixed(digits);
++}
++
++function isFiniteNumber(value: number | null): value is number {
++  return value !== null && Number.isFinite(value);
++}
+diff --git a/src/features/report/ExperimentReport.test.tsx b/src/features/report/ExperimentReport.test.tsx
+new file mode 100644
+index 0000000..3deb0a2
+--- /dev/null
++++ b/src/features/report/ExperimentReport.test.tsx
+@@ -0,0 +1,254 @@
++import { render, screen } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { expect, it, vi } from "vitest";
++import type { TelemetryFrame } from "../experiment/model";
++import type { SweepState } from "../sweep/sweepRunner";
++import { ExperimentReport } from "./ExperimentReport";
++import type { ExperimentCsvInput } from "./csv";
++
++function samples(power: 30 | 60 | 90, wind: number, load: number): TelemetryFrame[] {
++  return Array.from({ length: 80 }, (_, sequence) => ({
++    sequence,
++    simulationTimeMs: power * 1_000 + sequence * 50,
++    phase: "sampling",
++    fanPowerPct: power,
++    rpm: power * 62,
++    windSpeedMps: wind,
++    underbodyPressurePa: -power,
++    verticalLoadN: load,
++    quality: "stable",
++    provenance: "simulated",
++  }));
++}
++
++const completedSweep: SweepState = {
++  status: "completed",
++  conditionIndex: 2,
++  commandedPowerPct: 90,
++  stableMs: 2_000,
++  samplingMs: 4_000,
++  conditionElapsedMs: 6_000,
++  completedPowers: [30, 60, 90],
++  samplesByPower: {
++    30: samples(30, 3, 0.1),
++    60: samples(60, 6, 0.45),
++    90: samples(90, 9, 0.8),
++  },
++  error: null,
++};
++
++it("shows three condition summaries, v-squared guidance, and records the largest residual selection", async () => {
++  const user = userEvent.setup();
++  const onSelectLargestResidual = vi.fn();
++  render(<ExperimentReport
++    sweep={completedSweep}
++    conclusion=""
++    onConclusionChange={() => undefined}
++    onSelectLargestResidual={onSelectLargestResidual}
++    onStartSweep={() => undefined}
++    onCancelSweep={() => undefined}
++    onRetrySweep={() => undefined}
++  />);
++
++  for (const power of ["30%", "60%", "90%"]) {
++    expect(screen.getByRole("heading", { name: power })).toBeVisible();
++  }
++  expect(screen.getAllByText("RPM avg ± std")).toHaveLength(3);
++  expect(screen.getAllByText("压力 avg ± std")).toHaveLength(3);
++  expect(screen.getAllByText(/v²/)).toHaveLength(2);
++  await user.click(screen.getByRole("radio", { name: "90% 为最大残差" }));
++  expect(onSelectLargestResidual).toHaveBeenCalledOnce();
++  expect(screen.getByText("SIMULATED / 模拟数据")).toBeVisible();
++  expect(screen.getByText("2D TEACHING CFD / 二维教学近似")).toBeVisible();
++});
++
++it("enforces a twelve-character conclusion and prints the report", async () => {
++  const user = userEvent.setup();
++  const onConclusionChange = vi.fn();
++  const print = vi.spyOn(window, "print").mockImplementation(() => undefined);
++  const { rerender } = render(<ExperimentReport
++    sweep={completedSweep}
++    conclusion="短结论"
++    onConclusionChange={onConclusionChange}
++    onSelectLargestResidual={() => undefined}
++    onStartSweep={() => undefined}
++    onCancelSweep={() => undefined}
++    onRetrySweep={() => undefined}
++  />);
++
++  expect(screen.getByText("还需 9 个字符")).toBeVisible();
++  expect(screen.getByRole("button", { name: "导出 CSV" })).toBeDisabled();
++  await user.type(screen.getByRole("textbox", { name: "实验结论" }), "abcdefghijkl");
++  expect(onConclusionChange).toHaveBeenCalled();
++
++  rerender(<ExperimentReport
++    sweep={completedSweep}
++    conclusion="这是十二字符以上的有效实验结论"
++    onConclusionChange={onConclusionChange}
++    onSelectLargestResidual={() => undefined}
++    onStartSweep={() => undefined}
++    onCancelSweep={() => undefined}
++    onRetrySweep={() => undefined}
++  />);
++  await user.click(screen.getByRole("button", { name: "打印报告" }));
++  expect(print).toHaveBeenCalledOnce();
++});
++
++it("keeps an immutable CSV snapshot and exposes retry after export failure", async () => {
++  const user = userEvent.setup();
++  const attemptedCsv: string[] = [];
++  const downloadCsv = vi.fn((csv: string) => {
++    attemptedCsv.push(csv);
++    if (attemptedCsv.length === 1) throw new Error("blocked");
++  });
++  const { rerender } = render(<ExperimentReport
++    sweep={completedSweep}
++    conclusion="这是十二字符以上的有效实验结论"
++    generatedTime="2026-08-18T01:02:03.000Z"
++    downloadCsv={downloadCsv}
++    onConclusionChange={() => undefined}
++    onSelectLargestResidual={() => undefined}
++    onStartSweep={() => undefined}
++    onCancelSweep={() => undefined}
++    onRetrySweep={() => undefined}
++  />);
++
++  await user.click(screen.getByRole("button", { name: "导出 CSV" }));
++  expect(screen.getByRole("alert")).toHaveTextContent("导出失败，实验数据仍保留");
++
++  rerender(<ExperimentReport
++    sweep={{ ...completedSweep, samplesByPower: {} }}
++    conclusion="被外部修改但不应进入重试快照"
++    generatedTime="2099-01-01T00:00:00.000Z"
++    downloadCsv={downloadCsv}
++    onConclusionChange={() => undefined}
++    onSelectLargestResidual={() => undefined}
++    onStartSweep={() => undefined}
++    onCancelSweep={() => undefined}
++    onRetrySweep={() => undefined}
++  />);
++  await user.click(screen.getByRole("button", { name: "重试导出" }));
++  expect(attemptedCsv[1]).toBe(attemptedCsv[0]);
++});
++
++it("routes serialization failure through the same immutable retry UI", async () => {
++  const user = userEvent.setup();
++  const serializationInputs: ExperimentCsvInput[] = [];
++  const serializeCsv = vi.fn((input: ExperimentCsvInput) => {
++    serializationInputs.push(input);
++    if (serializationInputs.length === 1) throw new Error("serialization failed");
++    return "serialized immutable snapshot";
++  });
++  const downloadCsv = vi.fn();
++  const serializerProp = { serializeCsv };
++  const { rerender } = render(<ExperimentReport
++    {...serializerProp}
++    sweep={completedSweep}
++    conclusion="这是原始且足够长度的实验结论"
++    generatedTime="2026-08-18T01:02:03.000Z"
++    downloadCsv={downloadCsv}
++    onConclusionChange={() => undefined}
++    onSelectLargestResidual={() => undefined}
++    onStartSweep={() => undefined}
++    onCancelSweep={() => undefined}
++    onRetrySweep={() => undefined}
++  />);
++
++  await user.click(screen.getByRole("button", { name: "导出 CSV" }));
++  expect(screen.getByRole("alert")).toHaveTextContent("导出失败，实验数据仍保留");
++  expect(downloadCsv).not.toHaveBeenCalled();
++
++  rerender(<ExperimentReport
++    {...serializerProp}
++    sweep={{ ...completedSweep, samplesByPower: {} }}
++    conclusion="后来变化且不应进入重试的数据"
++    generatedTime="2099-01-01T00:00:00.000Z"
++    downloadCsv={downloadCsv}
++    onConclusionChange={() => undefined}
++    onSelectLargestResidual={() => undefined}
++    onStartSweep={() => undefined}
++    onCancelSweep={() => undefined}
++    onRetrySweep={() => undefined}
++  />);
++  await user.click(screen.getByRole("button", { name: "重试导出" }));
++
++  expect(serializationInputs).toHaveLength(2);
++  expect(serializationInputs[1]).toEqual(serializationInputs[0]);
++  expect(serializationInputs[1]?.samples).toHaveLength(240);
++  expect(serializationInputs[1]?.metadata.conclusion).toBe("这是原始且足够长度的实验结论");
++  expect(downloadCsv).toHaveBeenCalledWith("serialized immutable snapshot", "2026-08-18T01:02:03.000Z");
++  expect(completedSweep.samplesByPower[30]).toHaveLength(80);
++});
++
++it("does not enable residual evidence from invalid condition summaries", () => {
++  render(<ExperimentReport
++    sweep={{
++      ...completedSweep,
++      samplesByPower: {
++        30: samples(30, 3, 0.1).slice(0, 1),
++        60: samples(60, 6, 0.45).slice(0, 1),
++        90: samples(90, 9, 0.8).slice(0, 1),
++      },
++    }}
++    conclusion=""
++    onConclusionChange={() => undefined}
++    onSelectLargestResidual={() => undefined}
++    onStartSweep={() => undefined}
++    onCancelSweep={() => undefined}
++    onRetrySweep={() => undefined}
++  />);
++
++  for (const radio of screen.getAllByRole("radio")) expect(radio).toBeDisabled();
++});
++
++it.each([
++  ["only 30%", { 30: samples(30, 3, 0.1) }],
++  ["only 30% and 60%", { 30: samples(30, 3, 0.1), 60: samples(60, 6, 0.45) }],
++])("keeps every residual choice disabled with %s valid", (_label, samplesByPower) => {
++  render(<ExperimentReport
++    sweep={{ ...completedSweep, samplesByPower }}
++    conclusion=""
++    onConclusionChange={() => undefined}
++    onSelectLargestResidual={() => undefined}
++    onStartSweep={() => undefined}
++    onCancelSweep={() => undefined}
++    onRetrySweep={() => undefined}
++  />);
++
++  for (const radio of screen.getAllByRole("radio")) expect(radio).toBeDisabled();
++});
++
++it("keeps residual choices disabled until the fully valid sweep is completed", () => {
++  render(<ExperimentReport
++    sweep={{ ...completedSweep, status: "sampling" }}
++    conclusion=""
++    onConclusionChange={() => undefined}
++    onSelectLargestResidual={() => undefined}
++    onStartSweep={() => undefined}
++    onCancelSweep={() => undefined}
++    onRetrySweep={() => undefined}
++  />);
++
++  for (const radio of screen.getAllByRole("radio")) expect(radio).toBeDisabled();
++});
++
++it("keeps residual choices disabled when finite means produce a non-finite v-squared residual", () => {
++  render(<ExperimentReport
++    sweep={{
++      ...completedSweep,
++      samplesByPower: {
++        30: samples(30, Number.MIN_VALUE, 1),
++        60: samples(60, 1, 2),
++        90: samples(90, 2, 3),
++      },
++    }}
++    conclusion=""
++    onConclusionChange={() => undefined}
++    onSelectLargestResidual={() => undefined}
++    onStartSweep={() => undefined}
++    onCancelSweep={() => undefined}
++    onRetrySweep={() => undefined}
++  />);
++
++  for (const radio of screen.getAllByRole("radio")) expect(radio).toBeDisabled();
++});
+diff --git a/src/features/report/csv.ts b/src/features/report/csv.ts
+new file mode 100644
+index 0000000..bebdbcd
+--- /dev/null
++++ b/src/features/report/csv.ts
+@@ -0,0 +1,123 @@
++import type { TelemetryFrame } from "../experiment/model";
++import { SWEEP_POWERS } from "../sweep/sweepRunner";
++import { summarizeRun } from "./experimentSummary";
++
++export type ExperimentCsvMetadata = {
++  title?: string;
++  generatedTime?: string;
++  provenance: "simulated";
++  solver?: string;
++  gridSize?: string;
++  conclusion: string;
++  disclaimer?: string;
++};
++
++export type ExperimentCsvInput = {
++  metadata: ExperimentCsvMetadata;
++  samples: TelemetryFrame[];
++};
++
++const SAMPLE_HEADERS = [
++  "sequence",
++  "simulationTimeMs",
++  "phase",
++  "fanPowerPct",
++  "rpm",
++  "windSpeedMps",
++  "underbodyPressurePa",
++  "verticalLoadN",
++  "quality",
++  "provenance",
++] as const;
++
++const SUMMARY_HEADERS = [
++  "summaryFanPowerPct",
++  "valid",
++  "sampleCount",
++  "minSimulationTimeMs",
++  "maxSimulationTimeMs",
++  "meanRpm",
++  "stdRpm",
++  "minRpm",
++  "maxRpm",
++  "meanWindSpeedMps",
++  "stdWindSpeedMps",
++  "minWindSpeedMps",
++  "maxWindSpeedMps",
++  "meanUnderbodyPressurePa",
++  "stdUnderbodyPressurePa",
++  "minUnderbodyPressurePa",
++  "maxUnderbodyPressurePa",
++  "meanVerticalLoadN",
++  "stdVerticalLoadN",
++  "minVerticalLoadN",
++  "maxVerticalLoadN",
++] as const;
++
++export function serializeExperimentCsv({ metadata, samples }: ExperimentCsvInput): string {
++  const rows: Array<Array<string | number | boolean | null | undefined>> = [
++    ["title", metadata.title ?? "SophiFlow 三工况数字风洞实验"],
++    ["generatedTime", metadata.generatedTime ?? ""],
++    ["provenance", metadata.provenance],
++    ["solver", metadata.solver ?? "D2Q9 BGK teaching solver"],
++    ["gridSize", metadata.gridSize ?? "240 × 96"],
++    ["conclusion", metadata.conclusion],
++    ["disclaimer", metadata.disclaimer ?? "SIMULATED / 模拟数据；2D TEACHING CFD / 二维教学近似"],
++    ["units", "sequence=count; simulationTimeMs=ms; fanPowerPct=%; rpm=RPM; windSpeedMps=m/s; underbodyPressurePa=Pa; verticalLoadN=N"],
++    [],
++    [...SAMPLE_HEADERS],
++    ...samples.map((sample) => SAMPLE_HEADERS.map((header) => sample[header])),
++    [],
++    [...SUMMARY_HEADERS],
++  ];
++
++  for (const power of SWEEP_POWERS) {
++    const summary = summarizeRun(samples.filter((sample) => sample.fanPowerPct === power));
++    rows.push([
++      power,
++      summary.valid,
++      summary.sampleCount,
++      summary.minSimulationTimeMs,
++      summary.maxSimulationTimeMs,
++      summary.rpm.mean,
++      summary.rpm.standardDeviation,
++      summary.rpm.min,
++      summary.rpm.max,
++      summary.windSpeedMps.mean,
++      summary.windSpeedMps.standardDeviation,
++      summary.windSpeedMps.min,
++      summary.windSpeedMps.max,
++      summary.underbodyPressurePa.mean,
++      summary.underbodyPressurePa.standardDeviation,
++      summary.underbodyPressurePa.min,
++      summary.underbodyPressurePa.max,
++      summary.verticalLoadN.mean,
++      summary.verticalLoadN.standardDeviation,
++      summary.verticalLoadN.min,
++      summary.verticalLoadN.max,
++    ]);
++  }
++
++  return `\uFEFF${rows.map((row) => row.map(escapeCell).join(",")).join("\r\n")}\r\n`;
++}
++
++export function downloadExperimentCsv(csv: string, generatedTime = new Date().toISOString()): string {
++  const timestamp = generatedTime.replace(/\D/g, "").slice(0, 14).padEnd(14, "0");
++  const filename = `sophiflow-cfd-sweep-${timestamp.slice(0, 8)}-${timestamp.slice(8)}.csv`;
++  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
++  try {
++    const anchor = document.createElement("a");
++    anchor.href = url;
++    anchor.download = filename;
++    anchor.click();
++  } finally {
++    URL.revokeObjectURL(url);
++  }
++  return filename;
++}
++
++function escapeCell(value: string | number | boolean | null | undefined): string {
++  const safeValue = typeof value === "string" && /^\s*[=+\-@]/u.test(value) ? `'${value}` : value;
++  const cell = safeValue == null ? "" : String(safeValue).replace(/\r\n|\r|\n/g, "\r\n");
++  return /[",\r\n]/.test(cell) ? `"${cell.replaceAll('"', '""')}"` : cell;
++}
+diff --git a/src/features/report/csv.test.ts b/src/features/report/csv.test.ts
+new file mode 100644
+index 0000000..1e0f3e2
+--- /dev/null
++++ b/src/features/report/csv.test.ts
+@@ -0,0 +1,117 @@
++import { afterEach, expect, it, vi } from "vitest";
++import type { TelemetryFrame } from "../experiment/model";
++import { downloadExperimentCsv, serializeExperimentCsv } from "./csv";
++
++afterEach(() => vi.restoreAllMocks());
++
++it("writes BOM, metadata, units, raw samples, summaries, and RFC4180 escaping", () => {
++  const sample: TelemetryFrame = {
++    sequence: 1,
++    simulationTimeMs: 50,
++    phase: "sampling",
++    fanPowerPct: 30,
++    rpm: 1_860,
++    windSpeedMps: 3.6,
++    underbodyPressurePa: -8,
++    verticalLoadN: 0.1,
++    quality: "stable",
++    provenance: "simulated",
++  };
++  const csv = serializeExperimentCsv({
++    metadata: {
++      generatedTime: "2026-08-18T01:02:03.000Z",
++      conclusion: "速度越高, \"载荷\"越大\n符合趋势",
++      provenance: "simulated",
++    },
++    samples: [sample],
++  });
++
++  expect(csv.startsWith("\uFEFFtitle,SophiFlow 三工况数字风洞实验\r\n")).toBe(true);
++  expect(csv).toContain("generatedTime,2026-08-18T01:02:03.000Z\r\n");
++  expect(csv).toContain("provenance,simulated\r\n");
++  expect(csv).toContain("solver,D2Q9 BGK teaching solver\r\n");
++  expect(csv).toContain("gridSize,240 × 96\r\n");
++  expect(csv).toContain('conclusion,"速度越高, ""载荷""越大\r\n符合趋势"\r\n');
++  expect(csv).toContain("disclaimer,SIMULATED / 模拟数据；2D TEACHING CFD / 二维教学近似\r\n");
++  expect(csv).toContain("sequence,simulationTimeMs,phase,fanPowerPct,rpm,windSpeedMps,underbodyPressurePa,verticalLoadN,quality,provenance\r\n");
++  expect(csv).toContain("summaryFanPowerPct,valid,sampleCount");
++});
++
++it("downloads with the required timestamped filename and always revokes its object URL", () => {
++  const createObjectURL = vi.fn(() => "blob:sweep-report");
++  const revokeObjectURL = vi.fn();
++  Object.defineProperties(URL, {
++    createObjectURL: { configurable: true, value: createObjectURL },
++    revokeObjectURL: { configurable: true, value: revokeObjectURL },
++  });
++  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
++
++  const filename = downloadExperimentCsv("\uFEFFtitle,test\r\n", "2026-08-18T01:02:03.000Z");
++
++  expect(filename).toBe("sophiflow-cfd-sweep-20260818-010203.csv");
++  expect(click).toHaveBeenCalledOnce();
++  expect(revokeObjectURL).toHaveBeenCalledWith("blob:sweep-report");
++});
++
++it.each([
++  "=1+1",
++  "+SUM(A1:A2)",
++  "-2+3",
++  "@SUM(A1:A2)",
++  "   =1+1",
++  "\t@SUM(A1:A2)",
++])("prefixes spreadsheet-dangerous string cells: %j", (conclusion) => {
++  const csv = serializeExperimentCsv({ metadata: { conclusion, provenance: "simulated" }, samples: [] });
++  expect(csv).toContain(`conclusion,'${conclusion}\r\n`);
++});
++
++it("leaves ordinary Chinese strings and negative number cells unchanged", () => {
++  const sample: TelemetryFrame = {
++    sequence: 1,
++    simulationTimeMs: 50,
++    phase: "sampling",
++    fanPowerPct: 30,
++    rpm: 1_860,
++    windSpeedMps: 3.6,
++    underbodyPressurePa: -1,
++    verticalLoadN: 0.1,
++    quality: "stable",
++    provenance: "simulated",
++  };
++  const csv = serializeExperimentCsv({
++    metadata: { conclusion: "正常中文结论", provenance: "simulated" },
++    samples: [sample],
++  });
++
++  expect(csv).toContain("conclusion,正常中文结论\r\n");
++  expect(csv).toContain("1,50,sampling,30,1860,3.6,-1,0.1,stable,simulated\r\n");
++  expect(csv).not.toContain("'-1");
++});
++
++it("revokes the object URL when anchor setup throws", () => {
++  const revokeObjectURL = vi.fn();
++  Object.defineProperties(URL, {
++    createObjectURL: { configurable: true, value: vi.fn(() => "blob:setup-failure") },
++    revokeObjectURL: { configurable: true, value: revokeObjectURL },
++  });
++  vi.spyOn(document, "createElement").mockImplementationOnce(() => {
++    throw new Error("anchor setup failed");
++  });
++
++  expect(() => downloadExperimentCsv("csv", "2026-08-18T01:02:03.000Z")).toThrow("anchor setup failed");
++  expect(revokeObjectURL).toHaveBeenCalledWith("blob:setup-failure");
++});
++
++it("revokes the object URL when anchor click throws", () => {
++  const revokeObjectURL = vi.fn();
++  Object.defineProperties(URL, {
++    createObjectURL: { configurable: true, value: vi.fn(() => "blob:click-failure") },
++    revokeObjectURL: { configurable: true, value: revokeObjectURL },
++  });
++  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementationOnce(() => {
++    throw new Error("click failed");
++  });
++
++  expect(() => downloadExperimentCsv("csv", "2026-08-18T01:02:03.000Z")).toThrow("click failed");
++  expect(revokeObjectURL).toHaveBeenCalledWith("blob:click-failure");
++});
+diff --git a/src/features/report/experimentSummary.ts b/src/features/report/experimentSummary.ts
+new file mode 100644
+index 0000000..3325ee0
+--- /dev/null
++++ b/src/features/report/experimentSummary.ts
+@@ -0,0 +1,84 @@
++import type { TelemetryFrame } from "../experiment/model";
++
++type SummarySample = Pick<
++  TelemetryFrame,
++  "quality" | "windSpeedMps" | "rpm" | "underbodyPressurePa" | "verticalLoadN" | "simulationTimeMs"
++>;
++
++export type MetricStatistics = {
++  mean: number | null;
++  standardDeviation: number | null;
++  min: number | null;
++  max: number | null;
++};
++
++export type RunSummary = {
++  sampleCount: number;
++  valid: boolean;
++  minSimulationTimeMs: number | null;
++  maxSimulationTimeMs: number | null;
++  rpm: MetricStatistics;
++  windSpeedMps: MetricStatistics;
++  underbodyPressurePa: MetricStatistics;
++  verticalLoadN: MetricStatistics;
++  meanRpm: number | null;
++  meanWindSpeedMps: number | null;
++  meanUnderbodyPressurePa: number | null;
++  meanVerticalLoadN: number | null;
++};
++
++const emptyMetric = (): MetricStatistics => ({ mean: null, standardDeviation: null, min: null, max: null });
++
++export function summarizeRun(samples: SummarySample[]): RunSummary {
++  const stable = samples.filter((sample) => sample.quality === "stable" && isFiniteSample(sample));
++  const rpm = summarizeMetric(stable.map((sample) => sample.rpm));
++  const windSpeedMps = summarizeMetric(stable.map((sample) => sample.windSpeedMps));
++  const underbodyPressurePa = summarizeMetric(stable.map((sample) => sample.underbodyPressurePa));
++  const verticalLoadN = summarizeMetric(stable.map((sample) => sample.verticalLoadN));
++
++  return {
++    sampleCount: stable.length,
++    valid: stable.length >= 20 && [rpm, windSpeedMps, underbodyPressurePa, verticalLoadN].every(isFiniteMetric),
++    minSimulationTimeMs: stable.length > 0 ? Math.min(...stable.map((sample) => sample.simulationTimeMs)) : null,
++    maxSimulationTimeMs: stable.length > 0 ? Math.max(...stable.map((sample) => sample.simulationTimeMs)) : null,
++    rpm,
++    windSpeedMps,
++    underbodyPressurePa,
++    verticalLoadN,
++    meanRpm: rpm.mean,
++    meanWindSpeedMps: windSpeedMps.mean,
++    meanUnderbodyPressurePa: underbodyPressurePa.mean,
++    meanVerticalLoadN: verticalLoadN.mean,
++  };
++}
++
++function isFiniteSample(sample: SummarySample): boolean {
++  return Number.isFinite(sample.simulationTimeMs)
++    && Number.isFinite(sample.rpm)
++    && Number.isFinite(sample.windSpeedMps)
++    && Number.isFinite(sample.underbodyPressurePa)
++    && Number.isFinite(sample.verticalLoadN);
++}
++
++function isFiniteMetric(metric: MetricStatistics): boolean {
++  return metric.mean !== null
++    && metric.standardDeviation !== null
++    && metric.min !== null
++    && metric.max !== null
++    && Number.isFinite(metric.mean)
++    && Number.isFinite(metric.standardDeviation)
++    && Number.isFinite(metric.min)
++    && Number.isFinite(metric.max);
++}
++
++function summarizeMetric(values: number[]): MetricStatistics {
++  if (values.length === 0) return emptyMetric();
++  const mean = values.reduce((total, value) => total + value, 0) / values.length;
++  const variance = values.reduce((total, value) => total + (value - mean) ** 2, 0) / values.length;
++  return {
++    mean,
++    standardDeviation: Math.sqrt(variance),
++    min: Math.min(...values),
++    max: Math.max(...values),
++  };
++}
+diff --git a/src/features/report/experimentSummary.test.ts b/src/features/report/experimentSummary.test.ts
+new file mode 100644
+index 0000000..ce9184b
+--- /dev/null
++++ b/src/features/report/experimentSummary.test.ts
+@@ -0,0 +1,75 @@
++import { expect, it } from "vitest";
++import { summarizeRun } from "./experimentSummary";
++
++it("uses only stable samples for run statistics", () => {
++  const summary = summarizeRun([
++    { simulationTimeMs: 0, quality: "transient", windSpeedMps: 99, rpm: 99, underbodyPressurePa: 99, verticalLoadN: 99 },
++    { simulationTimeMs: 50, quality: "stable", windSpeedMps: 4, rpm: 2_000, underbodyPressurePa: -10, verticalLoadN: 0.2 },
++    { simulationTimeMs: 100, quality: "stable", windSpeedMps: 6, rpm: 3_000, underbodyPressurePa: -20, verticalLoadN: 0.4 },
++  ]);
++
++  expect(summary).toMatchObject({
++    sampleCount: 2,
++    valid: false,
++    meanWindSpeedMps: 5,
++    meanRpm: 2_500,
++    meanUnderbodyPressurePa: -15,
++    minSimulationTimeMs: 50,
++    maxSimulationTimeMs: 100,
++  });
++  expect(summary.meanVerticalLoadN).toBeCloseTo(0.3, 8);
++  expect(summary.windSpeedMps).toEqual({ mean: 5, standardDeviation: 1, min: 4, max: 6 });
++  expect(summary.verticalLoadN.standardDeviation).toBeCloseTo(0.1, 8);
++});
++
++it("marks a run valid only from twenty stable samples", () => {
++  const sample = { simulationTimeMs: 50, quality: "stable" as const, windSpeedMps: 4, rpm: 2_000, underbodyPressurePa: -10, verticalLoadN: 0.2 };
++  expect(summarizeRun(Array.from({ length: 19 }, () => sample)).valid).toBe(false);
++  expect(summarizeRun(Array.from({ length: 20 }, () => sample)).valid).toBe(true);
++});
++
++it("returns empty nullable statistics when no stable sample exists", () => {
++  const summary = summarizeRun([]);
++  expect(summary).toMatchObject({ sampleCount: 0, valid: false, minSimulationTimeMs: null, maxSimulationTimeMs: null });
++  expect(summary.windSpeedMps).toEqual({ mean: null, standardDeviation: null, min: null, max: null });
++});
++
++it.each([
++  ["simulation time NaN", { simulationTimeMs: Number.NaN }],
++  ["RPM infinity", { rpm: Number.POSITIVE_INFINITY }],
++  ["wind NaN", { windSpeedMps: Number.NaN }],
++  ["pressure negative infinity", { underbodyPressurePa: Number.NEGATIVE_INFINITY }],
++  ["load infinity", { verticalLoadN: Number.POSITIVE_INFINITY }],
++])("drops an otherwise stable sample with non-finite %s", (_label, invalidField) => {
++  const validSample = {
++    simulationTimeMs: 50,
++    quality: "stable" as const,
++    windSpeedMps: 4,
++    rpm: 2_000,
++    underbodyPressurePa: -10,
++    verticalLoadN: 0.2,
++  };
++  const summary = summarizeRun([
++    ...Array.from({ length: 19 }, () => validSample),
++    { ...validSample, ...invalidField },
++  ]);
++
++  expect(summary).toMatchObject({ sampleCount: 19, valid: false });
++  expect(summary.rpm.mean === null || Number.isFinite(summary.rpm.mean)).toBe(true);
++  expect(summary.windSpeedMps.mean === null || Number.isFinite(summary.windSpeedMps.mean)).toBe(true);
++});
++
++it("returns empty statistics when every stable frame is non-finite", () => {
++  const summary = summarizeRun(Array.from({ length: 20 }, () => ({
++    simulationTimeMs: Number.NaN,
++    quality: "stable" as const,
++    windSpeedMps: Number.POSITIVE_INFINITY,
++    rpm: Number.NaN,
++    underbodyPressurePa: Number.NEGATIVE_INFINITY,
++    verticalLoadN: Number.POSITIVE_INFINITY,
++  })));
++
++  expect(summary).toMatchObject({ sampleCount: 0, valid: false });
++  expect(summary.rpm.mean).toBeNull();
++  expect(summary.maxSimulationTimeMs).toBeNull();
++});
+diff --git a/src/features/sweep/sweepRunner.ts b/src/features/sweep/sweepRunner.ts
+new file mode 100644
+index 0000000..10c9590
+--- /dev/null
++++ b/src/features/sweep/sweepRunner.ts
+@@ -0,0 +1,157 @@
++import type { TelemetryFrame } from "../experiment/model";
++
++export const SWEEP_POWERS = [30, 60, 90] as const;
++export const REQUIRED_STABLE_MS = 2_000;
++export const REQUIRED_SAMPLING_MS = 4_000;
++export const CONDITION_TIMEOUT_MS = 15_000;
++export const MAX_SWEEP_STEP_MS = 1_000;
++
++export type SweepPower = (typeof SWEEP_POWERS)[number];
++export type SweepStatus = "idle" | "ramping" | "stabilizing" | "sampling" | "completed" | "failed";
++
++export type SweepState = {
++  status: SweepStatus;
++  conditionIndex: number;
++  commandedPowerPct: SweepPower;
++  stableMs: number;
++  samplingMs: number;
++  conditionElapsedMs: number;
++  completedPowers: number[];
++  samplesByPower: Partial<Record<SweepPower, TelemetryFrame[]>>;
++  error: string | null;
++};
++
++export type SweepTransition = {
++  state: SweepState;
++  commandPowerPct?: SweepPower;
++};
++
++export function createSweepState(): SweepState {
++  return {
++    status: "ramping",
++    conditionIndex: 0,
++    commandedPowerPct: SWEEP_POWERS[0],
++    stableMs: 0,
++    samplingMs: 0,
++    conditionElapsedMs: 0,
++    completedPowers: [],
++    samplesByPower: {},
++    error: null,
++  };
++}
++
++export function advanceSweep(state: SweepState, frame: TelemetryFrame, dtMs: number): SweepTransition {
++  if (state.status === "idle" || state.status === "completed" || state.status === "failed") {
++    return { state };
++  }
++  if (frame.fanPowerPct !== state.commandedPowerPct) {
++    return { state };
++  }
++
++  if (!isValidSweepDt(dtMs)) {
++    return {
++      state: {
++        ...state,
++        status: "failed",
++        error: `${state.commandedPowerPct}% 工况收到无效仿真时间步`,
++      },
++    };
++  }
++
++  const elapsed = dtMs;
++  const conditionElapsedMs = state.conditionElapsedMs + elapsed;
++
++  if (state.status === "sampling") {
++    const samplingMs = state.samplingMs + elapsed;
++    const samples = [...(state.samplesByPower[state.commandedPowerPct] ?? []), frame];
++    const samplingState: SweepState = {
++      ...state,
++      samplingMs,
++      conditionElapsedMs,
++      samplesByPower: { ...state.samplesByPower, [state.commandedPowerPct]: samples },
++    };
++
++    if (samplingMs < REQUIRED_SAMPLING_MS) return { state: samplingState };
++    return completeCondition(samplingState);
++  }
++
++  const stableMs = frame.quality === "stable" ? state.stableMs + elapsed : 0;
++  if (stableMs >= REQUIRED_STABLE_MS) {
++    return {
++      state: {
++        ...state,
++        status: "sampling",
++        stableMs: REQUIRED_STABLE_MS,
++        conditionElapsedMs,
++      },
++    };
++  }
++
++  if (conditionElapsedMs >= CONDITION_TIMEOUT_MS) {
++    return {
++      state: {
++        ...state,
++        status: "failed",
++        stableMs,
++        conditionElapsedMs,
++        error: `${state.commandedPowerPct}% 工况在 15 秒内未达到连续稳定判据`,
++      },
++    };
++  }
++
++  return {
++    state: {
++      ...state,
++      status: "stabilizing",
++      stableMs,
++      conditionElapsedMs,
++    },
++  };
++}
++
++export function isValidSweepDt(dtMs: number): boolean {
++  return Number.isFinite(dtMs) && dtMs >= 0 && dtMs <= MAX_SWEEP_STEP_MS;
++}
++
++export function retryFailedCondition(state: SweepState): SweepState {
++  if (state.status !== "failed") return state;
++  return {
++    ...state,
++    status: "ramping",
++    stableMs: 0,
++    samplingMs: 0,
++    conditionElapsedMs: 0,
++    samplesByPower: { ...state.samplesByPower, [state.commandedPowerPct]: [] },
++    error: null,
++  };
++}
++
++function completeCondition(state: SweepState): SweepTransition {
++  const completedPowers = [...state.completedPowers, state.commandedPowerPct];
++  const nextPower = SWEEP_POWERS[state.conditionIndex + 1];
++  if (nextPower === undefined) {
++    return {
++      state: {
++        ...state,
++        status: "completed",
++        completedPowers,
++        error: null,
++      },
++    };
++  }
++
++  return {
++    commandPowerPct: nextPower,
++    state: {
++      ...state,
++      status: "ramping",
++      conditionIndex: state.conditionIndex + 1,
++      commandedPowerPct: nextPower,
++      stableMs: 0,
++      samplingMs: 0,
++      conditionElapsedMs: 0,
++      completedPowers,
++      error: null,
++    },
++  };
++}
+diff --git a/src/features/sweep/sweepRunner.test.ts b/src/features/sweep/sweepRunner.test.ts
+new file mode 100644
+index 0000000..d7d474e
+--- /dev/null
++++ b/src/features/sweep/sweepRunner.test.ts
+@@ -0,0 +1,123 @@
++import { afterEach, describe, expect, it, vi } from "vitest";
++import type { TelemetryFrame } from "../experiment/model";
++import { advanceSweep, createSweepState, retryFailedCondition } from "./sweepRunner";
++
++const frame = (
++  power: number,
++  quality: TelemetryFrame["quality"] = "stable",
++  sequence = power,
++): TelemetryFrame => ({
++  sequence,
++  simulationTimeMs: sequence * 50,
++  phase: quality === "stable" ? "stabilizing" : "ramping",
++  fanPowerPct: power,
++  rpm: power * 62,
++  windSpeedMps: power * 0.12,
++  underbodyPressurePa: -power,
++  verticalLoadN: power / 100,
++  quality,
++  provenance: "simulated",
++});
++
++function advanceFor(state: ReturnType<typeof createSweepState>, power: number, milliseconds: number) {
++  let next = state;
++  for (let elapsed = 0; elapsed < milliseconds; elapsed += 50) {
++    next = advanceSweep(next, frame(power, "stable", elapsed / 50), 50).state;
++  }
++  return next;
++}
++
++describe("three-condition sweep reducer", () => {
++  afterEach(() => vi.useRealTimers());
++
++  it("runs exactly 30, 60, and 90 percent in order", () => {
++    let state = createSweepState();
++    for (const power of [30, 60, 90]) {
++      state = advanceFor(state, power, 6_500);
++    }
++
++    expect(state.completedPowers).toEqual([30, 60, 90]);
++    expect(state.status).toBe("completed");
++    expect(Object.keys(state.samplesByPower).map(Number)).toEqual([30, 60, 90]);
++  });
++
++  it("requires 2,000 consecutive stable milliseconds then samples for 4,000 milliseconds", () => {
++    let state = createSweepState();
++    state = advanceFor(state, 30, 1_950);
++    expect(state).toMatchObject({ status: "stabilizing", stableMs: 1_950, samplingMs: 0 });
++
++    state = advanceSweep(state, frame(30, "transient"), 50).state;
++    expect(state.stableMs).toBe(0);
++    state = advanceFor(state, 30, 2_000);
++    expect(state).toMatchObject({ status: "sampling", stableMs: 2_000, samplingMs: 0 });
++
++    state = advanceFor(state, 30, 3_950);
++    expect(state).toMatchObject({ status: "sampling", samplingMs: 3_950 });
++    const transition = advanceSweep(state, frame(30), 50);
++    expect(transition.state).toMatchObject({ status: "ramping", commandedPowerPct: 60 });
++    expect(transition.commandPowerPct).toBe(60);
++    expect(transition.state.samplesByPower[30]).toHaveLength(80);
++  });
++
++  it("ignores a prior condition trailing frame completely", () => {
++    const state = advanceFor(createSweepState(), 30, 6_000);
++    expect(state.commandedPowerPct).toBe(60);
++    const unchanged = advanceSweep(state, frame(30), 2_000);
++
++    expect(unchanged.state).toBe(state);
++    expect(unchanged.commandPowerPct).toBeUndefined();
++    expect(state.conditionElapsedMs).toBe(0);
++  });
++
++  it("fails at 15,000 simulation milliseconds and retries only that condition", () => {
++    let state = advanceFor(createSweepState(), 30, 6_000);
++    const firstSamples = state.samplesByPower[30];
++    for (let elapsed = 0; elapsed < 15_000; elapsed += 50) {
++      state = advanceSweep(state, frame(60, "transient", elapsed / 50), 50).state;
++    }
++
++    expect(state).toMatchObject({ status: "failed", commandedPowerPct: 60, conditionElapsedMs: 15_000 });
++    expect(state.error).toContain("60%");
++    const retry = retryFailedCondition(state);
++    expect(retry).toMatchObject({
++      status: "ramping",
++      commandedPowerPct: 60,
++      stableMs: 0,
++      samplingMs: 0,
++      conditionElapsedMs: 0,
++      completedPowers: [30],
++    });
++    expect(retry.samplesByPower[30]).toBe(firstSamples);
++  });
++
++  it("is deterministic under fake system-time changes", () => {
++    vi.useFakeTimers();
++    vi.setSystemTime("2031-01-01T00:00:00Z");
++    const first = advanceFor(createSweepState(), 30, 2_000);
++    vi.setSystemTime("2099-12-31T23:59:59Z");
++    const second = advanceFor(createSweepState(), 30, 2_000);
++
++    expect(second).toEqual(first);
++  });
++
++  it.each([
++    ["NaN", Number.NaN],
++    ["positive infinity", Number.POSITIVE_INFINITY],
++    ["negative infinity", Number.NEGATIVE_INFINITY],
++    ["negative rollback", -50],
++    ["single-frame jump", 6_000],
++  ])("fails retryably without polluting timers for %s dt", (_label, dtMs) => {
++    const initial = createSweepState();
++    const failed = advanceSweep(initial, frame(30), dtMs).state;
++
++    expect(failed).toMatchObject({
++      status: "failed",
++      stableMs: 0,
++      samplingMs: 0,
++      conditionElapsedMs: 0,
++    });
++    expect(failed.error).toContain("无效仿真时间步");
++    expect(Number.isFinite(failed.stableMs)).toBe(true);
++    expect(retryFailedCondition(failed)).toMatchObject({ status: "ramping", error: null });
++  });
++});
+diff --git a/src/features/experiment/labStore.ts b/src/features/experiment/labStore.ts
+new file mode 100644
+index 0000000..748a98e
+--- /dev/null
++++ b/src/features/experiment/labStore.ts
+@@ -0,0 +1,141 @@
++import { useStore } from "zustand";
++import { createStore } from "zustand/vanilla";
++import { createDefaultSimulationSource } from "./SimulationSource";
++import { experimentReducer } from "./experimentMachine";
++import type { ActiveRunPhase, RunPhase, TelemetryFrame } from "./model";
++import type { FlowFieldFrame } from "../flow/types";
++import {
++  advanceSweep,
++  createSweepState,
++  isValidSweepDt,
++  retryFailedCondition,
++  type SweepState,
++} from "../sweep/sweepRunner";
++
++export const MAX_HISTORY = 1200;
++
++export type LabState = {
++  phase: RunPhase;
++  resumePhase: ActiveRunPhase | null;
++  fanPowerPct: number;
++  telemetry: TelemetryFrame;
++  history: TelemetryFrame[];
++  flowField: FlowFieldFrame | null;
++  flowStatus: "idle" | "loading" | "ready" | "failed";
++  flowError: string | null;
++  eventLog: string[];
++  selectedField: "speed" | "pressure" | "vorticity" | "streamlines";
++  sweep: SweepState | null;
++  setFanPower(percent: number): void;
++  acceptFrame(frame: TelemetryFrame): void;
++  startRun(): void;
++  pauseRun(): void;
++  resumeRun(): void;
++  advancePhase(): void;
++  resetLab(): void;
++  selectField(field: LabState["selectedField"]): void;
++  startSweep(): void;
++  cancelSweep(): void;
++  retrySweep(): void;
++};
++
++const initialTelemetry = createDefaultSimulationSource(0).reset();
++
++export const labStore = createStore<LabState>((set) => ({
++  phase: "idle",
++  resumePhase: null,
++  fanPowerPct: 0,
++  telemetry: initialTelemetry,
++  history: [],
++  flowField: null,
++  flowStatus: "idle",
++  flowError: null,
++  eventLog: [],
++  selectedField: "speed",
++  sweep: null,
++  setFanPower: (percent) => set((state) => isSweepActive(state.sweep)
++    ? state
++    : { fanPowerPct: Math.min(100, Math.max(0, percent)) }),
++  acceptFrame: (frame) => set((state) => {
++    if (!isSweepActive(state.sweep)) {
++      return {
++        telemetry: frame,
++        history: [...state.history.slice(-MAX_HISTORY + 1), frame],
++      };
++    }
++
++    const dtMs = frame.simulationTimeMs - state.telemetry.simulationTimeMs;
++    const transition = advanceSweep(state.sweep, frame, dtMs);
++    if (!isValidSweepDt(dtMs)) {
++      if (frame.fanPowerPct !== state.sweep.commandedPowerPct) return state;
++      return {
++        sweep: transition.state,
++        phase: "completed",
++        resumePhase: null,
++      };
++    }
++    return {
++      telemetry: frame,
++      history: [...state.history.slice(-MAX_HISTORY + 1), frame],
++      sweep: transition.state,
++      fanPowerPct: transition.commandPowerPct ?? state.fanPowerPct,
++      phase: sweepStatusToRunPhase(transition.state),
++      resumePhase: null,
++    };
++  }),
++  startRun: () => set((state) => isSweepActive(state.sweep) ? state : experimentReducer(state, { type: "start" })),
++  pauseRun: () => set((state) => isSweepActive(state.sweep) ? state : experimentReducer(state, { type: "pause" })),
++  resumeRun: () => set((state) => isSweepActive(state.sweep) ? state : experimentReducer(state, { type: "resume" })),
++  advancePhase: () => set((state) => isSweepActive(state.sweep) ? state : experimentReducer(state, { type: "advance" })),
++  resetLab: () => set({
++    phase: "idle",
++    resumePhase: null,
++    fanPowerPct: 0,
++    telemetry: initialTelemetry,
++    history: [],
++    flowField: null,
++    flowStatus: "idle",
++    flowError: null,
++    eventLog: [],
++    selectedField: "speed",
++    sweep: null,
++  }),
++  selectField: (selectedField) => set({ selectedField }),
++  startSweep: () => set((state) => isSweepActive(state.sweep) ? state : ({
++    sweep: createSweepState(),
++    fanPowerPct: 30,
++    phase: "ramping",
++    resumePhase: null,
++  })),
++  cancelSweep: () => set((state) => ({
++    sweep: state.sweep ? { ...state.sweep, status: "idle", error: null } : null,
++    fanPowerPct: 0,
++    phase: "idle",
++    resumePhase: null,
++  })),
++  retrySweep: () => set((state) => {
++    if (!state.sweep || state.sweep.status !== "failed") return state;
++    const sweep = retryFailedCondition(state.sweep);
++    return {
++      sweep,
++      fanPowerPct: sweep.commandedPowerPct,
++      phase: "ramping",
++      resumePhase: null,
++    };
++  }),
++}));
++
++export function useLabStore<T>(selector: (state: LabState) => T): T {
++  return useStore(labStore, selector);
++}
++
++function isSweepActive(sweep: SweepState | null): sweep is SweepState {
++  return sweep !== null && ["ramping", "stabilizing", "sampling"].includes(sweep.status);
++}
++
++function sweepStatusToRunPhase(sweep: SweepState): RunPhase {
++  if (sweep.status === "ramping" || sweep.status === "stabilizing" || sweep.status === "sampling") {
++    return sweep.status;
++  }
++  return "completed";
++}
+diff --git a/src/features/experiment/labStore.test.ts b/src/features/experiment/labStore.test.ts
+new file mode 100644
+index 0000000..74fa17e
+--- /dev/null
++++ b/src/features/experiment/labStore.test.ts
+@@ -0,0 +1,146 @@
++import { beforeEach, describe, expect, it } from "vitest";
++import { labStore, MAX_HISTORY } from "./labStore";
++
++describe("labStore", () => {
++  beforeEach(() => {
++    labStore.getState().resetLab();
++  });
++
++  it("keeps at most sixty seconds of 20 Hz telemetry", () => {
++    const frame = labStore.getState().telemetry;
++    for (let index = 0; index < MAX_HISTORY + 25; index += 1) {
++      labStore.getState().acceptFrame({ ...frame, sequence: index });
++    }
++
++    expect(labStore.getState().history).toHaveLength(MAX_HISTORY);
++    expect(labStore.getState().history[0]!.sequence).toBe(25);
++  });
++
++  it("clamps fan commands and exposes typed control actions", () => {
++    labStore.getState().setFanPower(140);
++    expect(labStore.getState().fanPowerPct).toBe(100);
++    labStore.getState().setFanPower(-4);
++    expect(labStore.getState().fanPowerPct).toBe(0);
++  });
++
++  it("drives phase transitions through the experiment reducer", () => {
++    labStore.getState().startRun();
++    labStore.getState().pauseRun();
++    expect(labStore.getState()).toMatchObject({ phase: "paused", resumePhase: "ramping" });
++    labStore.getState().resumeRun();
++    labStore.getState().advancePhase();
++    expect(labStore.getState().phase).toBe("stabilizing");
++  });
++
++  it("starts, cancels, and reruns a sweep without using wall-clock time", () => {
++    labStore.getState().acceptFrame({ ...labStore.getState().telemetry, sequence: 1 });
++    labStore.getState().startSweep();
++    expect(labStore.getState()).toMatchObject({ fanPowerPct: 30, phase: "ramping" });
++    expect(labStore.getState().sweep?.commandedPowerPct).toBe(30);
++
++    labStore.getState().cancelSweep();
++    expect(labStore.getState()).toMatchObject({ fanPowerPct: 0, phase: "idle", history: [{ sequence: 1 }] });
++    expect(labStore.getState().sweep).toMatchObject({ status: "idle", completedPowers: [] });
++
++    labStore.getState().startRun();
++    labStore.getState().acceptFrame({
++      ...labStore.getState().telemetry,
++      sequence: 2,
++      simulationTimeMs: labStore.getState().telemetry.simulationTimeMs + 50,
++      phase: "ramping",
++    });
++    expect(labStore.getState().phase).toBe("ramping");
++    labStore.getState().resetLab();
++
++    labStore.getState().startSweep();
++    expect(labStore.getState().sweep?.completedPowers).toEqual([]);
++    labStore.getState().resetLab();
++    expect(labStore.getState()).toMatchObject({ sweep: null, history: [] });
++  });
++
++  it("keeps the exact store state while an active sweep owns every run action", () => {
++    const actions = ["startRun", "pauseRun", "resumeRun", "advancePhase", "startSweep"] as const;
++
++    for (const action of actions) {
++      labStore.getState().resetLab();
++      labStore.getState().startSweep();
++      const owned = labStore.getState();
++      labStore.getState()[action]();
++      expect(labStore.getState(), action).toBe(owned);
++    }
++  });
++
++  it.each(["idle", "failed", "completed"] as const)("unlocks sweep restart from %s", (status) => {
++    labStore.getState().startSweep();
++    const previousSweep = labStore.getState().sweep!;
++    labStore.setState({ sweep: { ...previousSweep, status }, phase: status === "idle" ? "idle" : "completed" });
++
++    labStore.getState().startSweep();
++
++    expect(labStore.getState().sweep).not.toBe(previousSweep);
++    expect(labStore.getState()).toMatchObject({ phase: "ramping", fanPowerPct: 30 });
++  });
++
++  it("unlocks manual run actions after cancel and reset", () => {
++    labStore.getState().startSweep();
++    labStore.getState().cancelSweep();
++    labStore.getState().startRun();
++    expect(labStore.getState().phase).toBe("ramping");
++
++    labStore.getState().resetLab();
++    labStore.getState().startRun();
++    expect(labStore.getState().phase).toBe("ramping");
++  });
++
++  it.each([
++    ["NaN", Number.NaN],
++    ["positive infinity", Number.POSITIVE_INFINITY],
++    ["negative infinity", Number.NEGATIVE_INFINITY],
++    ["rollback", 50],
++    ["single-frame jump", 10_000],
++  ])("rejects %s simulation timestamps without accepting the bad frame", (_label, simulationTimeMs) => {
++    const baseline = { ...labStore.getState().telemetry, simulationTimeMs: 100 };
++    labStore.setState({ telemetry: baseline, history: [] });
++    labStore.getState().startSweep();
++
++    labStore.getState().acceptFrame({
++      ...baseline,
++      sequence: 2,
++      simulationTimeMs,
++      fanPowerPct: 30,
++      quality: "stable",
++    });
++
++    expect(labStore.getState().telemetry).toBe(baseline);
++    expect(labStore.getState().history).toEqual([]);
++    expect(labStore.getState().sweep).toMatchObject({
++      status: "failed",
++      stableMs: 0,
++      samplingMs: 0,
++      conditionElapsedMs: 0,
++    });
++
++    labStore.getState().retrySweep();
++    labStore.getState().acceptFrame({
++      ...baseline,
++      sequence: 3,
++      simulationTimeMs: 150,
++      fanPowerPct: 30,
++      quality: "stable",
++    });
++    expect(labStore.getState().sweep).toMatchObject({ status: "stabilizing", conditionElapsedMs: 50 });
++  });
++
++  it("ignores an invalid-time trailing frame without poisoning the next commanded frame", () => {
++    const baseline = { ...labStore.getState().telemetry, simulationTimeMs: 100 };
++    labStore.setState({ telemetry: baseline, history: [] });
++    labStore.getState().startSweep();
++    const owned = labStore.getState();
++
++    labStore.getState().acceptFrame({ ...baseline, simulationTimeMs: Number.NaN, fanPowerPct: 0 });
++    expect(labStore.getState()).toBe(owned);
++
++    labStore.getState().acceptFrame({ ...baseline, simulationTimeMs: 150, fanPowerPct: 30, quality: "stable" });
++    expect(labStore.getState().sweep).toMatchObject({ status: "stabilizing", conditionElapsedMs: 50 });
++  });
++});

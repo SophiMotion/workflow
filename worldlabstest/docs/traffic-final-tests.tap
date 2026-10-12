@@ -1,0 +1,164 @@
+TAP version 13
+# Subtest: proving road has four real surface zones with level transitions and bounded slopes
+ok 1 - proving road has four real surface zones with level transitions and bounded slopes
+  ---
+  duration_ms: 6.254167
+  type: 'test'
+  ...
+# Subtest: race circuit is closed, level, finite, within site, and has no crossing segments
+ok 2 - race circuit is closed, level, finite, within site, and has no crossing segments
+  ---
+  duration_ms: 23.062542
+  type: 'test'
+  ...
+# Subtest: sampling a complete proving route stays finite and reaches every zone
+ok 3 - sampling a complete proving route stays finite and reaches every zone
+  ---
+  duration_ms: 174.244875
+  type: 'test'
+  ...
+# Subtest: axle-based vehicle stance responds to rough road and returns level in water
+ok 4 - axle-based vehicle stance responds to rough road and returns level in water
+  ---
+  duration_ms: 250.3395
+  type: 'test'
+  ...
+# Subtest: independent fleet speeds and pauses do not move another vehicle
+ok 5 - independent fleet speeds and pauses do not move another vehicle
+  ---
+  duration_ms: 6.2065
+  type: 'test'
+  ...
+# Subtest: loop preserves excess distance and cumulative wheel rotation
+ok 6 - loop preserves excess distance and cumulative wheel rotation
+  ---
+  duration_ms: 0.092916
+  type: 'test'
+  ...
+# Subtest: nonloop vehicle stops at endpoint while another keeps running
+ok 7 - nonloop vehicle stops at endpoint while another keeps running
+  ---
+  duration_ms: 0.124
+  type: 'test'
+  ...
+# Subtest: serialized fleet validates identifiers, finite path, speed and distance
+ok 8 - serialized fleet validates identifiers, finite path, speed and distance
+  ---
+  duration_ms: 4.180333
+  type: 'test'
+  ...
+# (node:48745) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/wubo/Documents/2026-2/sophistudio/workflow/worldlabstest/js/local-assets.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /Users/wubo/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: file asset lookup is limited to the exact bundled project paths
+ok 9 - file asset lookup is limited to the exact bundled project paths
+  ---
+  duration_ms: 0.572834
+  type: 'test'
+  ...
+# Subtest: concurrent asset loads reuse one Blob URL and preserve all bytes
+ok 10 - concurrent asset loads reuse one Blob URL and preserve all bytes
+  ---
+  duration_ms: 32.803792
+  type: 'test'
+  ...
+# Subtest: restoring a scene cannot mutate the packed default data
+ok 11 - restoring a scene cannot mutate the packed default data
+  ---
+  duration_ms: 0.760916
+  type: 'test'
+  ...
+# Subtest: all streets, intersections and wet areas have exactly the same road datum
+ok 12 - all streets, intersections and wet areas have exactly the same road datum
+  ---
+  duration_ms: 31.321458
+  type: 'test'
+  ...
+# Subtest: road mesh covers the entire network without overlapping tiles or uncovered junctions
+ok 13 - road mesh covers the entire network without overlapping tiles or uncovered junctions
+  ---
+  duration_ms: 47.949916
+  type: 'test'
+  ...
+# Subtest: demonstration route stays level and inside roads through a complete closed lap
+ok 14 - demonstration route stays level and inside roads through a complete closed lap
+  ---
+  duration_ms: 0.835834
+  type: 'test'
+  ...
+# Subtest: access paving is clipped to the race shoulder without coplanar overlap
+ok 15 - access paving is clipped to the race shoulder without coplanar overlap
+  ---
+  duration_ms: 29.385792
+  type: 'test'
+  ...
+# Subtest: meters follow the length of a sloped road, not just its ground projection
+ok 16 - meters follow the length of a sloped road, not just its ground projection
+  ---
+  duration_ms: 1.147583
+  type: 'test'
+  ...
+# Subtest: empty and repeated points cannot produce invalid position or heading
+ok 17 - empty and repeated points cannot produce invalid position or heading
+  ---
+  duration_ms: 0.772917
+  type: 'test'
+  ...
+# Subtest: scrubbing clamps to both endpoints and turns at segment boundaries
+ok 18 - scrubbing clamps to both endpoints and turns at segment boundaries
+  ---
+  duration_ms: 0.123875
+  type: 'test'
+  ...
+# Subtest: playback reaches the endpoint once or wraps without losing excess distance
+ok 19 - playback reaches the endpoint once or wraps without losing excess distance
+  ---
+  duration_ms: 0.206542
+  type: 'test'
+  ...
+# Subtest: fast follower brakes for a parked vehicle at low frame rate
+ok 20 - fast follower brakes for a parked vehicle at low frame rate
+  ---
+  duration_ms: 34.549375
+  type: 'test'
+  ...
+# Subtest: crossing routes yield then both clear the junction
+ok 21 - crossing routes yield then both clear the junction
+  ---
+  duration_ms: 25.17225
+  type: 'test'
+  ...
+# Subtest: a stopped leader can resume without trapping its follower
+ok 22 - a stopped leader can resume without trapping its follower
+  ---
+  duration_ms: 25.513833
+  type: 'test'
+  ...
+# Subtest: six distinct assigned routes run for 10 minutes without overlap
+ok 23 - six distinct assigned routes run for 10 minutes without overlap
+  ---
+  duration_ms: 4187.467625
+  type: 'test'
+  ...
+# Subtest: regression reproduces overlap in the old independent playback
+ok 24 - regression reproduces overlap in the old independent playback
+  ---
+  duration_ms: 1.333583
+  type: 'test'
+  ...
+# Subtest: zoom from close-up to full site retains separation of ground and asphalt
+ok 25 - zoom from close-up to full site retains separation of ground and asphalt
+  ---
+  duration_ms: 1.639459
+  type: 'test'
+  ...
+1..25
+# tests 25
+# suites 0
+# pass 25
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4407.721958

@@ -1,0 +1,11 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {TrafficController,trafficOverlaps} from '../js/traffic-controller.mjs';
+import {FLEET_ASSIGNMENTS,expandedRoute} from '../js/fleet-routes.mjs';
+import {pathLength} from '../js/route-math.mjs';
+const entry=(id,p,speed=3,distance=0,size={width:1,length:2},loop=false)=>({id,size,drive:{route:{speed,loop},samples:p,length:pathLength(p),distance,playing:true}});
+function run(entries,seconds,dt=.1){const c=new TrafficController();let yields=0;for(let t=0;t<seconds;t+=dt){c.tick(entries,dt);assert.equal(trafficOverlaps(entries).length,0,'overlap at '+t);yields+=entries.some(e=>e.drive.yielding)?1:0;}return yields;}
+test('fast follower brakes for a parked vehicle at low frame rate',()=>{const p=[[0,0,0],[0,0,100]],a=entry('a',p,10),b=entry('b',p,1,20);b.drive.playing=false;run([a,b],30,.5);assert.ok(a.drive.distance<18);assert.equal(b.drive.distance,20);assert.equal(a.drive.actualSpeed,0);});
+test('crossing routes yield then both clear the junction',()=>{const a=entry('a',[[-20,0,0],[20,0,0]],5),b=entry('b',[[0,0,-20],[0,0,20]],5);assert.ok(run([a,b],25)>0);assert.equal(a.drive.distance,40);assert.equal(b.drive.distance,40);});
+test('a stopped leader can resume without trapping its follower',()=>{const p=[[0,0,0],[0,0,100]],a=entry('a',p,5),b=entry('b',p,2,10);b.drive.playing=false;run([a,b],10);b.drive.playing=true;run([a,b],30);assert.ok(a.drive.distance>35);assert.ok(b.drive.distance>50);});
+test('six distinct assigned routes run for 10 minutes without overlap',()=>{const dims={rover:[2.06,3.94],sophicar:[1.8,2.7],fusion:[.35,.5],nav:[.47,.42],edu:[.36,.53],sophicore:[.86,.91]},entries=Object.entries(FLEET_ASSIGNMENTS).map(([id,route])=>entry(id,expandedRoute(route),id==='sophicar'?8:id==='edu'?3:2,0,{width:dims[id][0],length:dims[id][1]},route!=='test'));assert.equal(new Set(Object.values(FLEET_ASSIGNMENTS)).size,6);run(entries,600,.2);for(const e of entries)assert.ok((e.drive.travel||0)>50,e.id+' should move');});
+test('regression reproduces overlap in the old independent playback',async()=>{const {tickDrive}=await import('../js/fleet-motion.mjs');const p=[[0,0,0],[0,0,100]],a=entry('a',p,10),b=entry('b',p,1,20);b.drive.playing=false;tickDrive(a.drive,2);assert.equal(trafficOverlaps([a,b]).length,1,'uncontrolled playback reaches the parked car');});

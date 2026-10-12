@@ -1,0 +1,196 @@
+{
+  "dimensions": {
+    "base_length": {
+      "name": "base_length",
+      "scale": 1,
+      "offset": 0
+    },
+    "base_width": {
+      "name": "base_width",
+      "scale": 1,
+      "offset": 0
+    },
+    "base_height": {
+      "name": "base_height",
+      "scale": 1,
+      "offset": 0
+    },
+    "base_angle": {
+      "name": "base_angle",
+      "scale": 1,
+      "offset": 0
+    },
+    "base_middle_length": {
+      "name": "base_middle_length",
+      "scale": 1,
+      "offset": 0
+    },
+    "thin_sheet": {
+      "name": "sheet_thickness",
+      "scale": 1,
+      "offset": 0
+    },
+    "wheel_base": {
+      "name": "wheel_base",
+      "scale": 1,
+      "offset": 0
+    },
+    "wheel_track": {
+      "name": "wheel_track",
+      "scale": 1,
+      "offset": 0
+    },
+    "od_tire": {
+      "name": "OD_tire",
+      "scale": 1,
+      "offset": 0
+    },
+    "tire_thickness": {
+      "name": "tire_thickness",
+      "scale": 1,
+      "offset": 0
+    },
+    "total_height": {
+      "name": "Total_height",
+      "scale": 1,
+      "offset": 0
+    },
+    "shoulder_length": {
+      "name": "shoulder_length",
+      "scale": 1,
+      "offset": 0
+    },
+    "hip_length": {
+      "name": "Hip_length",
+      "scale": 1,
+      "offset": 0
+    },
+    "hip_position": {
+      "name": "Hip_height",
+      "scale": 1,
+      "offset": 0
+    },
+    "tube_diameter": {
+      "name": "dia_tube",
+      "scale": 1,
+      "offset": 0
+    },
+    "tube_thickness": {
+      "name": "thickness_tube",
+      "scale": 1,
+      "offset": 0
+    },
+    "upper_arm_length": {
+      "name": "upper_arm_length",
+      "scale": 1,
+      "offset": 0
+    },
+    "lower_arm_length": {
+      "name": "lower_arm_length",
+      "scale": 1,
+      "offset": 0
+    },
+    "thigh_length": {
+      "name": "thigh_length",
+      "scale": 1,
+      "offset": 0
+    },
+    "lower_leg_length": {
+      "name": "lower_leg_length",
+      "scale": 1,
+      "offset": 0
+    }
+  },
+  "joints": {
+    "arm_l.shoulder_lift": {
+      "name": "arm_l_shoulder_lift",
+      "scale": 1,
+      "offset": 0
+    },
+    "arm_l.shoulder_swing": {
+      "name": "arm_l_shoulder_swing",
+      "scale": 1,
+      "offset": 0
+    },
+    "arm_l.arm_twist": {
+      "name": "arm_l_arm_twist",
+      "scale": 1,
+      "offset": 0
+    },
+    "arm_l.elbow_bend": {
+      "name": "arm_l_elbow_bend",
+      "scale": 1,
+      "offset": 0
+    },
+    "arm_l.wrist_rotation": {
+      "name": "arm_l_wrist_rotation",
+      "scale": 1,
+      "offset": 0
+    },
+    "arm_l.clamp": {
+      "name": "arm_l_clamp",
+      "scale": 1,
+      "offset": 0
+    },
+    "arm_r.shoulder_lift": {
+      "name": "arm_r_shoulder_lift",
+      "scale": 1,
+      "offset": 0
+    },
+    "arm_r.shoulder_swing": {
+      "name": "arm_r_shoulder_swing",
+      "scale": 1,
+      "offset": 0
+    },
+    "arm_r.arm_twist": {
+      "name": "arm_r_arm_twist",
+      "scale": 1,
+      "offset": 0
+    },
+    "arm_r.elbow_bend": {
+      "name": "arm_r_elbow_bend",
+      "scale": 1,
+      "offset": 0
+    },
+    "arm_r.wrist_rotation": {
+      "name": "arm_r_wrist_rotation",
+      "scale": 1,
+      "offset": 0
+    },
+    "arm_r.clamp": {
+      "name": "arm_r_clamp",
+      "scale": 1,
+      "offset": 0
+    },
+    "leg_l.shoulder_lift": {
+      "name": "leg_l_shoulder_lift",
+      "scale": 1,
+      "offset": 0
+    },
+    "leg_l.elbow_bend": {
+      "name": "leg_l_elbow_bend",
+      "scale": 1,
+      "offset": 0
+    },
+    "leg_r.shoulder_lift": {
+      "name": "leg_r_shoulder_lift",
+      "scale": 1,
+      "offset": 0
+    },
+    "leg_r.elbow_bend": {
+      "name": "leg_r_elbow_bend",
+      "scale": 1,
+      "offset": 0
+    },
+    "head.rotation": {
+      "name": "head_rotation",
+      "scale": 1,
+      "offset": 0
+    },
+    "head.tilt": {
+      "name": "head_tilt",
+      "scale": 1,
+      "offset": 0
+    }
+  }
+}

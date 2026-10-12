@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#F8F9FA">
+  <title>飞书知识库 · SophiStudio</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='4' y='4' width='24' height='24' rx='6' fill='%234285F4'/%3E%3Cpath d='M10 11h12M10 16h12M10 21h7' stroke='white' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="../unit/css/style.css?v=20260911-1">
+  <link rel="stylesheet" href="style.css?v=20260913-1">
+  <script defer src="vendor/marked.umd.js"></script>
+  <script defer src="vendor/purify.min.js"></script>
+  <script defer src="app.js?v=20260913-1"></script>
+  <script defer src="knowledge.js?v=20260913-1"></script>
+</head>
+<body class="feishu-page">
+  <header class="sync-header">
+    <a href="../index.html#/workflow" class="brand" aria-label="返回 SophiStudio 工作流"><img class="brand-logo" src="../assets/sophistudio-logo.png" alt="SophiStudio"></a>
+    <span class="header-divider"></span><a href="../index.html#/workflow" class="back-link">工作流</a><span class="breadcrumb-slash">/</span><span>飞书知识库</span>
+    <span class="connection-pill" id="connection-status"><i></i>连接本地服务中</span>
+  </header>
+
+  <main class="sync-main">
+    <div class="page-heading">
+      <div><h1>从知识积累，到有据可查的建议。</h1><p>阅读本地文档，结合国际与国内视角，形成可执行的判断。</p></div>
+      <button class="button outline" id="settings-open"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16M8 4v6M16 14v6"/></svg>知识库 ID 管理</button>
+    </div>
+
+    <section class="offline-banner" id="offline-banner" hidden>
+      <div><strong>本地同步服务尚未连接</strong><p>在 Finder 中双击 <code>feishu/start.command</code>，会启动后台并在 Edge 打开页面。</p><p>想要以后直接打开 HTML 即可使用，请先双击一次 <code>feishu/开启登录启动.command</code>。后台启动后，此页面会自动重连。</p></div>
+      <button class="button outline" id="reconnect">重新连接</button>
+    </section>
+
+    <section class="sync-control" aria-labelledby="sync-title">
+      <div class="sync-flow" aria-hidden="true">
+        <div class="flow-icon cloud"><svg viewBox="0 0 32 32"><path d="M9 23h15a5 5 0 0 0 0-10 8 8 0 0 0-15-2 6 6 0 0 0 0 12Z"/></svg></div>
+        <span class="flow-line"></span><svg class="flow-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-5-5 5 5-5 5"/></svg><span class="flow-line"></span>
+        <div class="flow-icon local"><svg viewBox="0 0 32 32"><path d="M4 9h10l3 3h11v14H4V9Z"/><path d="m11 18 3 3-3 3m6 0h5"/></svg></div>
+      </div>
+      <div class="sync-control-copy"><h2 id="sync-title">飞书 → 本地知识库</h2><p id="scope-label">全部可访问的知识库 · Markdown 格式</p><span id="automation-hint">初始化完成后，开启自动化持续同步</span></div>
+      <div class="primary-actions">
+        <button class="button primary" id="initialize" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 16v5h14v-5"/></svg>初始化</button>
+        <button class="button automation" id="automation" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 2-9 12h7l-1 8 10-13h-8l1-7Z"/></svg><span>自动化</span><i class="toggle-dot"></i></button>
+      </div>
+    </section>
+
+    <div class="status-strip" aria-label="同步概况">
+      <div><span>已同步文档</span><strong id="stat-documents">—</strong></div>
+      <div><span>本地知识库</span><strong id="stat-spaces">—</strong></div>
+      <div><span>待处理冲突</span><strong id="stat-conflicts">—</strong></div>
+      <div><span>上次同步</span><strong class="time-stat" id="stat-last">尚未同步</strong></div>
+    </div>
+
+    <section class="knowledge-panel" aria-labelledby="knowledge-title">
+      <div class="knowledge-heading"><div><span class="eyebrow">KNOWLEDGE ADVISOR</span><h2 id="knowledge-title">问问知识库</h2><p>OpenAI 国际视角 · DeepSeek 国内视角 · DeepSeek 综合建议</p></div><button class="button outline" id="ai-settings-open">模型设置</button></div>
+      <form id="question-form">
+        <label class="sr-only" for="question-input">向知识库提问</label>
+        <textarea id="question-input" rows="3" maxlength="2000" placeholder="例如：根据爬索机器人相关资料，下一阶段应优先验证哪些安全风险？请结合国际工程实践与国内落地条件给出建议。" required minlength="3"></textarea>
+        <div class="question-actions"><select id="qa-scope" aria-label="问答知识库范围"><option value="">全部本地知识库</option></select><button class="button text-button" type="button" id="preview-sources">先看检索依据</button><span class="question-spacer"></span><button class="button outline" type="button" id="qa-cancel" hidden>取消回答</button><button class="button primary" id="qa-submit" type="submit" disabled>获取专业建议 <span aria-hidden="true">↗</span></button></div>
+        <p class="qa-privacy">提交问题后，仅向 OpenAI 和 DeepSeek 官方 API 发送问题与检索命中的片段，按各自 API 用量计费。每次问题独立检索，请写明项目和目标。</p>
+      </form>
+      <div class="qa-status-row"><p id="qa-status" role="status">连接本地服务后即可使用。</p><label class="qa-history-label">历史提问<select id="qa-history"><option value="">选择历史提问</option></select></label></div>
+      <div id="qa-result" hidden>
+        <h3 id="qa-question"></h3>
+        <div class="qa-stage-track" id="qa-stages" aria-label="回答进度"></div>
+        <article class="answer-card synthesis-card" id="synthesis-card" hidden><header><h3>综合建议</h3><span id="synthesis-model"></span></header><div id="synthesis-answer" class="markdown-body"></div><p id="synthesis-warning" class="evidence-warning"></p></article>
+        <div class="perspective-grid"><details class="answer-card" id="international-card" hidden><summary>国际视角 · OpenAI <small id="international-model"></small></summary><div id="international-answer" class="markdown-body"></div><p id="international-warning" class="evidence-warning"></p></details><details class="answer-card" id="domestic-card" hidden><summary>国内视角 · DeepSeek <small id="domestic-model"></small></summary><div id="domestic-answer" class="markdown-body"></div><p id="domestic-warning" class="evidence-warning"></p></details></div>
+        <details class="sources-panel" id="sources-panel" open><summary id="sources-summary">知识库依据</summary><div id="qa-sources"></div></details>
+        <p class="qa-footnote">回答依据本地同步版本；导出不完整的内容会标注。引用编号用于回查原文，不代表结论已被人工核实。当前未启用联网检索。</p>
+      </div>
+    </section>
+
+    <div class="workspace-layout">
+      <section class="repository" aria-label="本地知识库">
+        <div class="repo-toolbar">
+          <div class="view-tabs" role="tablist" aria-label="内容视图">
+            <button role="tab" id="tab-documents" aria-selected="true" aria-controls="documents-panel">文档</button>
+            <button role="tab" id="tab-history" aria-selected="false" aria-controls="history-panel">同步记录</button>
+          </div>
+          <button class="button text-button" id="sync-now" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 8a8 8 0 0 0-14-3L3 8m0-5v5h5M4 16a8 8 0 0 0 14 3l3-3m0 5v-5h-5"/></svg>立即同步</button>
+        </div>
+        <div class="progress-line" id="progress-area" hidden><div class="progress-track"><div id="progress-bar"></div></div><p id="progress-message" role="status"></p></div>
+        <div id="documents-panel" role="tabpanel" aria-labelledby="tab-documents">
+          <div class="document-filters">
+            <label class="search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="search" type="search" placeholder="搜索文档或知识库" aria-label="搜索文档或知识库"></label>
+            <select id="status-filter" aria-label="筛选同步状态"><option value="all">全部状态</option><option value="conflict">待处理冲突</option><option value="error">下载失败</option><option value="warning">导出提示</option><option value="local">本地修改</option><option value="missing">云端不可见</option></select>
+          </div>
+          <div class="document-list" id="document-list"></div>
+          <div class="empty-state" id="empty-state">
+            <svg class="empty-icon" viewBox="0 0 64 64" aria-hidden="true"><path d="M18 8h20l10 10v38H18V8Z"/><path d="M38 8v12h10M25 30h16M25 37h16M25 44h10"/></svg>
+            <h3>你的本地知识库，从这里开始</h3><p>配置飞书应用与知识库，点击「初始化」。<br>文档将按原有层级保存，图片与附件一并下载。</p>
+            <button class="button outline" id="empty-configure">配置知识库<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16m-5-5 5 5-5 5"/></svg></button>
+          </div>
+          <p class="list-footer" id="list-footer">本地内容会在首次同步后显示</p>
+        </div>
+        <div id="history-panel" role="tabpanel" aria-labelledby="tab-history" hidden><div id="history-list" class="history-list"></div></div>
+      </section>
+
+      <aside class="sync-sidebar">
+        <section class="destination-panel"><h3>本地存储</h3><div class="folder-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h7l2 3h9v11H3V6Z"/></svg><b>online-vault / feishu-vault</b><span>.md</span></div><code id="output-path">sophistudio/online-vault/feishu-vault</code><button class="button text-button" id="copy-path">复制路径</button><p>文档层级、来源链接、图片与附件<br>一同保留在你的电脑上。</p></section>
+        <section class="sync-rules"><h3>每次同步会发生什么</h3><ol><li><span>01</span><div><b>拉取飞书变化</b><p>发现新增、更新和重命名。</p></div></li><li><span>02</span><div><b>比较本地版本</b><p>检查内容指纹，保留本地编辑。</p></div></li><li><span>03</span><div><b>留下更新记录</b><p>查看差异，按文档处理冲突。</p></div></li></ol><div class="preserve-note"><i></i>云端不可见的文档仍保留在本地</div></section>
+        <p class="runtime-note" id="runtime-note">自动化在本地服务中运行。<br>关闭页面不影响同步；服务关闭或电脑休眠时暂停。</p>
+      </aside>
+    </div>
+    <footer class="sync-footer"><a href="../index.html#/workflow">返回 SophiStudio 工作流</a><span>单向同步 · 飞书 → 本地 · 版本与差异记录</span></footer>
+  </main>
+
+  <dialog id="settings-dialog" class="sync-dialog" aria-labelledby="settings-title">
+    <form id="settings-form">
+      <div class="dialog-head"><div><h2 id="settings-title">知识库 ID 管理</h2><p>添加或删除知识库 ID，保存后生效。</p></div><button type="button" class="close-button" data-close="settings-dialog" aria-label="关闭设置">×</button></div>
+      <div class="dialog-body">
+        <section><h3>知识库列表</h3>
+          <div class="form-grid space-fields"><label>知识库 ID 或链接<input id="space-input" placeholder="输入数字 space_id 或飞书知识库链接" aria-label="知识库 ID 或链接"></label><label>名称（可选）<input id="space-name" placeholder="例如：产品研发知识库" maxlength="120"></label></div>
+          <div class="space-list-heading"><span id="space-count">已添加 0 个知识库 ID</span><button type="button" class="button outline" id="add-space">添加 ID</button></div>
+          <div id="configured-spaces" class="configured-spaces" aria-label="知识库 ID 列表"></div>
+          <label class="check-line"><input type="checkbox" id="all-spaces" checked>同步应用有权限访问的全部知识库</label><p class="form-hint" id="scope-help">取消勾选后，仅同步上面 ID 列表中的知识库。</p>
+          <p class="form-hint">删除 ID 只调整同步清单，已下载的本地文档会保留。知识库链接会解析为其所属的整个知识库。</p>
+          <button type="button" class="button text-button" id="discover-spaces">发现应用可访问的知识库</button>
+        </section>
+        <section><h3>飞书应用</h3><p class="form-hint" id="credential-hint">使用企业自建应用的 App ID 和 App Secret。密钥仅存于本机后端。</p>
+          <div class="form-grid"><label>App ID<input id="app-id" autocomplete="off" placeholder="cli_…"></label><label>App Secret<input type="password" id="app-secret" autocomplete="new-password" placeholder="留空保留当前密钥"></label></div>
+        </section>
+        <section class="interval-row"><div><h3>自动化检查间隔</h3><p class="form-hint">开关和间隔会保存，服务重启后自动恢复。</p></div><select id="interval" aria-label="自动化检查间隔"><option value="60">每 1 分钟</option><option value="300">每 5 分钟</option><option value="900">每 15 分钟</option><option value="1800">每 30 分钟</option><option value="3600">每小时</option></select></section>
+        <details class="permission-details"><summary>飞书后台需要哪些权限？</summary><p>创建并发布企业自建应用，将应用/机器人添加为目标知识库成员。至少开通：</p><ul><li><code>wiki:wiki:readonly</code> — 查看知识库</li><li><code>docx:document:readonly</code> — 查看新版文档</li><li><code>docs:document.media:download</code> — 下载文档图片和附件</li></ul><p>按实际内容补充：旧版文档 <code>docs:doc:readonly</code>，电子表格 <code>sheets:spreadsheet:readonly</code>，多维表格 <code>bitable:app:readonly</code>，知识库原始文件 <code>drive:drive:readonly</code> 或对应文件下载权限。</p><p>应用权限和知识库成员权限都需要生效。未支持的画板、思维笔记等内容会保留来源与结构数据并显示提示。</p><a href="https://open.feishu.cn/app" target="_blank" rel="noopener noreferrer">打开飞书开发者后台 ↗</a></details>
+        <p id="settings-message" role="status" class="form-message"></p>
+      </div>
+      <div class="dialog-foot"><button type="button" class="button outline" id="check-connection">保存并检查连接</button><button class="button primary" type="submit" id="save-config">保存配置</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="diff-dialog" class="sync-dialog diff-dialog" aria-labelledby="diff-title"><div class="dialog-head"><div><h2 id="diff-title">文档差异</h2><p id="diff-description">上次版本与当前飞书版本的逐行差异</p></div><button class="close-button" data-close="diff-dialog" aria-label="关闭差异">×</button></div><pre id="diff-content" tabindex="0"></pre><div class="dialog-foot" id="conflict-actions" hidden><span>操作前会备份当前本地版本。</span><button class="button outline" id="keep-local">保留本地</button><button class="button primary" id="use-remote">采用飞书版本</button></div></dialog>
+  <div id="toast" role="status" hidden></div>
+  <dialog id="reader-dialog" class="sync-dialog reader-dialog" aria-labelledby="reader-title">
+    <div class="dialog-head"><div><h2 id="reader-title">文档阅读</h2><p id="reader-meta"></p></div><button class="close-button" data-close="reader-dialog" aria-label="关闭文档">×</button></div>
+    <div class="reader-toolbar"><button class="button outline" id="reader-mode">查看 Markdown</button><button class="button text-button" id="reader-download">下载 Markdown</button><a id="reader-source" target="_blank" rel="noopener noreferrer">在飞书打开 ↗</a></div>
+    <div class="reader-scroll"><p id="reader-warning" class="evidence-warning"></p><section id="reader-citation" hidden><h3 id="reader-citation-label"></h3><pre id="reader-excerpt"></pre></section><div id="reader-body" class="markdown-body"></div><pre id="reader-raw" hidden tabindex="0"></pre></div>
+  </dialog>
+  <dialog id="ai-settings-dialog" class="sync-dialog" aria-labelledby="ai-settings-title"><form id="ai-settings-form"><div class="dialog-head"><div><h2 id="ai-settings-title">模型设置</h2><p>由 DeepSeek Harness 核心组件编排，使用官方 API。</p></div><button type="button" class="close-button" data-close="ai-settings-dialog" aria-label="关闭模型设置">×</button></div><div class="dialog-body"><section><h3>OpenAI · 国际视角</h3><p id="openai-config-status" class="form-hint"></p><div class="form-grid"><label>模型<input id="openai-model" required placeholder="gpt-5.4"></label><label>API Key<input id="openai-key" type="password" autocomplete="new-password" placeholder="留空保留已有密钥"></label></div></section><section><h3>DeepSeek · 国内视角与综合</h3><p id="deepseek-config-status" class="form-hint"></p><div class="form-grid"><label>模型<input id="deepseek-model" required placeholder="deepseek-v4-pro"></label><label>API Key<input id="deepseek-key" type="password" autocomplete="new-password" placeholder="留空保留已有密钥"></label></div></section><p class="form-hint">密钥只存于本机后台。ChatGPT 网页订阅与 OpenAI API 额度独立。页面配置优先于既有 Harness 和项目配置，后台环境变量优先级最高。</p><p id="ai-settings-message" class="form-message" role="status"></p></div><div class="dialog-foot"><button class="button outline" type="button" id="ai-check">检查已保存的连接</button><button class="button primary" type="submit">保存模型配置</button></div></form></dialog>
+</body>
+</html>

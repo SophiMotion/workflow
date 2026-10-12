@@ -1,0 +1,437 @@
+# Review package: Task 5 (new-file snapshot; no commits by ruling)
+
+## Files changed
+src/features/flow/types.ts
+src/features/flow/obstacleMask.ts
+src/features/flow/obstacleMask.test.ts
+src/features/flow/lbmSolver.ts
+src/features/flow/lbmSolver.test.ts
+
+## Diff
+diff --git a/src/features/flow/types.ts b/src/features/flow/types.ts
+new file mode 100644
+index 0000000..9f21f56
+--- /dev/null
++++ b/src/features/flow/types.ts
+@@ -0,0 +1,18 @@
++export type LbmConfig = {
++  width: number;
++  height: number;
++  inletVelocity: number;
++  tau: number;
++  obstacleMask: Uint8Array;
++};
++
++export type FlowFieldFrame = {
++  width: number;
++  height: number;
++  speed: Float32Array;
++  pressure: Float32Array;
++  vorticity: Float32Array;
++  velocityX: Float32Array;
++  velocityY: Float32Array;
++  provenance: "2d-teaching-cfd";
++};
+diff --git a/src/features/flow/obstacleMask.ts b/src/features/flow/obstacleMask.ts
+new file mode 100644
+index 0000000..d504f7f
+--- /dev/null
++++ b/src/features/flow/obstacleMask.ts
+@@ -0,0 +1,48 @@
++/**
++ * Builds a compact side-profile obstacle for the 2D teaching solver.
++ * 为二维教学求解器生成紧凑的车辆侧面障碍物。
++ */
++export function createCarProfileMask(width: number, height: number): Uint8Array {
++  const mask = new Uint8Array(width * height);
++
++  for (let y = 1; y < height - 1; y += 1) {
++    const normalizedY = (y + 0.5) / height;
++
++    for (let x = 1; x < width - 1; x += 1) {
++      const normalizedX = (x + 0.5) / width;
++      if (normalizedX < 0.36 || normalizedX > 0.66 || normalizedY < 0.43 || normalizedY > 0.66) {
++        continue;
++      }
++
++      const roundedBody = normalizedX >= 0.37
++        && normalizedX <= 0.65
++        && normalizedY >= 0.51
++        && normalizedY <= 0.65
++        && ellipseValue(normalizedX, normalizedY, 0.51, 0.58, 0.15, 0.08) <= 1;
++      const cabin = normalizedY >= 0.43
++        && normalizedY <= 0.56
++        && normalizedX >= 0.43 + (0.56 - normalizedY) * 0.45
++        && normalizedX <= 0.57 - (0.56 - normalizedY) * 0.2;
++      const noseRamp = normalizedX >= 0.57
++        && normalizedX <= 0.66
++        && normalizedY >= 0.48 + (normalizedX - 0.57) * 0.35
++        && normalizedY <= 0.64;
++      const rearCorner = ellipseValue(normalizedX, normalizedY, 0.39, 0.58, 0.035, 0.07) <= 1;
++
++      const frontWheelCutout = ellipseValue(normalizedX, normalizedY, 0.60, 0.64, 0.026, 0.035) <= 1;
++      const rearWheelCutout = ellipseValue(normalizedX, normalizedY, 0.43, 0.64, 0.026, 0.035) <= 1;
++
++      if ((roundedBody || cabin || noseRamp || rearCorner) && !frontWheelCutout && !rearWheelCutout) {
++        mask[y * width + x] = 1;
++      }
++    }
++  }
++
++  return mask;
++}
++
++function ellipseValue(x: number, y: number, centerX: number, centerY: number, radiusX: number, radiusY: number): number {
++  const offsetX = (x - centerX) / radiusX;
++  const offsetY = (y - centerY) / radiusY;
++  return offsetX * offsetX + offsetY * offsetY;
++}
+diff --git a/src/features/flow/obstacleMask.test.ts b/src/features/flow/obstacleMask.test.ts
+new file mode 100644
+index 0000000..deec7e4
+--- /dev/null
++++ b/src/features/flow/obstacleMask.test.ts
+@@ -0,0 +1,12 @@
++import { createCarProfileMask } from "./obstacleMask";
++
++it("creates an interior car profile without blocking inlet or outlet", () => {
++  const width = 80;
++  const height = 32;
++  const mask = createCarProfileMask(width, height);
++  expect(mask.some((cell) => cell === 1)).toBe(true);
++  for (let y = 0; y < height; y += 1) {
++    expect(mask[y * width]).toBe(0);
++    expect(mask[y * width + width - 1]).toBe(0);
++  }
++});
+diff --git a/src/features/flow/lbmSolver.ts b/src/features/flow/lbmSolver.ts
+new file mode 100644
+index 0000000..95cd902
+--- /dev/null
++++ b/src/features/flow/lbmSolver.ts
+@@ -0,0 +1,245 @@
++import type { FlowFieldFrame, LbmConfig } from "./types";
++
++const CX = [0, 1, 0, -1, 0, 1, -1, -1, 1] as const;
++const CY = [0, 0, 1, 0, -1, 1, 1, -1, -1] as const;
++const WEIGHT = [4 / 9, 1 / 9, 1 / 9, 1 / 9, 1 / 9, 1 / 36, 1 / 36, 1 / 36, 1 / 36] as const;
++const OPPOSITE = [0, 3, 4, 1, 2, 7, 8, 5, 6] as const;
++const DIRECTIONS = 9;
++
++function equilibrium(direction: number, density: number, ux: number, uy: number): number {
++  const cu = 3 * (CX[direction]! * ux + CY[direction]! * uy);
++  const u2 = ux * ux + uy * uy;
++  return WEIGHT[direction]! * density * (1 + cu + 0.5 * cu * cu - 1.5 * u2);
++}
++
++export class NumericalInstabilityError extends Error {
++  readonly code = "NON_FINITE_FIELD" as const;
++
++  constructor() {
++    super("The LBM field contains a non-finite value.");
++    this.name = "NumericalInstabilityError";
++  }
++}
++
++/** A small D2Q9 BGK solver intended for interactive teaching visuals. */
++export class LbmSolver {
++  private readonly width: number;
++  private readonly height: number;
++
++  private readonly tau: number;
++  private readonly obstacleMask: Uint8Array;
++  private inletVelocity: number;
++  private current: Float32Array;
++  private next: Float32Array;
++  private readonly density: Float32Array;
++  private readonly frame: FlowFieldFrame;
++
++  constructor(config: LbmConfig) {
++    if (config.tau <= 0.5) {
++      throw new RangeError("tau must be greater than 0.5");
++    }
++    if (config.obstacleMask.length !== config.width * config.height) {
++      throw new RangeError("obstacleMask length must equal width * height");
++    }
++
++    this.width = config.width;
++    this.height = config.height;
++    this.tau = config.tau;
++    this.obstacleMask = config.obstacleMask;
++    this.inletVelocity = clampInletVelocity(config.inletVelocity);
++
++    const cellCount = this.width * this.height;
++    this.current = new Float32Array(cellCount * DIRECTIONS);
++    this.next = new Float32Array(cellCount * DIRECTIONS);
++    this.density = new Float32Array(cellCount);
++    this.frame = {
++      width: this.width,
++      height: this.height,
++      speed: new Float32Array(cellCount),
++      pressure: new Float32Array(cellCount),
++      vorticity: new Float32Array(cellCount),
++      velocityX: new Float32Array(cellCount),
++      velocityY: new Float32Array(cellCount),
++      provenance: "2d-teaching-cfd",
++    };
++
++    this.initializeRestField();
++  }
++
++  setInletVelocity(value: number): void {
++    this.inletVelocity = clampInletVelocity(value);
++  }
++
++  step(iterations: number): FlowFieldFrame {
++    const iterationCount = Math.max(0, Math.floor(iterations));
++    for (let iteration = 0; iteration < iterationCount; iteration += 1) {
++      this.advanceOneIteration();
++    }
++    return this.snapshot();
++  }
++
++  snapshot(): FlowFieldFrame {
++    const { speed, pressure, velocityX, velocityY } = this.frame;
++    const cellCount = this.width * this.height;
++
++    for (let cell = 0; cell < cellCount; cell += 1) {
++      if (this.obstacleMask[cell] === 1) {
++        this.density[cell] = 0;
++        velocityX[cell] = 0;
++        velocityY[cell] = 0;
++        speed[cell] = 0;
++        pressure[cell] = -1 / 3;
++        continue;
++      }
++
++      const distributionOffset = cell * DIRECTIONS;
++      let density = 0;
++      let momentumX = 0;
++      let momentumY = 0;
++      for (let direction = 0; direction < DIRECTIONS; direction += 1) {
++        const distribution = this.current[distributionOffset + direction]!;
++        density += distribution;
++        momentumX += distribution * CX[direction]!;
++        momentumY += distribution * CY[direction]!;
++      }
++
++      const ux = momentumX / density;
++      const uy = momentumY / density;
++      this.density[cell] = density;
++      velocityX[cell] = ux;
++      velocityY[cell] = uy;
++      speed[cell] = Math.hypot(ux, uy);
++      pressure[cell] = (density - 1) / 3;
++    }
++
++    this.computeVorticity();
++    this.assertFiniteFields();
++    return this.frame;
++  }
++
++  private initializeRestField(): void {
++    const cellCount = this.width * this.height;
++    for (let cell = 0; cell < cellCount; cell += 1) {
++      if (this.obstacleMask[cell] === 1) {
++        continue;
++      }
++      const distributionOffset = cell * DIRECTIONS;
++      for (let direction = 0; direction < DIRECTIONS; direction += 1) {
++        this.current[distributionOffset + direction] = equilibrium(direction, 1, 0, 0);
++      }
++    }
++  }
++
++  private advanceOneIteration(): void {
++    this.next.fill(0);
++
++    for (let y = 0; y < this.height; y += 1) {
++      for (let x = 0; x < this.width; x += 1) {
++        const cell = y * this.width + x;
++        if (this.obstacleMask[cell] === 1) {
++          continue;
++        }
++
++        const distributionOffset = cell * DIRECTIONS;
++        let density = 0;
++        let momentumX = 0;
++        let momentumY = 0;
++        for (let direction = 0; direction < DIRECTIONS; direction += 1) {
++          const distribution = this.current[distributionOffset + direction]!;
++          density += distribution;
++          momentumX += distribution * CX[direction]!;
++          momentumY += distribution * CY[direction]!;
++        }
++
++        const ux = momentumX / density;
++        const uy = momentumY / density;
++        for (let direction = 0; direction < DIRECTIONS; direction += 1) {
++          const distribution = this.current[distributionOffset + direction]!;
++          const postCollision = distribution - (distribution - equilibrium(direction, density, ux, uy)) / this.tau;
++          const neighborX = x + CX[direction]!;
++          const neighborY = y + CY[direction]!;
++
++          if (neighborY < 0 || neighborY >= this.height) {
++            this.next[distributionOffset + OPPOSITE[direction]!] = postCollision;
++            continue;
++          }
++          if (neighborX < 0 || neighborX >= this.width) {
++            continue;
++          }
++
++          const neighbor = neighborY * this.width + neighborX;
++          if (this.obstacleMask[neighbor] === 1) {
++            this.next[distributionOffset + OPPOSITE[direction]!] = postCollision;
++          } else {
++            this.next[neighbor * DIRECTIONS + direction] = postCollision;
++          }
++        }
++      }
++    }
++
++    this.applyInletBoundary();
++    this.applyOutletBoundary();
++
++    const previous = this.current;
++    this.current = this.next;
++    this.next = previous;
++  }
++
++  private applyInletBoundary(): void {
++    for (let y = 0; y < this.height; y += 1) {
++      const distributionOffset = y * this.width * DIRECTIONS;
++      for (let direction = 0; direction < DIRECTIONS; direction += 1) {
++        this.next[distributionOffset + direction] = equilibrium(direction, 1, this.inletVelocity, 0);
++      }
++    }
++  }
++
++  private applyOutletBoundary(): void {
++    const outletX = this.width - 1;
++    const sourceX = this.width - 2;
++    for (let y = 0; y < this.height; y += 1) {
++      const outletOffset = (y * this.width + outletX) * DIRECTIONS;
++      const sourceOffset = (y * this.width + sourceX) * DIRECTIONS;
++      for (let direction = 0; direction < DIRECTIONS; direction += 1) {
++        this.next[outletOffset + direction] = this.next[sourceOffset + direction]!;
++      }
++    }
++  }
++
++  private computeVorticity(): void {
++    const { velocityX, velocityY, vorticity } = this.frame;
++    for (let y = 0; y < this.height; y += 1) {
++      const lowerY = y === 0 ? 0 : y - 1;
++      const upperY = y === this.height - 1 ? this.height - 1 : y + 1;
++      const yScale = upperY - lowerY;
++
++      for (let x = 0; x < this.width; x += 1) {
++        const leftX = x === 0 ? 0 : x - 1;
++        const rightX = x === this.width - 1 ? this.width - 1 : x + 1;
++        const xScale = rightX - leftX;
++        const cell = y * this.width + x;
++
++        const velocityYGradientX = (velocityY[y * this.width + rightX]! - velocityY[y * this.width + leftX]!) / xScale;
++        const velocityXGradientY = (velocityX[upperY * this.width + x]! - velocityX[lowerY * this.width + x]!) / yScale;
++        vorticity[cell] = velocityYGradientX - velocityXGradientY;
++      }
++    }
++  }
++
++  private assertFiniteFields(): void {
++    const { speed, pressure, vorticity, velocityX, velocityY } = this.frame;
++    for (let cell = 0; cell < speed.length; cell += 1) {
++      if (!Number.isFinite(speed[cell])
++        || !Number.isFinite(pressure[cell])
++        || !Number.isFinite(vorticity[cell])
++        || !Number.isFinite(velocityX[cell])
++        || !Number.isFinite(velocityY[cell])) {
++        throw new NumericalInstabilityError();
++      }
++    }
++  }
++}
++
++function clampInletVelocity(value: number): number {
++  return Math.min(0.08, Math.max(0, value));
++}
+diff --git a/src/features/flow/lbmSolver.test.ts b/src/features/flow/lbmSolver.test.ts
+new file mode 100644
+index 0000000..cf64ba1
+--- /dev/null
++++ b/src/features/flow/lbmSolver.test.ts
+@@ -0,0 +1,74 @@
++import { LbmSolver, NumericalInstabilityError } from "./lbmSolver";
++import { createCarProfileMask } from "./obstacleMask";
++
++it("preserves a finite rest field", () => {
++  const solver = new LbmSolver({ width: 48, height: 24, inletVelocity: 0, tau: 0.62, obstacleMask: new Uint8Array(48 * 24) });
++  const frame = solver.step(20);
++  expect(Math.max(...frame.speed)).toBeCloseTo(0, 6);
++  expect(Array.from(frame.pressure).every(Number.isFinite)).toBe(true);
++  const meanPressure = Array.from(frame.pressure).reduce((sum, value) => sum + value, 0) / frame.pressure.length;
++  expect(meanPressure).toBeCloseTo(0, 6);
++});
++
++it("produces forward flow and a slower vehicle wake", () => {
++  const width = 96;
++  const height = 40;
++  const solver = new LbmSolver({ width, height, inletVelocity: 0.055, tau: 0.62, obstacleMask: createCarProfileMask(width, height) });
++  const frame = solver.step(160);
++  const upstream = frame.speed[Math.floor(height / 2) * width + 20]!;
++  const wake = frame.speed[Math.floor(height / 2) * width + 72]!;
++  expect(upstream).toBeGreaterThan(0.01);
++  expect(wake).toBeLessThan(upstream);
++  expect(Array.from(frame.vorticity).every(Number.isFinite)).toBe(true);
++});
++
++it("keeps solid-cell speed at zero", () => {
++  const width = 64;
++  const height = 32;
++  const mask = createCarProfileMask(width, height);
++  const solver = new LbmSolver({ width, height, inletVelocity: 0.04, tau: 0.62, obstacleMask: mask });
++  const frame = solver.step(40);
++  const solidIndex = mask.findIndex((cell) => cell === 1);
++  expect(frame.speed[solidIndex]).toBe(0);
++});
++
++it("keeps every driven-field component finite", () => {
++  const width = 72;
++  const height = 32;
++  const solver = new LbmSolver({ width, height, inletVelocity: 0.08, tau: 0.62, obstacleMask: createCarProfileMask(width, height) });
++  const frame = solver.step(120);
++
++  for (const field of [frame.speed, frame.pressure, frame.vorticity, frame.velocityX, frame.velocityY]) {
++    expect(Array.from(field).every(Number.isFinite)).toBe(true);
++  }
++});
++
++it("clamps inlet velocity and rejects unstable relaxation time", () => {
++  const width = 24;
++  const height = 12;
++  const obstacleMask = new Uint8Array(width * height);
++  expect(() => new LbmSolver({ width, height, inletVelocity: 0, tau: 0.5, obstacleMask })).toThrow(RangeError);
++
++  const solver = new LbmSolver({ width, height, inletVelocity: 1, tau: 0.62, obstacleMask });
++  let frame = solver.step(1);
++  expect(frame.speed[Math.floor(height / 2) * width]).toBeCloseTo(0.08, 6);
++
++  solver.setInletVelocity(-1);
++  frame = solver.step(1);
++  expect(frame.speed[Math.floor(height / 2) * width]).toBeCloseTo(0, 6);
++});
++
++it("throws a typed error instead of returning non-finite fields", () => {
++  const width = 24;
++  const height = 12;
++  const solver = new LbmSolver({ width, height, inletVelocity: Number.NaN, tau: 0.62, obstacleMask: new Uint8Array(width * height) });
++
++  let thrown: unknown;
++  try {
++    solver.step(1);
++  } catch (error) {
++    thrown = error;
++  }
++  expect(thrown).toBeInstanceOf(NumericalInstabilityError);
++  expect(thrown).toMatchObject({ code: "NON_FINITE_FIELD" });
++});

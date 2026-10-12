@@ -1,0 +1,13 @@
+{
+  "autodeskProduct": "Fusion",
+  "type": "addin",
+  "author": "SophiStudio",
+  "description": {
+    "": "Mooncake 月饼定制工坊：5° 脱模斜度、6mm 内部直壁段与腔底、Ø30 螺纹座、M20 螺纹与 Ø30×40mm 推杆、四语言设计器。"
+  },
+  "version": "1.6.0",
+  "runOnStartup": true,
+  "supportedOS": "windows|mac",
+  "editEnabled": true,
+  "iconFilename": "MooncakeIcon.svg"
+}

@@ -1,0 +1,47 @@
+{
+  "browser": {
+    "mode": "launch",
+    "executable_path": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "headless": true
+  },
+  "start_url": {
+    "url": "http://127.0.0.1:8765/weld.html"
+  },
+  "environment": {
+    "viewport": {
+      "width": 390,
+      "height": 844,
+      "device_scale_factor": 1
+    },
+    "locale": "zh-CN",
+    "timezone": "Asia/Shanghai"
+  },
+  "actions": [
+    {
+      "step_id": "viewport-ready",
+      "action": "wait_for",
+      "locator": {
+        "kind": "css",
+        "selector": "canvas"
+      },
+      "state": "visible",
+      "timeout_ms": 10000
+    },
+    {
+      "step_id": "initial-render",
+      "action": "wait_for_timeout",
+      "duration_ms": 1500
+    }
+  ],
+  "capture": {
+    "at_end": [
+      "screenshot",
+      "accessibility",
+      "url"
+    ],
+    "events": [
+      "console",
+      "page-errors"
+    ]
+  }
+}

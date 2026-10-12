@@ -1,0 +1,14 @@
+{
+  "repository": "https://github.com/SophiMotion/SkateChassis",
+  "commit": "186568417862df9db7d60f8bec5e6f7f759328f1",
+  "files": [
+    {
+      "path": "shared/domain.mjs",
+      "git_blob_sha": "26a863db7d95419c7cb47032354f785d22cada03"
+    },
+    {
+      "path": "shared/robot.mjs",
+      "git_blob_sha": "a8e6a90febbff97455beac76734b00e8369b67ff"
+    }
+  ]
+}

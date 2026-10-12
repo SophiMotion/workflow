@@ -1,0 +1,8 @@
+{
+  "display_name": "Sophi Campus — Material Transfer / Draft 01",
+  "model": "marble-1.0-draft",
+  "world_prompt": {
+    "type": "text",
+    "text_prompt": "Create a coherent full-scale contemporary university campus handover zone in Hangzhou, China, imagined for 2035. One teaching building faces a laboratory across a short low-speed service road. Include a clearly readable pedestrian crossing, a loading bay beside the teaching building, an accessible path and a sheltered handover point beside the laboratory. Human eye-level starting viewpoint, realistic architecture and restrained greenery, overcast daylight, spatial continuity and clear sightlines. Static environment only: no vehicles, robots, people, text labels, logos or UI. Keep the roadway and loading areas unobstructed for adding independently modeled vehicles later. This is an imagined design study, not a reconstruction of an actual university campus."
+  }
+}

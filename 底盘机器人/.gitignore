@@ -1,0 +1,14 @@
+node_modules/
+dist-static/
+data/
+.env
+.env.*
+output/
+__pycache__/
+*.pyc
+*.log
+.DS_Store
+SkateChassis 工作台.app/
+/打开工作台.html
+
+# Browser-ready output is versioned in the workflow collection.

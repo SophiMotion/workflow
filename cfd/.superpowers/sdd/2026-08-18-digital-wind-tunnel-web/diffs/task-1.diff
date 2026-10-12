@@ -1,0 +1,391 @@
+# Review package: Task 1 (filesystem snapshot; no commits by controller ruling)
+
+## Files changed
+package.json
+package-lock.json (generated lockfile)
+index.html
+tsconfig.json
+vite.config.ts
+eslint.config.js
+src/main.tsx
+src/App.tsx
+src/App.test.tsx
+src/test/setup.ts
+src/styles/global.css
+src/features/shell/AppShell.tsx
+
+## Diff
+diff --git a/package.json b/package.json
+new file mode 100644
+index 0000000..ec89250
+--- /dev/null
++++ b/package.json
+@@ -0,0 +1,47 @@
++{
++  "name": "cfd",
++  "version": "1.0.0",
++  "description": "",
++  "type": "module",
++  "scripts": {
++    "dev": "vite",
++    "build": "tsc --noEmit && vite build",
++    "test": "vitest",
++    "test:run": "vitest run",
++    "test:e2e": "playwright test",
++    "lint": "eslint ."
++  },
++  "keywords": [],
++  "author": "",
++  "license": "ISC",
++  "dependencies": {
++    "@react-three/drei": "^10.7.8",
++    "@react-three/fiber": "^9.7.0",
++    "lucide-react": "^1.31.0",
++    "react": "^19.2.8",
++    "react-dom": "^19.2.8",
++    "recharts": "^3.10.1",
++    "three": "^0.185.1",
++    "zustand": "^5.0.15"
++  },
++  "devDependencies": {
++    "@playwright/test": "^1.62.1",
++    "@testing-library/jest-dom": "^7.0.1",
++    "@testing-library/react": "^16.3.2",
++    "@testing-library/user-event": "^14.6.5",
++    "@types/node": "^26.2.0",
++    "@types/react": "^19.2.18",
++    "@types/react-dom": "^19.2.4",
++    "@types/three": "^0.185.4",
++    "@vitejs/plugin-react": "^6.0.5",
++    "eslint": "^10.8.1",
++    "eslint-plugin-react-hooks": "^7.1.1",
++    "eslint-plugin-react-refresh": "^0.5.4",
++    "globals": "^17.11.0",
++    "jsdom": "^30.0.1",
++    "typescript": "^6.0.3",
++    "typescript-eslint": "^8.67.0",
++    "vite": "^8.2.1",
++    "vitest": "^4.1.10"
++  }
++}
+diff --git a/index.html b/index.html
+new file mode 100644
+index 0000000..2aa0a98
+--- /dev/null
++++ b/index.html
+@@ -0,0 +1,12 @@
++<!doctype html>
++<html lang="zh-CN">
++  <head>
++    <meta charset="UTF-8" />
++    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
++    <title>SophiFlow Lab</title>
++  </head>
++  <body>
++    <div id="root"></div>
++    <script type="module" src="/src/main.tsx"></script>
++  </body>
++</html>
+diff --git a/tsconfig.json b/tsconfig.json
+new file mode 100644
+index 0000000..44b2d69
+--- /dev/null
++++ b/tsconfig.json
+@@ -0,0 +1,21 @@
++{
++  "compilerOptions": {
++    "target": "ES2022",
++    "useDefineForClassFields": true,
++    "lib": ["ES2022", "DOM", "DOM.Iterable"],
++    "allowJs": false,
++    "skipLibCheck": true,
++    "esModuleInterop": true,
++    "allowSyntheticDefaultImports": true,
++    "strict": true,
++    "noUncheckedIndexedAccess": true,
++    "module": "ESNext",
++    "moduleResolution": "Bundler",
++    "resolveJsonModule": true,
++    "isolatedModules": true,
++    "noEmit": true,
++    "jsx": "react-jsx",
++    "types": ["vite/client", "vitest/globals", "node"]
++  },
++  "include": ["src", "vite.config.ts", "playwright.config.ts"]
++}
+diff --git a/vite.config.ts b/vite.config.ts
+new file mode 100644
+index 0000000..50172b5
+--- /dev/null
++++ b/vite.config.ts
+@@ -0,0 +1,12 @@
++import { defineConfig } from "vitest/config";
++import react from "@vitejs/plugin-react";
++
++export default defineConfig({
++  plugins: [react()],
++  test: {
++    environment: "jsdom",
++    setupFiles: ["./src/test/setup.ts"],
++    css: true,
++    globals: true,
++  },
++});
+diff --git a/eslint.config.js b/eslint.config.js
+new file mode 100644
+index 0000000..6fcbdf4
+--- /dev/null
++++ b/eslint.config.js
+@@ -0,0 +1,18 @@
++import globals from "globals";
++import tseslint from "typescript-eslint";
++import reactHooks from "eslint-plugin-react-hooks";
++import reactRefresh from "eslint-plugin-react-refresh";
++
++export default tseslint.config(
++  { ignores: ["dist", "coverage", "playwright-report"] },
++  {
++    files: ["src/**/*.{ts,tsx}"],
++    extends: [tseslint.configs.recommended, reactHooks.configs.flat["recommended-latest"], reactRefresh.configs.vite],
++    languageOptions: { globals: globals.browser },
++  },
++  {
++    files: ["vite.config.ts", "playwright.config.ts"],
++    extends: [tseslint.configs.recommended],
++    languageOptions: { globals: globals.node },
++  },
++);
+diff --git a/src/main.tsx b/src/main.tsx
+new file mode 100644
+index 0000000..a905044
+--- /dev/null
++++ b/src/main.tsx
+@@ -0,0 +1,16 @@
++import { StrictMode } from "react";
++import { createRoot } from "react-dom/client";
++import { App } from "./App";
++import "./styles/global.css";
++
++const rootElement = document.getElementById("root");
++
++if (!rootElement) {
++  throw new Error("Root element not found");
++}
++
++createRoot(rootElement).render(
++  <StrictMode>
++    <App />
++  </StrictMode>,
++);
+diff --git a/src/App.tsx b/src/App.tsx
+new file mode 100644
+index 0000000..8b7797e
+--- /dev/null
++++ b/src/App.tsx
+@@ -0,0 +1,12 @@
++import { AppShell } from "./features/shell/AppShell";
++
++export function App() {
++  return (
++    <AppShell
++      left={<p>教学章节将在此处呈现。</p>}
++      scene={<p>数字风洞场景将在此处呈现。</p>}
++      right={<p>实验控制将在此处呈现。</p>}
++      bottom={<p>实验曲线将在此处呈现。</p>}
++    />
++  );
++}
+diff --git a/src/App.test.tsx b/src/App.test.tsx
+new file mode 100644
+index 0000000..14d4c16
+--- /dev/null
++++ b/src/App.test.tsx
+@@ -0,0 +1,12 @@
++import { render, screen } from "@testing-library/react";
++import "@testing-library/jest-dom/vitest";
++import { App } from "./App";
++
++it("renders the five digital wind-tunnel workbench regions", () => {
++  render(<App />);
++  expect(screen.getByRole("banner")).toHaveTextContent("SophiFlow Lab");
++  expect(screen.getByRole("navigation", { name: "教学章节" })).toBeInTheDocument();
++  expect(screen.getByRole("main", { name: "数字风洞" })).toBeInTheDocument();
++  expect(screen.getByRole("complementary", { name: "实验控制" })).toBeInTheDocument();
++  expect(screen.getByRole("region", { name: "实验曲线" })).toBeInTheDocument();
++});
+diff --git a/src/test/setup.ts b/src/test/setup.ts
+new file mode 100644
+index 0000000..f149f27
+--- /dev/null
++++ b/src/test/setup.ts
+@@ -0,0 +1 @@
++import "@testing-library/jest-dom/vitest";
+diff --git a/src/styles/global.css b/src/styles/global.css
+new file mode 100644
+index 0000000..248f9f4
+--- /dev/null
++++ b/src/styles/global.css
+@@ -0,0 +1,127 @@
++:root {
++  --bg: #071014;
++  --panel: #0d181d;
++  --panel-raised: #132229;
++  --tunnel: #e9e6df;
++  --ink: #e9f2f3;
++  --muted: #8da3aa;
++  --flow: #50e3c2;
++  --warning: #f2bd4f;
++  --danger: #e44b43;
++  color: var(--ink);
++  background: var(--bg);
++  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
++}
++
++* {
++  box-sizing: border-box;
++}
++
++body {
++  margin: 0;
++  min-width: 320px;
++  min-height: 100vh;
++  background: var(--bg);
++}
++
++button,
++input,
++select,
++textarea {
++  font: inherit;
++}
++
++.app-shell {
++  display: grid;
++  grid-template-areas:
++    "header header header"
++    "left scene right"
++    "left bottom right";
++  grid-template-columns: 240px minmax(0, 1fr) 320px;
++  grid-template-rows: auto minmax(0, 1fr) 220px;
++  min-height: 100vh;
++  background: var(--bg);
++}
++
++.topbar {
++  grid-area: header;
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 1rem;
++  padding: 0.85rem 1.25rem;
++  border-bottom: 1px solid var(--panel-raised);
++  background: var(--panel);
++}
++
++.eyebrow {
++  color: var(--flow);
++  font-size: 0.7rem;
++  font-weight: 700;
++  letter-spacing: 0.12em;
++}
++
++h1 {
++  margin: 0.15rem 0 0;
++  font-size: 1.15rem;
++}
++
++.topbar-actions {
++  display: flex;
++  align-items: center;
++  gap: 0.75rem;
++}
++
++.provenance-badge {
++  color: var(--warning);
++  font-size: 0.72rem;
++  font-weight: 700;
++  letter-spacing: 0.04em;
++}
++
++.tutorial-rail,
++.control-panel,
++.chart-drawer {
++  padding: 1rem;
++  background: var(--panel);
++}
++
++.tutorial-rail {
++  grid-area: left;
++  border-right: 1px solid var(--panel-raised);
++}
++
++.scene-panel {
++  grid-area: scene;
++  padding: 1rem;
++  background: var(--panel-raised);
++}
++
++.control-panel {
++  grid-area: right;
++  border-left: 1px solid var(--panel-raised);
++}
++
++.chart-drawer {
++  grid-area: bottom;
++  border-top: 1px solid var(--panel-raised);
++}
++
++@media (max-width: 900px) {
++  .app-shell {
++    grid-template-areas:
++      "header"
++      "scene"
++      "left"
++      "right"
++      "bottom";
++    grid-template-columns: minmax(0, 1fr);
++    grid-template-rows: auto minmax(18rem, 1fr) auto auto 220px;
++  }
++
++  .tutorial-rail,
++  .control-panel {
++    border: 0;
++    border-top: 1px solid var(--panel-raised);
++  }
++}
+diff --git a/src/features/shell/AppShell.tsx b/src/features/shell/AppShell.tsx
+new file mode 100644
+index 0000000..200883a
+--- /dev/null
++++ b/src/features/shell/AppShell.tsx
+@@ -0,0 +1,30 @@
++import type { ReactNode } from "react";
++
++export type AppShellProps = {
++  left: ReactNode;
++  scene: ReactNode;
++  right: ReactNode;
++  bottom: ReactNode;
++  headerActions?: ReactNode;
++};
++
++export function AppShell({ left, scene, right, bottom, headerActions }: AppShellProps) {
++  return (
++    <div className="app-shell">
++      <header className="topbar" role="banner">
++        <div>
++          <span className="eyebrow">CFD TEACHING CONSOLE</span>
++          <h1>SophiFlow Lab</h1>
++        </div>
++        <div className="topbar-actions">
++          {headerActions}
++          <span className="provenance-badge">SIMULATED / 模拟数据</span>
++        </div>
++      </header>
++      <nav className="tutorial-rail" aria-label="教学章节">{left}</nav>
++      <main className="scene-panel" aria-label="数字风洞">{scene}</main>
++      <aside className="control-panel" aria-label="实验控制">{right}</aside>
++      <section className="chart-drawer" aria-label="实验曲线">{bottom}</section>
++    </div>
++  );
++}

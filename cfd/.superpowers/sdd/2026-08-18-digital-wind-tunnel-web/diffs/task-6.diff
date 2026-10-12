@@ -1,0 +1,1013 @@
+# Review package: Task 6 (changed-file current snapshots; no commits by ruling)
+
+## Files
+src/features/flow/lbm.worker.ts
+src/features/flow/LbmWorkerClient.ts
+src/features/flow/LbmWorkerClient.test.ts
+src/features/flow/flowRuntime.ts
+src/features/flow/flowRuntime.test.ts
+src/features/experiment/labStore.ts
+
+## Current contents
+diff --git a/src/features/flow/lbm.worker.ts b/src/features/flow/lbm.worker.ts
+new file mode 100644
+index 0000000..637461a
+--- /dev/null
++++ b/src/features/flow/lbm.worker.ts
+@@ -0,0 +1,115 @@
++/// <reference lib="webworker" />
++
++import { LbmSolver, NumericalInstabilityError } from "./lbmSolver";
++import { createCarProfileMask } from "./obstacleMask";
++import type { WorkerRequest, WorkerResponse } from "./LbmWorkerClient";
++import type { FlowFieldFrame } from "./types";
++
++type PostWorkerResponse = (response: WorkerResponse, transfer?: Transferable[]) => void;
++
++export function createLbmWorkerMessageHandler(postResponse: PostWorkerResponse) {
++  let solver: LbmSolver | null = null;
++  let disposed = false;
++
++  return (request: WorkerRequest): void => {
++    if (disposed) {
++      return;
++    }
++
++    if (request.type === "dispose") {
++      disposed = true;
++      solver = null;
++      return;
++    }
++
++    if (request.type === "init") {
++      try {
++        const { width, height } = request.config;
++        solver = new LbmSolver({
++          ...request.config,
++          obstacleMask: createCarProfileMask(width, height),
++        });
++        postResponse({ type: "ready" });
++      } catch (error) {
++        postFailure(postResponse, error);
++      }
++      return;
++    }
++
++    if (solver === null) {
++      postResponse({
++        type: "error",
++        requestId: request.requestId,
++        code: "WORKER_FAILURE",
++        message: "Flow worker has not been initialized",
++      });
++      return;
++    }
++
++    try {
++      solver.setInletVelocity(request.inletVelocity);
++      const outboundFrame = copyFrameForTransfer(solver.step(request.iterations));
++      const transfer = frameTransferList(outboundFrame);
++      postResponse({
++        type: "frame",
++        requestId: request.requestId,
++        frame: outboundFrame,
++      }, transfer);
++    } catch (error) {
++      postFailure(postResponse, error, request.requestId);
++    }
++  };
++}
++
++function copyFrameForTransfer(frame: FlowFieldFrame): FlowFieldFrame {
++  return {
++    width: frame.width,
++    height: frame.height,
++    speed: frame.speed.slice(),
++    pressure: frame.pressure.slice(),
++    vorticity: frame.vorticity.slice(),
++    velocityX: frame.velocityX.slice(),
++    velocityY: frame.velocityY.slice(),
++    provenance: "2d-teaching-cfd",
++  };
++}
++
++function frameTransferList(frame: FlowFieldFrame): Transferable[] {
++  return [
++    frame.speed.buffer,
++    frame.pressure.buffer,
++    frame.vorticity.buffer,
++    frame.velocityX.buffer,
++    frame.velocityY.buffer,
++  ];
++}
++
++function postFailure(
++  postResponse: PostWorkerResponse,
++  error: unknown,
++  requestId?: number,
++): void {
++  const numericalFailure = error instanceof NumericalInstabilityError
++    || (typeof error === "object" && error !== null && "code" in error
++      && error.code === "NON_FINITE_FIELD");
++  const message = error instanceof Error ? error.message : "Unknown flow worker failure";
++  postResponse({
++    type: "error",
++    ...(requestId === undefined ? {} : { requestId }),
++    code: numericalFailure ? "NON_FINITE_FIELD" : "WORKER_FAILURE",
++    message,
++  });
++}
++
++const workerScope = typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope
++  ? self as DedicatedWorkerGlobalScope
++  : null;
++
++if (workerScope !== null) {
++  const handleMessage = createLbmWorkerMessageHandler((response, transfer = []) => {
++    workerScope.postMessage(response, transfer);
++  });
++  workerScope.onmessage = (event: MessageEvent<WorkerRequest>) => {
++    handleMessage(event.data);
++  };
++}
+diff --git a/src/features/flow/LbmWorkerClient.ts b/src/features/flow/LbmWorkerClient.ts
+new file mode 100644
+index 0000000..607626e
+--- /dev/null
++++ b/src/features/flow/LbmWorkerClient.ts
+@@ -0,0 +1,211 @@
++import type { FlowFieldFrame, LbmConfig } from "./types";
++
++export type WorkerRequest =
++  | { type: "init"; config: Omit<LbmConfig, "obstacleMask"> }
++  | { type: "frame"; requestId: number; inletVelocity: number; iterations: number }
++  | { type: "dispose" };
++
++export type WorkerErrorCode = "NON_FINITE_FIELD" | "WORKER_FAILURE";
++
++export type WorkerResponse =
++  | { type: "ready" }
++  | { type: "frame"; requestId: number; frame: FlowFieldFrame }
++  | { type: "error"; requestId?: number; code: WorkerErrorCode; message: string };
++
++export interface WorkerLike {
++  onmessage: ((event: MessageEvent<WorkerResponse>) => void) | null;
++  onerror: ((event: ErrorEvent) => void) | null;
++  postMessage(message: WorkerRequest, transfer?: Transferable[]): void;
++  terminate(): void;
++}
++
++type Deferred<T> = {
++  promise: Promise<T>;
++  resolve(value: T): void;
++  reject(reason: unknown): void;
++};
++
++type PendingFrame = Deferred<FlowFieldFrame> & {
++  timeout: ReturnType<typeof setTimeout>;
++};
++
++const REQUEST_TIMEOUT_MS = 1_500;
++
++export class FlowWorkerError extends Error {
++  constructor(
++    readonly code: WorkerErrorCode,
++    message: string,
++  ) {
++    super(message);
++    this.name = "FlowWorkerError";
++  }
++}
++
++export const createLbmWorker = (): WorkerLike => new Worker(
++  new URL("./lbm.worker.ts", import.meta.url),
++  { type: "module" },
++);
++
++export class LbmWorkerClient {
++  private worker!: WorkerLike;
++  private generation = 0;
++  private nextRequestId = 1;
++  private readyDeferred!: Deferred<void>;
++  private readonly pendingFrames = new Map<number, PendingFrame>();
++  private state: "starting" | "ready" | "failed" | "disposed" = "starting";
++  private failure: Error | null = null;
++
++  constructor(
++    private readonly workerFactory: () => WorkerLike,
++    private readonly config: Omit<LbmConfig, "obstacleMask">,
++  ) {
++    this.spawnWorker();
++  }
++
++  ready(): Promise<void> {
++    if (this.state === "disposed") {
++      return Promise.reject(new Error("Flow worker client is disposed"));
++    }
++    return this.readyDeferred.promise;
++  }
++
++  async requestFrame(inletVelocity: number, iterations = 4): Promise<FlowFieldFrame> {
++    await this.ready();
++    if (this.state === "failed") {
++      throw this.failure ?? new FlowWorkerError("WORKER_FAILURE", "Flow worker failed");
++    }
++    if (this.state === "disposed") {
++      throw new Error("Flow worker client is disposed");
++    }
++
++    const requestId = this.nextRequestId;
++    this.nextRequestId += 1;
++    const deferred = createDeferred<FlowFieldFrame>();
++    const timeout = setTimeout(() => {
++      if (this.pendingFrames.delete(requestId)) {
++        deferred.reject(new Error("Flow worker timed out"));
++      }
++    }, REQUEST_TIMEOUT_MS);
++    this.pendingFrames.set(requestId, { ...deferred, timeout });
++    this.worker.postMessage({
++      type: "frame",
++      requestId,
++      inletVelocity,
++      iterations,
++    });
++    return deferred.promise;
++  }
++
++  restart(): Promise<void> {
++    if (this.state === "disposed") {
++      return Promise.reject(new Error("Flow worker client is disposed"));
++    }
++
++    const restartError = new Error("Flow worker restarted");
++    this.readyDeferred.reject(restartError);
++    this.rejectPending(restartError);
++    this.detachAndTerminateWorker();
++    this.spawnWorker();
++    return this.ready();
++  }
++
++  dispose(): void {
++    if (this.state === "disposed") {
++      return;
++    }
++
++    const disposedError = new Error("Flow worker client is disposed");
++    this.state = "disposed";
++    this.generation += 1;
++    this.readyDeferred.reject(disposedError);
++    this.rejectPending(disposedError);
++    try {
++      this.worker.postMessage({ type: "dispose" });
++    } finally {
++      this.detachAndTerminateWorker();
++    }
++  }
++
++  private spawnWorker(): void {
++    this.state = "starting";
++    this.failure = null;
++    this.readyDeferred = createDeferred<void>();
++    const generation = this.generation + 1;
++    this.generation = generation;
++    const worker = this.workerFactory();
++    this.worker = worker;
++
++    worker.onmessage = (event) => {
++      if (generation !== this.generation || worker !== this.worker) {
++        return;
++      }
++      this.handleMessage(event.data);
++    };
++    worker.onerror = (event) => {
++      if (generation !== this.generation || worker !== this.worker) {
++        return;
++      }
++      this.fail(new FlowWorkerError(
++        "WORKER_FAILURE",
++        event.message || "Flow worker failed",
++      ));
++    };
++    worker.postMessage({ type: "init", config: { ...this.config } });
++  }
++
++  private handleMessage(message: WorkerResponse): void {
++    if (message.type === "ready") {
++      if (this.state === "starting") {
++        this.state = "ready";
++        this.readyDeferred.resolve(undefined);
++      }
++      return;
++    }
++
++    if (message.type === "error") {
++      this.fail(new FlowWorkerError(message.code, message.message));
++      return;
++    }
++
++    const pending = this.pendingFrames.get(message.requestId);
++    if (pending === undefined) {
++      return;
++    }
++    clearTimeout(pending.timeout);
++    this.pendingFrames.delete(message.requestId);
++    pending.resolve(message.frame);
++  }
++
++  private fail(error: Error): void {
++    this.state = "failed";
++    this.failure = error;
++    this.readyDeferred.reject(error);
++    this.rejectPending(error);
++  }
++
++  private rejectPending(error: Error): void {
++    for (const pending of this.pendingFrames.values()) {
++      clearTimeout(pending.timeout);
++      pending.reject(error);
++    }
++    this.pendingFrames.clear();
++  }
++
++  private detachAndTerminateWorker(): void {
++    this.worker.onmessage = null;
++    this.worker.onerror = null;
++    this.worker.terminate();
++  }
++}
++
++function createDeferred<T>(): Deferred<T> {
++  let resolve!: (value: T) => void;
++  let reject!: (reason: unknown) => void;
++  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
++    resolve = resolvePromise;
++    reject = rejectPromise;
++  });
++  // Lifecycle cleanup may reject readiness before an external consumer awaits it.
++  void promise.catch(() => undefined);
++  return { promise, resolve, reject };
++}
+diff --git a/src/features/flow/LbmWorkerClient.test.ts b/src/features/flow/LbmWorkerClient.test.ts
+new file mode 100644
+index 0000000..3b4afcf
+--- /dev/null
++++ b/src/features/flow/LbmWorkerClient.test.ts
+@@ -0,0 +1,257 @@
++import { afterEach, describe, expect, it, vi } from "vitest";
++import { createLbmWorkerMessageHandler } from "./lbm.worker";
++import {
++  FlowWorkerError,
++  LbmWorkerClient,
++  type WorkerLike,
++  type WorkerRequest,
++  type WorkerResponse,
++} from "./LbmWorkerClient";
++
++class FakeWorker implements WorkerLike {
++  onmessage: ((event: MessageEvent<WorkerResponse>) => void) | null = null;
++  onerror: ((event: ErrorEvent) => void) | null = null;
++  readonly posted: WorkerRequest[] = [];
++  terminated = false;
++
++  postMessage(message: WorkerRequest): void {
++    this.posted.push(message);
++  }
++
++  terminate(): void {
++    this.terminated = true;
++  }
++
++  emit(message: WorkerResponse): void {
++    this.onmessage?.({ data: message } as MessageEvent<WorkerResponse>);
++  }
++}
++
++function frame(value = 0) {
++  return {
++    width: 2,
++    height: 1,
++    speed: new Float32Array([value, value]),
++    pressure: new Float32Array(2),
++    vorticity: new Float32Array(2),
++    velocityX: new Float32Array(2),
++    velocityY: new Float32Array(2),
++    provenance: "2d-teaching-cfd" as const,
++  };
++}
++
++describe("LbmWorkerClient", () => {
++  afterEach(() => {
++    vi.useRealTimers();
++  });
++
++  it("initializes immediately, then resolves one default four-iteration frame request", async () => {
++    const worker = new FakeWorker();
++    const client = new LbmWorkerClient(() => worker, {
++      width: 2,
++      height: 1,
++      inletVelocity: 0,
++      tau: 0.62,
++    });
++
++    expect(worker.posted).toEqual([{
++      type: "init",
++      config: { width: 2, height: 1, inletVelocity: 0, tau: 0.62 },
++    }]);
++
++    const ready = client.ready();
++    worker.emit({ type: "ready" });
++    await ready;
++    const pending = client.requestFrame(0.04);
++    await Promise.resolve();
++
++    expect(worker.posted.at(-1)).toEqual({
++      type: "frame",
++      requestId: 1,
++      inletVelocity: 0.04,
++      iterations: 4,
++    });
++
++    worker.emit({ type: "frame", requestId: 1, frame: frame() });
++    await expect(pending).resolves.toMatchObject({ width: 2, provenance: "2d-teaching-cfd" });
++    client.dispose();
++  });
++
++  it("rejects pending work, removes listeners, and terminates when disposed", async () => {
++    const worker = new FakeWorker();
++    const client = new LbmWorkerClient(() => worker, {
++      width: 2,
++      height: 1,
++      inletVelocity: 0,
++      tau: 0.62,
++    });
++    worker.emit({ type: "ready" });
++    await client.ready();
++    const pending = client.requestFrame(0.04);
++    await Promise.resolve();
++
++    client.dispose();
++
++    await expect(pending).rejects.toThrow("disposed");
++    expect(worker.posted.at(-1)).toEqual({ type: "dispose" });
++    expect(worker.terminated).toBe(true);
++    expect(worker.onmessage).toBeNull();
++    expect(worker.onerror).toBeNull();
++  });
++
++  it("terminates and replaces a failed worker while ignoring stale-generation messages", async () => {
++    const workers: [FakeWorker, FakeWorker] = [new FakeWorker(), new FakeWorker()];
++    let factoryIndex = 0;
++    const client = new LbmWorkerClient(() => workers[factoryIndex++]!, {
++      width: 2,
++      height: 1,
++      inletVelocity: 0,
++      tau: 0.62,
++    });
++    workers[0].emit({ type: "ready" });
++    await client.ready();
++
++    const oldMessageListener = workers[0].onmessage!;
++    const interrupted = client.requestFrame(0.04);
++    await Promise.resolve();
++    const restarted = client.restart();
++    await expect(interrupted).rejects.toThrow("restarted");
++
++    expect(workers[0].terminated).toBe(true);
++    expect(workers[1].posted[0]).toEqual(workers[0].posted[0]);
++    oldMessageListener({ data: { type: "ready" } } as MessageEvent<WorkerResponse>);
++    workers[1].emit({ type: "ready" });
++    await restarted;
++
++    const next = client.requestFrame(0.03);
++    await Promise.resolve();
++    oldMessageListener({
++      data: { type: "frame", requestId: 2, frame: frame(99) },
++    } as MessageEvent<WorkerResponse>);
++    workers[1].emit({ type: "frame", requestId: 2, frame: frame(3) });
++
++    await expect(next).resolves.toMatchObject({ speed: new Float32Array([3, 3]) });
++    client.dispose();
++  });
++
++  it("rejects all pending requests on a worker error and can restart afterward", async () => {
++    const workers: [FakeWorker, FakeWorker] = [new FakeWorker(), new FakeWorker()];
++    let factoryIndex = 0;
++    const client = new LbmWorkerClient(() => workers[factoryIndex++]!, {
++      width: 2,
++      height: 1,
++      inletVelocity: 0,
++      tau: 0.62,
++    });
++    workers[0].emit({ type: "ready" });
++    await client.ready();
++    const first = client.requestFrame(0.02);
++    const second = client.requestFrame(0.03);
++    await Promise.resolve();
++
++    workers[0].onerror?.({ message: "worker crashed" } as ErrorEvent);
++
++    await expect(first).rejects.toThrow("worker crashed");
++    await expect(second).rejects.toThrow("worker crashed");
++    await expect(client.requestFrame(0.04)).rejects.toThrow("worker crashed");
++    const restarted = client.restart();
++    workers[1].emit({ type: "ready" });
++    await restarted;
++    client.dispose();
++  });
++
++  it("preserves protocol error codes for runtime recovery", async () => {
++    const worker = new FakeWorker();
++    const client = new LbmWorkerClient(() => worker, {
++      width: 2,
++      height: 1,
++      inletVelocity: 0,
++      tau: 0.62,
++    });
++    worker.emit({ type: "ready" });
++    await client.ready();
++    const pending = client.requestFrame(0.04);
++    await Promise.resolve();
++    worker.emit({
++      type: "error",
++      requestId: 1,
++      code: "NON_FINITE_FIELD",
++      message: "unstable",
++    });
++
++    await expect(pending).rejects.toMatchObject({
++      name: "FlowWorkerError",
++      code: "NON_FINITE_FIELD",
++      message: "unstable",
++    } satisfies Partial<FlowWorkerError>);
++    client.dispose();
++  });
++
++  it("times out a request after 1,500 ms", async () => {
++    vi.useFakeTimers();
++    const worker = new FakeWorker();
++    const client = new LbmWorkerClient(() => worker, {
++      width: 2,
++      height: 1,
++      inletVelocity: 0,
++      tau: 0.62,
++    });
++    worker.emit({ type: "ready" });
++    await client.ready();
++    const pending = client.requestFrame(0.04);
++    await Promise.resolve();
++
++    const assertion = expect(pending).rejects.toThrow("Flow worker timed out");
++    await vi.advanceTimersByTimeAsync(1_500);
++    await assertion;
++    client.dispose();
++  });
++});
++
++describe("LBM worker protocol", () => {
++  it("transfers five copied buffers and remains reusable after transfer detaches them", () => {
++    const responses: WorkerResponse[] = [];
++    const transferLists: Transferable[][] = [];
++    const handleMessage = createLbmWorkerMessageHandler((response, transfer = []) => {
++      transferLists.push(transfer);
++      responses.push(structuredClone(response, { transfer }));
++    });
++
++    handleMessage({
++      type: "init",
++      config: { width: 20, height: 10, inletVelocity: 0.02, tau: 0.62 },
++    });
++    handleMessage({ type: "frame", requestId: 1, inletVelocity: 0.03, iterations: 4 });
++    handleMessage({ type: "frame", requestId: 2, inletVelocity: 0.04, iterations: 4 });
++
++    expect(responses.map((response) => response.type)).toEqual(["ready", "frame", "frame"]);
++    expect(transferLists[1]).toHaveLength(5);
++    expect(new Set(transferLists[1])).toHaveLength(5);
++    expect(transferLists[2]).toHaveLength(5);
++    expect(responses[1]).toMatchObject({
++      type: "frame",
++      requestId: 1,
++      frame: { provenance: "2d-teaching-cfd" },
++    });
++    expect(responses[2]).toMatchObject({ type: "frame", requestId: 2 });
++  });
++
++  it("reports a typed numerical error instead of transferring an invalid field", () => {
++    const responses: WorkerResponse[] = [];
++    const handleMessage = createLbmWorkerMessageHandler((response) => {
++      responses.push(response);
++    });
++
++    handleMessage({
++      type: "init",
++      config: { width: 1, height: 1, inletVelocity: 0.02, tau: 0.62 },
++    });
++    handleMessage({ type: "frame", requestId: 7, inletVelocity: 0.03, iterations: 4 });
++
++    expect(responses.at(-1)).toMatchObject({
++      type: "error",
++      requestId: 7,
++      code: "NON_FINITE_FIELD",
++    });
++  });
++});
+diff --git a/src/features/flow/flowRuntime.ts b/src/features/flow/flowRuntime.ts
+new file mode 100644
+index 0000000..f84d24e
+--- /dev/null
++++ b/src/features/flow/flowRuntime.ts
+@@ -0,0 +1,131 @@
++import { labStore } from "../experiment/labStore";
++import { FlowWorkerError } from "./LbmWorkerClient";
++import type { FlowFieldFrame } from "./types";
++
++const FRAME_INTERVAL_MS = 100;
++
++export interface FlowClientLike {
++  requestFrame(inletVelocity: number, iterations?: number): Promise<FlowFieldFrame>;
++  restart(): Promise<void>;
++}
++
++export interface FlowRuntime {
++  stop(): void;
++  restart(): Promise<void>;
++}
++
++export function mapWindToLatticeVelocity(windSpeedMps: number): number {
++  return Math.min(0.08, Math.max(0, windSpeedMps / 12 * 0.08));
++}
++
++export function startFlowRuntime(client: FlowClientLike): FlowRuntime {
++  let stopped = false;
++  let pending = false;
++  let failed = false;
++  let recoveryUsed = false;
++  let velocityScale = 1;
++  let generation = 0;
++
++  labStore.setState({ flowStatus: "loading", flowError: null });
++
++  const tick = async () => {
++    if (stopped || failed || pending || document.hidden) {
++      return;
++    }
++
++    pending = true;
++    const tickGeneration = generation;
++    const windSpeedMps = labStore.getState().telemetry.windSpeedMps;
++    const inletVelocity = mapWindToLatticeVelocity(windSpeedMps) * velocityScale;
++
++    try {
++      let nextFrame: FlowFieldFrame;
++      try {
++        nextFrame = await client.requestFrame(inletVelocity);
++      } catch (error) {
++        if (!isNumericalInstability(error) || recoveryUsed) {
++          throw error;
++        }
++
++        recoveryUsed = true;
++        velocityScale *= 0.8;
++        labStore.setState((state) => ({
++          eventLog: [
++            ...state.eventLog,
++            "二维教学 CFD 数值场异常：入口格点速度已降至 80%，正在重启求解器。",
++          ],
++        }));
++        await client.restart();
++        nextFrame = await client.requestFrame(inletVelocity * 0.8);
++      }
++
++      if (!stopped && tickGeneration === generation) {
++        labStore.setState({
++          flowField: nextFrame,
++          flowStatus: "ready",
++          flowError: null,
++        });
++      }
++    } catch (error) {
++      if (!stopped && tickGeneration === generation) {
++        failed = true;
++        labStore.setState({
++          flowStatus: "failed",
++          flowError: errorMessage(error),
++        });
++      }
++    } finally {
++      if (tickGeneration === generation) {
++        pending = false;
++      }
++    }
++  };
++
++  const timer = setInterval(() => {
++    void tick();
++  }, FRAME_INTERVAL_MS);
++
++  return {
++    stop() {
++      if (stopped) {
++        return;
++      }
++      stopped = true;
++      generation += 1;
++      clearInterval(timer);
++    },
++    async restart() {
++      if (stopped) {
++        throw new Error("Flow runtime is stopped");
++      }
++
++      generation += 1;
++      failed = false;
++      recoveryUsed = false;
++      velocityScale = 1;
++      labStore.setState({ flowError: null });
++      try {
++        await client.restart();
++      } catch (error) {
++        failed = true;
++        labStore.setState({
++          flowStatus: "failed",
++          flowError: errorMessage(error),
++        });
++        throw error;
++      } finally {
++        pending = false;
++      }
++    },
++  };
++}
++
++function isNumericalInstability(error: unknown): boolean {
++  return error instanceof FlowWorkerError && error.code === "NON_FINITE_FIELD"
++    || (typeof error === "object" && error !== null && "code" in error
++      && error.code === "NON_FINITE_FIELD");
++}
++
++function errorMessage(error: unknown): string {
++  return error instanceof Error ? error.message : "Unknown flow worker failure";
++}
+diff --git a/src/features/flow/flowRuntime.test.ts b/src/features/flow/flowRuntime.test.ts
+new file mode 100644
+index 0000000..3bc18fa
+--- /dev/null
++++ b/src/features/flow/flowRuntime.test.ts
+@@ -0,0 +1,182 @@
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { labStore } from "../experiment/labStore";
++import type { FlowFieldFrame } from "./types";
++import { FlowWorkerError } from "./LbmWorkerClient";
++import {
++  mapWindToLatticeVelocity,
++  startFlowRuntime,
++  type FlowClientLike,
++} from "./flowRuntime";
++
++function deferred<T>() {
++  let resolve!: (value: T) => void;
++  let reject!: (reason: unknown) => void;
++  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
++    resolve = resolvePromise;
++    reject = rejectPromise;
++  });
++  return { promise, resolve, reject };
++}
++
++function frame(value: number): FlowFieldFrame {
++  return {
++    width: 2,
++    height: 1,
++    speed: new Float32Array([value, value]),
++    pressure: new Float32Array(2),
++    vorticity: new Float32Array(2),
++    velocityX: new Float32Array(2),
++    velocityY: new Float32Array(2),
++    provenance: "2d-teaching-cfd",
++  };
++}
++
++class FakeFlowClient implements FlowClientLike {
++  readonly requests: Array<{ inletVelocity: number; iterations?: number }> = [];
++  readonly pending: Array<ReturnType<typeof deferred<FlowFieldFrame>>> = [];
++  restartCount = 0;
++
++  requestFrame(inletVelocity: number, iterations?: number): Promise<FlowFieldFrame> {
++    this.requests.push({ inletVelocity, iterations });
++    const request = deferred<FlowFieldFrame>();
++    this.pending.push(request);
++    return request.promise;
++  }
++
++  async restart(): Promise<void> {
++    this.restartCount += 1;
++  }
++}
++
++async function flushRuntime(): Promise<void> {
++  await Promise.resolve();
++  await Promise.resolve();
++  await Promise.resolve();
++}
++
++describe("flowRuntime", () => {
++  beforeEach(() => {
++    vi.useFakeTimers();
++    labStore.getState().resetLab();
++  });
++
++  afterEach(() => {
++    vi.useRealTimers();
++  });
++
++  it("maps real speed into the stable 2D teaching range", () => {
++    expect(mapWindToLatticeVelocity(0)).toBe(0);
++    expect(mapWindToLatticeVelocity(6)).toBeCloseTo(0.04, 5);
++    expect(mapWindToLatticeVelocity(99)).toBe(0.08);
++    expect(mapWindToLatticeVelocity(-2)).toBe(0);
++  });
++
++  it("requests at 10 Hz without overlapping pending frames", async () => {
++    const client = new FakeFlowClient();
++    const runtime = startFlowRuntime(client);
++
++    await vi.advanceTimersByTimeAsync(100);
++    expect(client.requests).toHaveLength(1);
++    await vi.advanceTimersByTimeAsync(500);
++    expect(client.requests).toHaveLength(1);
++
++    client.pending[0]!.resolve(frame(1));
++    await flushRuntime();
++    await vi.advanceTimersByTimeAsync(100);
++    expect(client.requests).toHaveLength(2);
++    runtime.stop();
++  });
++
++  it("skips hidden-document ticks and stores successful teaching frames", async () => {
++    const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(true);
++    const client = new FakeFlowClient();
++    const runtime = startFlowRuntime(client);
++
++    await vi.advanceTimersByTimeAsync(300);
++    expect(client.requests).toHaveLength(0);
++    hidden.mockReturnValue(false);
++    await vi.advanceTimersByTimeAsync(100);
++    client.pending[0]!.resolve(frame(2));
++    await flushRuntime();
++
++    expect(labStore.getState()).toMatchObject({
++      flowStatus: "ready",
++      flowError: null,
++      flowField: { provenance: "2d-teaching-cfd" },
++    });
++    runtime.stop();
++    hidden.mockRestore();
++  });
++
++  it("preserves the last frame, logs instability, reduces velocity, restarts once, and retries", async () => {
++    const previousFrame = frame(7);
++    labStore.setState((state) => ({
++      ...state,
++      flowField: previousFrame,
++      telemetry: { ...state.telemetry, windSpeedMps: 6 },
++    }));
++    const client = new FakeFlowClient();
++    const runtime = startFlowRuntime(client);
++
++    await vi.advanceTimersByTimeAsync(100);
++    client.pending[0]!.reject(new FlowWorkerError("NON_FINITE_FIELD", "unstable"));
++    await flushRuntime();
++
++    expect(client.restartCount).toBe(1);
++    expect(client.requests.map(({ inletVelocity }) => inletVelocity)).toEqual([0.04, 0.032]);
++    expect(labStore.getState().flowField).toBe(previousFrame);
++    expect(labStore.getState().eventLog.at(-1)).toContain("二维教学 CFD");
++
++    client.pending[1]!.resolve(frame(3));
++    await flushRuntime();
++    expect(labStore.getState()).toMatchObject({ flowStatus: "ready", flowError: null });
++    runtime.stop();
++  });
++
++  it("fails without another restart when instability repeats", async () => {
++    const client = new FakeFlowClient();
++    const runtime = startFlowRuntime(client);
++
++    await vi.advanceTimersByTimeAsync(100);
++    client.pending[0]!.reject(new FlowWorkerError("NON_FINITE_FIELD", "first instability"));
++    await flushRuntime();
++    client.pending[1]!.reject(new FlowWorkerError("NON_FINITE_FIELD", "second instability"));
++    await flushRuntime();
++
++    expect(client.restartCount).toBe(1);
++    expect(labStore.getState()).toMatchObject({
++      flowStatus: "failed",
++      flowError: "second instability",
++    });
++    runtime.stop();
++  });
++
++  it("records other failures and manual restart clears only flow failure state", async () => {
++    const previousFrame = frame(5);
++    const previousTelemetry = labStore.getState().telemetry;
++    labStore.setState({ flowField: previousFrame });
++    const client = new FakeFlowClient();
++    const runtime = startFlowRuntime(client);
++
++    await vi.advanceTimersByTimeAsync(100);
++    client.pending[0]!.reject(new Error("network worker failure"));
++    await flushRuntime();
++    expect(labStore.getState()).toMatchObject({
++      flowStatus: "failed",
++      flowError: "network worker failure",
++    });
++
++    await runtime.restart();
++    expect(client.restartCount).toBe(1);
++    expect(labStore.getState().flowError).toBeNull();
++    expect(labStore.getState().flowStatus).toBe("failed");
++    expect(labStore.getState().flowField).toBe(previousFrame);
++    expect(labStore.getState().telemetry).toBe(previousTelemetry);
++
++    await vi.advanceTimersByTimeAsync(100);
++    expect(client.requests).toHaveLength(2);
++    runtime.stop();
++    await vi.advanceTimersByTimeAsync(300);
++    expect(client.requests).toHaveLength(2);
++  });
++});
+diff --git a/src/features/experiment/labStore.ts b/src/features/experiment/labStore.ts
+new file mode 100644
+index 0000000..ddcf140
+--- /dev/null
++++ b/src/features/experiment/labStore.ts
+@@ -0,0 +1,70 @@
++import { useStore } from "zustand";
++import { createStore } from "zustand/vanilla";
++import { createDefaultSimulationSource } from "./SimulationSource";
++import { experimentReducer } from "./experimentMachine";
++import type { ActiveRunPhase, RunPhase, TelemetryFrame } from "./model";
++import type { FlowFieldFrame } from "../flow/types";
++
++export const MAX_HISTORY = 1200;
++
++export type LabState = {
++  phase: RunPhase;
++  resumePhase: ActiveRunPhase | null;
++  fanPowerPct: number;
++  telemetry: TelemetryFrame;
++  history: TelemetryFrame[];
++  flowField: FlowFieldFrame | null;
++  flowStatus: "idle" | "loading" | "ready" | "failed";
++  flowError: string | null;
++  eventLog: string[];
++  selectedField: "speed" | "pressure" | "vorticity" | "streamlines";
++  setFanPower(percent: number): void;
++  acceptFrame(frame: TelemetryFrame): void;
++  startRun(): void;
++  pauseRun(): void;
++  resumeRun(): void;
++  advancePhase(): void;
++  resetLab(): void;
++  selectField(field: LabState["selectedField"]): void;
++};
++
++const initialTelemetry = createDefaultSimulationSource(0).reset();
++
++export const labStore = createStore<LabState>((set) => ({
++  phase: "idle",
++  resumePhase: null,
++  fanPowerPct: 0,
++  telemetry: initialTelemetry,
++  history: [],
++  flowField: null,
++  flowStatus: "idle",
++  flowError: null,
++  eventLog: [],
++  selectedField: "speed",
++  setFanPower: (percent) => set({ fanPowerPct: Math.min(100, Math.max(0, percent)) }),
++  acceptFrame: (frame) => set((state) => ({
++    telemetry: frame,
++    history: [...state.history.slice(-MAX_HISTORY + 1), frame],
++  })),
++  startRun: () => set((state) => experimentReducer(state, { type: "start" })),
++  pauseRun: () => set((state) => experimentReducer(state, { type: "pause" })),
++  resumeRun: () => set((state) => experimentReducer(state, { type: "resume" })),
++  advancePhase: () => set((state) => experimentReducer(state, { type: "advance" })),
++  resetLab: () => set({
++    phase: "idle",
++    resumePhase: null,
++    fanPowerPct: 0,
++    telemetry: initialTelemetry,
++    history: [],
++    flowField: null,
++    flowStatus: "idle",
++    flowError: null,
++    eventLog: [],
++    selectedField: "speed",
++  }),
++  selectField: (selectedField) => set({ selectedField }),
++}));
++
++export function useLabStore<T>(selector: (state: LabState) => T): T {
++  return useStore(labStore, selector);
++}

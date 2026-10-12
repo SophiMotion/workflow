@@ -1,0 +1,381 @@
+{
+  "schema": "sophi-worlds-scene",
+  "schema_version": 2,
+  "title": "未来校园 · 湖区 / 赛道 / 综合测试场",
+  "updated_at": "2026-10-02T18:00:00+08:00",
+  "units": "meters",
+  "up_axis": "Y",
+  "world": {
+    "name": "未来校园 · 湖区 / 赛道 / 综合测试场",
+    "kind": "spz",
+    "url": "assets/worlds/campus-4x/full_res.spz",
+    "file_name": "",
+    "marble_url": "https://marble.worldlabs.ai/world/5ec6efd4-4809-4874-9864-2921e49bf208",
+    "world_id": "5ec6efd4-4809-4874-9864-2921e49bf208",
+    "scale": 3.0701990127563477,
+    "ground_offset": 27.2877197265625,
+    "axis_flip": true,
+    "position": [
+      0,
+      0,
+      0
+    ],
+    "yaw": 0,
+    "calibrated": false,
+    "concept": true,
+    "quality": "full_res",
+    "quality_urls": {
+      "100k": "assets/worlds/campus-4x/100k.spz",
+      "500k": "assets/worlds/campus-4x/500k.spz",
+      "full_res": "assets/worlds/campus-4x/full_res.spz"
+    },
+    "default_scene_revision": "campus-street-life-20261002-v5",
+    "area_multiplier_intent": 5.55,
+    "scale_basis": "Designed 220 x 223 meter site; not measured Zhejiang University geography.",
+    "reference_image": "assets/campus-user-reference.png",
+    "overview_camera": {
+      "position": [
+        313.600599,
+        293.2,
+        -65.606992
+      ],
+      "target": [
+        -41.095633,
+        3.2,
+        84.561524
+      ]
+    },
+    "collider_url": "assets/worlds/campus-4x/collider.glb",
+    "camera_presets": [
+      {
+        "name": "全园总览",
+        "road_view": "overview",
+        "position": [
+          313.600599,
+          293.2,
+          -65.606992
+        ],
+        "target": [
+          -41.095633,
+          3.2,
+          84.561524
+        ]
+      },
+      {
+        "name": "原图校园核心",
+        "road_view": "campus",
+        "position": [
+          99.9391,
+          79.2,
+          -9.662698
+        ],
+        "target": [
+          -11.869021,
+          5.2,
+          40.814465
+        ]
+      },
+      {
+        "name": "建筑与庭院近景",
+        "road_view": "facades",
+        "position": [
+          52.280976,
+          31.2,
+          14.455826
+        ],
+        "target": [
+          -8.065457,
+          7.2,
+          32.657695
+        ]
+      },
+      {
+        "name": "接驳车与入口",
+        "road_view": "entrance",
+        "position": [
+          7.749752,
+          18.2,
+          -10.722937
+        ],
+        "target": [
+          -11.517235,
+          4.6,
+          4.567034
+        ]
+      },
+      {
+        "name": "配送与校园街景",
+        "road_view": "street",
+        "position": [
+          15.19319,
+          22.2,
+          32.4696
+        ],
+        "target": [
+          -13.983088,
+          4.6,
+          42.035415
+        ]
+      },
+      {
+        "name": "新增教学与服务区",
+        "road_view": "annex",
+        "position": [
+          152.153166,
+          138.2,
+          51.096592
+        ],
+        "target": [
+          14.423666,
+          3.2,
+          86.176284
+        ]
+      },
+      {
+        "name": "操场与运动公园",
+        "road_view": "sports",
+        "position": [
+          -1.557611,
+          88.2,
+          -23.890055
+        ],
+        "target": [
+          -82.983647,
+          3.2,
+          8.756548
+        ]
+      },
+      {
+        "name": "湖泊与栈道",
+        "road_view": "lake",
+        "position": [
+          -45.143482,
+          83.2,
+          83.777358
+        ],
+        "target": [
+          -122.827025,
+          3.2,
+          106.031957
+        ]
+      },
+      {
+        "name": "赛车环道",
+        "road_view": "race",
+        "position": [
+          101.067667,
+          148.2,
+          129.889178
+        ],
+        "target": [
+          -35.154574,
+          3.2,
+          154.637938
+        ]
+      },
+      {
+        "name": "综合测试道路",
+        "road_view": "test",
+        "position": [
+          113.858596,
+          65.2,
+          74.064523
+        ],
+        "target": [
+          52.906331,
+          3.2,
+          86.466998
+        ]
+      },
+      {
+        "name": "崎岖路近景",
+        "road_view": "rough",
+        "position": [
+          76.33843,
+          11.2,
+          59.878716
+        ],
+        "target": [
+          63.471787,
+          3.5,
+          63.809304
+        ]
+      },
+      {
+        "name": "水塘路近景",
+        "road_view": "water",
+        "position": [
+          63.298335,
+          16.2,
+          90.209491
+        ],
+        "target": [
+          47.412293,
+          3.2,
+          98.248999
+        ]
+      },
+      {
+        "name": "搓衣板路近景",
+        "road_view": "washboard",
+        "position": [
+          53.094425,
+          10.2,
+          109.725644
+        ],
+        "target": [
+          39.805165,
+          3.2,
+          114.56254
+        ]
+      }
+    ],
+    "demo_route": {
+      "name": "校园巡游",
+      "source": "engineered-road"
+    },
+    "engineered_road": {
+      "id": "campus-expanded-v3",
+      "road_width_m": 6.6,
+      "road_bed_height_local_m": 0,
+      "site_bounds": {
+        "minX": -115,
+        "maxX": 105,
+        "minZ": -18,
+        "maxZ": 205
+      },
+      "test_sections": [
+        {
+          "id": "rough",
+          "name": "崎岖路",
+          "from": 14,
+          "to": 32
+        },
+        {
+          "id": "gravel",
+          "name": "砂石路",
+          "from": 34,
+          "to": 50
+        },
+        {
+          "id": "water",
+          "name": "水塘路",
+          "from": 52,
+          "to": 68
+        },
+        {
+          "id": "washboard",
+          "name": "搓衣板路",
+          "from": 70,
+          "to": 88
+        }
+      ],
+      "test_water_depth_m": 0.12,
+      "note": "Level core/race roads with a separate non-flat proving lane. Design concept based on the supplied campus reference."
+    },
+    "original_camera": {
+      "position": [
+        0,
+        27.2877197265625,
+        0
+      ],
+      "target": [
+        0,
+        0,
+        35
+      ]
+    }
+  },
+  "objects": [
+    {
+      "id": "d4f47e24-9a0b-49b3-82ae-b43088e3afce",
+      "kind": "sophicar",
+      "name": "线控底盘 1",
+      "params": {
+        "Aluminum_profile_dimensions": 40,
+        "frame_total_long": 2140,
+        "frame_total_width": 910,
+        "wheel_base": 1683,
+        "front_width": 450,
+        "front_long": 450,
+        "frame_high": 350,
+        "track_width": 1400,
+        "Seat_Y": -16.05,
+        "cameraModel": "MaixCAM",
+        "lidarModel": "Mid360"
+      },
+      "position": [
+        1.323752,
+        3.225,
+        16.071774
+      ],
+      "yaw": 155,
+      "scale": 1,
+      "pitch": 0
+    },
+    {
+      "id": "94df6015-1052-4c55-8b3f-92c77c383832",
+      "kind": "robot",
+      "name": "移动机器人 1",
+      "params": {
+        "Aluminum_profile_dimensions": 40,
+        "frame_total_long": 2140,
+        "frame_total_width": 910,
+        "wheel_base": 1683,
+        "front_width": 450,
+        "front_long": 450,
+        "frame_high": 350,
+        "track_width": 1400,
+        "Seat_Y": -16.05,
+        "cameraModel": "MaixCAM",
+        "lidarModel": "Mid360"
+      },
+      "position": [
+        9.08844,
+        3.225,
+        21.899263
+      ],
+      "yaw": 155,
+      "scale": 1
+    }
+  ],
+  "route": {
+    "name": "校园巡游",
+    "object_id": "d4f47e24-9a0b-49b3-82ae-b43088e3afce",
+    "points": [
+      [
+        1.323752,
+        3.225,
+        16.071774
+      ],
+      [
+        -24.667271,
+        3.225,
+        71.809703
+      ]
+    ],
+    "speed": 4,
+    "surface": "road",
+    "loop": false,
+    "distance": 0,
+    "preset_id": "campus-level-network-v2"
+  },
+  "limitations": [
+    "Expanded design campus based on supplied reference; not a photogrammetric reconstruction.",
+    "Campus and race road beds are level; only the dedicated proving lane has authored elevation.",
+    "Two-axle path pose, not suspension dynamics or fluid simulation."
+  ],
+  "default_scene_revision": "campus-street-life-20261002-v5",
+  "camera": {
+    "position": [
+      99.9391,
+      79.2,
+      -9.662698
+    ],
+    "target": [
+      -11.869021,
+      5.2,
+      40.814465
+    ]
+  }
+}

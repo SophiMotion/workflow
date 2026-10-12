@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>打开 SkateChassis · SophiStudio</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f7f8f4;color:#242923;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
+    main{max-width:640px;margin:12vh auto;padding:44px;background:#fff;border:1px solid #e1e5dc;border-radius:20px}
+    .brand{font-size:19px;font-weight:700;letter-spacing:-.6px}.brand i{display:inline-block;width:8px;height:23px;background:#a4b779;transform:skewY(-20deg);margin-right:9px;vertical-align:middle}
+    .tag{display:inline-block;margin-top:36px;padding:6px 10px;background:#f0f4e5;color:#637245;border-radius:6px;font-size:12px}
+    h1{font-size:32px;line-height:1.3;letter-spacing:-1px;margin:16px 0}p{line-height:1.85;color:#757d6c;font-size:14px}
+    .actions{display:flex;gap:12px;flex-wrap:wrap;margin:28px 0 18px}.actions a{padding:14px 21px;border-radius:9px;text-decoration:none;font-size:14px;font-weight:600;border:1px solid #dfe4d6;color:#343b2e}.actions .primary{background:#252e21;border-color:#252e21;color:#fff}
+    #status{min-height:26px;color:#667a42}.help{margin-top:28px;border-top:1px solid #e9ece4;padding-top:19px;font-size:13px}.help strong{color:#4f5946;font-weight:500}small{display:block;font-size:12px;color:#929a89;margin-top:24px}
+    @media(max-width:680px){main{margin:20px 14px;padding:28px}h1{font-size:27px}.actions a{width:100%;text-align:center}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="brand"><i></i>sophistudio.</div>
+  <span class="tag">机器人设计工作台</span>
+  <h1>从一个参数，到一台机器人。</h1>
+  <p>参数设计、BOM、报价、协作 PRD 与 Fusion 联动。<br>由本机启动器在后台运行，无需打开终端。</p>
+  <div class="actions">
+    <a class="primary" id="launch" href="sophistudio-skate://open">启动工作台</a>
+    <a href="http://127.0.0.1:4173/">打开已启动的网页</a>
+  </div>
+  <p id="status" role="status">也可以直接双击项目中的「SkateChassis 工作台.app」。</p>
+  <div class="help"><p><strong>首次使用</strong><br>如果浏览器询问是否打开“SkateChassis 工作台”，请允许。若点击无反应，先在访达中双击同目录的 .app，再使用本页。</p><p><strong>退出与再次使用</strong><br>关闭网页后，服务继续在本机后台运行；重启电脑后再次双击启动器即可。</p></div>
+  <small>本机地址 · http://127.0.0.1:4173/</small>
+</main>
+<script>
+  document.getElementById('launch').addEventListener('click',()=>{
+    document.getElementById('status').textContent='已请求打开本机启动器。启动成功后会自动打开工作台网页。';
+  });
+</script>
+</body>
+</html>

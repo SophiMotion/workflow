@@ -1,0 +1,280 @@
+[
+  {
+    "file": "rea-desktop-evidence.json",
+    "evidence_id": "ev_d22a4be96a198c351e59f4b992882a504cad4216ce10a1bbd412e2b8c9490083",
+    "operation": "capture_browser_scenario",
+    "status": "complete",
+    "steps": [
+      {
+        "id": "scenario_start",
+        "status": "completed"
+      },
+      {
+        "id": "viewport-ready",
+        "status": "completed"
+      },
+      {
+        "id": "initial-render",
+        "status": "completed"
+      }
+    ],
+    "consoleEvents": 1,
+    "pageErrorEvents": 0
+  },
+  {
+    "file": "rea-final-analysis-evidence.json",
+    "evidence_id": "ev_7d2959ac7c29a5aee7ee8773977b2e4f9153295218ff373bc29e1f96da7ece4c",
+    "operation": "capture_browser_scenario",
+    "status": "complete",
+    "steps": [
+      {
+        "id": "scenario_start",
+        "status": "completed"
+      },
+      {
+        "id": "viewport-ready",
+        "status": "completed"
+      },
+      {
+        "id": "initial-render",
+        "status": "completed"
+      },
+      {
+        "id": "run-demo",
+        "status": "completed"
+      },
+      {
+        "id": "weld-preview",
+        "status": "completed"
+      },
+      {
+        "id": "pause",
+        "status": "completed"
+      },
+      {
+        "id": "temperature-result",
+        "status": "completed"
+      },
+      {
+        "id": "settle-temperature",
+        "status": "completed"
+      }
+    ],
+    "consoleEvents": 0,
+    "pageErrorEvents": 0
+  },
+  {
+    "file": "rea-final-desktop-evidence.json",
+    "evidence_id": "ev_eda66ee1863f3f1055fc46dfc03d0a7a47b18a1f2410c29b5f00943b2a8749b0",
+    "operation": "capture_browser_scenario",
+    "status": "complete",
+    "steps": [
+      {
+        "id": "scenario_start",
+        "status": "completed"
+      },
+      {
+        "id": "viewport-ready",
+        "status": "completed"
+      },
+      {
+        "id": "initial-render",
+        "status": "completed"
+      }
+    ],
+    "consoleEvents": 0,
+    "pageErrorEvents": 0
+  },
+  {
+    "file": "rea-final-mobile-evidence.json",
+    "evidence_id": "ev_c2a27238bb2390c137bb010c26dd9d2b7f62e7d8c3795f3f9912354c43a22d61",
+    "operation": "capture_browser_scenario",
+    "status": "complete",
+    "steps": [
+      {
+        "id": "scenario_start",
+        "status": "completed"
+      },
+      {
+        "id": "viewport-ready",
+        "status": "completed"
+      },
+      {
+        "id": "initial-render",
+        "status": "completed"
+      }
+    ],
+    "consoleEvents": 0,
+    "pageErrorEvents": 0
+  },
+  {
+    "file": "rea-interaction-evidence.json",
+    "evidence_id": "ev_145acecb8d992a9283bf079809d9d7f8efbdf9587eda4b51752f5490b3f24eeb",
+    "operation": "capture_browser_scenario",
+    "status": "complete",
+    "steps": [
+      {
+        "id": "scenario_start",
+        "status": "completed"
+      },
+      {
+        "id": "viewport-ready",
+        "status": "completed"
+      },
+      {
+        "id": "initial-render",
+        "status": "completed"
+      },
+      {
+        "id": "set-current",
+        "status": "completed"
+      },
+      {
+        "id": "commit-current",
+        "status": "completed"
+      },
+      {
+        "id": "set-speed",
+        "status": "completed"
+      },
+      {
+        "id": "commit-speed",
+        "status": "completed"
+      },
+      {
+        "id": "select-sequence",
+        "status": "completed"
+      },
+      {
+        "id": "run-demo",
+        "status": "completed"
+      },
+      {
+        "id": "let-play",
+        "status": "completed"
+      },
+      {
+        "id": "pause",
+        "status": "completed"
+      },
+      {
+        "id": "stress-result",
+        "status": "completed"
+      },
+      {
+        "id": "settle-stress",
+        "status": "completed"
+      }
+    ],
+    "consoleEvents": 1,
+    "pageErrorEvents": 0
+  },
+  {
+    "file": "rea-mobile-drawer-evidence.json",
+    "evidence_id": "ev_73cc0710f8b49cb75618e6194c94e3c1596dbf8efe3d8e8771f14a474d44e9f3",
+    "operation": "capture_browser_scenario",
+    "status": "incomplete",
+    "steps": [
+      {
+        "id": "scenario_start",
+        "status": "completed"
+      },
+      {
+        "id": "viewport-ready",
+        "status": "completed"
+      },
+      {
+        "id": "initial-render",
+        "status": "completed"
+      },
+      {
+        "id": "open-parameters",
+        "status": "completed"
+      },
+      {
+        "id": "close-parameters",
+        "status": "failed"
+      }
+    ],
+    "consoleEvents": 0,
+    "pageErrorEvents": 0
+  },
+  {
+    "file": "rea-mobile-drawer-fixed-evidence.json",
+    "evidence_id": "ev_95f343f1d5bf97c27b64554b8eb5fe5560475705db35a168c1e744bc901d0445",
+    "operation": "capture_browser_scenario",
+    "status": "complete",
+    "steps": [
+      {
+        "id": "scenario_start",
+        "status": "completed"
+      },
+      {
+        "id": "viewport-ready",
+        "status": "completed"
+      },
+      {
+        "id": "initial-render",
+        "status": "completed"
+      },
+      {
+        "id": "open-parameters",
+        "status": "completed"
+      },
+      {
+        "id": "close-parameters",
+        "status": "completed"
+      },
+      {
+        "id": "closed-state",
+        "status": "completed"
+      }
+    ],
+    "consoleEvents": 0,
+    "pageErrorEvents": 0
+  },
+  {
+    "file": "rea-mobile-evidence.json",
+    "evidence_id": "ev_294a5ed3d2266086135c65ba763a8b9c5c7d813f30083f8cf72b3e87da8fa50a",
+    "operation": "capture_browser_scenario",
+    "status": "complete",
+    "steps": [
+      {
+        "id": "scenario_start",
+        "status": "completed"
+      },
+      {
+        "id": "viewport-ready",
+        "status": "completed"
+      },
+      {
+        "id": "initial-render",
+        "status": "completed"
+      }
+    ],
+    "consoleEvents": 1,
+    "pageErrorEvents": 0
+  },
+  {
+    "file": "rea-portrait-mobile-evidence.json",
+    "evidence_id": "ev_a2bd726fa1072761a0a9e0e75005e3ada6ac0cd51b8af55793cddd691cbf9e64",
+    "operation": "capture_browser_scenario",
+    "status": "complete",
+    "steps": [
+      {
+        "id": "scenario_start",
+        "status": "completed"
+      },
+      {
+        "id": "viewport-ready",
+        "status": "completed"
+      },
+      {
+        "id": "initial-render",
+        "status": "completed"
+      }
+    ],
+    "consoleEvents": 0,
+    "pageErrorEvents": 0
+  }
+]

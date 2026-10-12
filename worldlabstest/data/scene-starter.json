@@ -1,0 +1,99 @@
+{
+  "schema": "sophi-worlds-scene",
+  "schema_version": 2,
+  "title": "浙大地图 · 待导入",
+  "updated_at": "2026-10-02T08:29:51.391Z",
+  "units": "meters",
+  "up_axis": "Y",
+  "world": {
+    "name": "浙大地图 · 待导入",
+    "kind": null,
+    "url": "",
+    "file_name": "",
+    "marble_url": "",
+    "world_id": "",
+    "scale": 1,
+    "ground_offset": 0,
+    "axis_flip": true,
+    "position": [
+      0,
+      0,
+      0
+    ],
+    "yaw": 0,
+    "calibrated": false
+  },
+  "objects": [
+    {
+      "id": "d4f47e24-9a0b-49b3-82ae-b43088e3afce",
+      "kind": "sophicar",
+      "name": "线控底盘 1",
+      "params": {
+        "Aluminum_profile_dimensions": 40,
+        "frame_total_long": 2140,
+        "frame_total_width": 910,
+        "wheel_base": 1683,
+        "front_width": 450,
+        "front_long": 450,
+        "frame_high": 350,
+        "track_width": 1400,
+        "Seat_Y": -16.05,
+        "cameraModel": "MaixCAM",
+        "lidarModel": "Mid360"
+      },
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "94df6015-1052-4c55-8b3f-92c77c383832",
+      "kind": "robot",
+      "name": "移动机器人 1",
+      "params": {
+        "Aluminum_profile_dimensions": 40,
+        "frame_total_long": 2140,
+        "frame_total_width": 910,
+        "wheel_base": 1683,
+        "front_width": 450,
+        "front_long": 450,
+        "frame_high": 350,
+        "track_width": 1400,
+        "Seat_Y": -16.05,
+        "cameraModel": "MaixCAM",
+        "lidarModel": "Mid360"
+      },
+      "position": [
+        2.2,
+        0,
+        0
+      ],
+      "yaw": 0,
+      "scale": 1
+    }
+  ],
+  "route": {
+    "object_id": null,
+    "points": [],
+    "speed": 1
+  },
+  "camera": {
+    "position": [
+      3.810208263762115,
+      2.8501295900215227,
+      3.284814736685618
+    ],
+    "target": [
+      0.8538750007450581,
+      0.7150000111758709,
+      0
+    ]
+  },
+  "limitations": [
+    "Gaussian splat environment with independent meshes; no physical simulation.",
+    "Local assets must be relinked by file name after reopening."
+  ]
+}

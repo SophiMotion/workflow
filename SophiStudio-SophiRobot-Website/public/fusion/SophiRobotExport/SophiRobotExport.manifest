@@ -1,0 +1,1 @@
+{"autodeskProduct":"Fusion360","type":"script","author":"SophiStudio","description":{"":"Apply a validated SophiRobot configuration to native Fusion parameters and export STEP."},"supportedOS":"windows|mac","version":"1.0.0","runOnStartup":false}

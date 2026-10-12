@@ -1,0 +1,279 @@
+{
+  "schemaVersion": "1.0.0",
+  "units": {
+    "length": "m",
+    "mass": "kg",
+    "angle": "rad",
+    "inertia": "kg*m^2",
+    "fusionDocumentLength": "mm",
+    "fusionDocumentAngle": "deg"
+  },
+  "parameters": {
+    "user": [
+      {
+        "name": "w1",
+        "unit": "mm",
+        "expression": "20 mm",
+        "valueSi": 0.02,
+        "comment": "连杆1宽度",
+        "favorite": false,
+        "dependencies": [],
+        "writable": true
+      },
+      {
+        "name": "w2",
+        "unit": "mm",
+        "expression": "20 mm",
+        "valueSi": 0.02,
+        "comment": "连杆2宽度",
+        "favorite": false,
+        "dependencies": [],
+        "writable": true
+      },
+      {
+        "name": "l1",
+        "unit": "mm",
+        "expression": "200 mm",
+        "valueSi": 0.2,
+        "comment": "连杆1长度",
+        "favorite": false,
+        "dependencies": [],
+        "writable": true
+      },
+      {
+        "name": "l2",
+        "unit": "mm",
+        "expression": "250 mm",
+        "valueSi": 0.25,
+        "comment": "连杆2长度",
+        "favorite": false,
+        "dependencies": [],
+        "writable": true
+      },
+      {
+        "name": "d",
+        "unit": "mm",
+        "expression": "10 mm",
+        "valueSi": 0.01,
+        "comment": "孔轴直径",
+        "favorite": false,
+        "dependencies": [],
+        "writable": true
+      },
+      {
+        "name": "t1",
+        "unit": "mm",
+        "expression": "20 mm",
+        "valueSi": 0.02,
+        "comment": "连杆1厚度",
+        "favorite": false,
+        "dependencies": [],
+        "writable": true
+      },
+      {
+        "name": "t2",
+        "unit": "mm",
+        "expression": "20 mm",
+        "valueSi": 0.02,
+        "comment": "连杆2厚度",
+        "favorite": false,
+        "dependencies": [],
+        "writable": true
+      }
+    ],
+    "model": []
+  },
+  "components": [
+    {
+      "id": "ground-component",
+      "name": "连杆2",
+      "partNumber": "LINK-L2-GROUND",
+      "description": "固定连杆",
+      "material": "Steel",
+      "collisionMesh": "meshes/collision/ground.stl"
+    },
+    {
+      "id": "input-component",
+      "name": "连杆1",
+      "partNumber": "LINK-L1-INPUT",
+      "description": "输入连杆",
+      "material": "Steel",
+      "collisionMesh": "meshes/collision/input.stl"
+    },
+    {
+      "id": "coupler-component",
+      "name": "连杆2",
+      "partNumber": "LINK-L2-COUPLER",
+      "description": "耦合连杆",
+      "material": "Steel",
+      "collisionMesh": "meshes/collision/coupler.stl"
+    },
+    {
+      "id": "output-component",
+      "name": "连杆1",
+      "partNumber": "LINK-L1-OUTPUT",
+      "description": "输出连杆",
+      "material": "Steel",
+      "collisionMesh": "meshes/collision/output.stl"
+    }
+  ],
+  "occurrences": [
+    {
+      "id": "ground",
+      "componentId": "ground-component",
+      "name": "连杆2:1",
+      "fullPath": "test1 v1+连杆2:1",
+      "transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      "visible": true,
+      "grounded": true
+    },
+    {
+      "id": "input",
+      "componentId": "input-component",
+      "name": "连杆1:1",
+      "fullPath": "test1 v1+连杆1:1",
+      "transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      "visible": true,
+      "grounded": false
+    },
+    {
+      "id": "coupler",
+      "componentId": "coupler-component",
+      "name": "连杆2:2",
+      "fullPath": "test1 v1+连杆2:2",
+      "transform": [1, 0, 0, 0.2, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      "visible": true,
+      "grounded": false
+    },
+    {
+      "id": "output",
+      "componentId": "output-component",
+      "name": "连杆1:2",
+      "fullPath": "test1 v1+连杆1:2",
+      "transform": [1, 0, 0, 0.25, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      "visible": true,
+      "grounded": false
+    }
+  ],
+  "joints": [
+    {
+      "id": "j-ground-input",
+      "name": "轴1",
+      "parentOccurrenceId": "ground",
+      "childOccurrenceId": "input",
+      "type": "revolute",
+      "fusionType": "RevoluteJointType",
+      "origin": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      "axis": [0, 0, 1],
+      "degreesOfFreedom": 1,
+      "position": 0,
+      "limit": { "lower": -1.5707963267948966, "upper": 1.5707963267948966, "effort": 100, "velocity": 2 },
+      "suppressed": false,
+      "loopClosure": false,
+      "writeback": { "limits": true, "type": false, "axis": false }
+    },
+    {
+      "id": "j-input-coupler",
+      "name": "轴2",
+      "parentOccurrenceId": "input",
+      "childOccurrenceId": "coupler",
+      "type": "revolute",
+      "fusionType": "RevoluteJointType",
+      "origin": [1, 0, 0, 0.2, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      "axis": [0, 0, 1],
+      "degreesOfFreedom": 1,
+      "position": 0,
+      "limit": { "lower": -3.141592653589793, "upper": 3.141592653589793, "effort": 100, "velocity": 2 },
+      "suppressed": false,
+      "loopClosure": false,
+      "writeback": { "limits": true, "type": false, "axis": false }
+    },
+    {
+      "id": "j-coupler-output",
+      "name": "轴3",
+      "parentOccurrenceId": "coupler",
+      "childOccurrenceId": "output",
+      "type": "revolute",
+      "fusionType": "RevoluteJointType",
+      "origin": [1, 0, 0, 0.25, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      "axis": [0, 0, 1],
+      "degreesOfFreedom": 1,
+      "position": 0,
+      "limit": { "lower": -3.141592653589793, "upper": 3.141592653589793, "effort": 100, "velocity": 2 },
+      "suppressed": false,
+      "loopClosure": false,
+      "writeback": { "limits": true, "type": false, "axis": false }
+    },
+    {
+      "id": "j-output-ground",
+      "name": "轴4",
+      "parentOccurrenceId": "output",
+      "childOccurrenceId": "ground",
+      "type": "revolute",
+      "fusionType": "RevoluteJointType",
+      "origin": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      "axis": [0, 0, 1],
+      "degreesOfFreedom": 1,
+      "position": 0,
+      "limit": { "lower": -1.5707963267948966, "upper": 1.5707963267948966, "effort": 100, "velocity": 2 },
+      "suppressed": false,
+      "loopClosure": true,
+      "writeback": { "limits": true, "type": false, "axis": false }
+    }
+  ],
+  "physicalProperties": [
+    {
+      "entityId": "ground",
+      "massKg": 0.8,
+      "volumeM3": 0.0001,
+      "centerOfMass": [0.125, 0, 0],
+      "inertiaKgM2": [0.001, 0, 0, 0, 0.005, 0, 0, 0, 0.005],
+      "inertiaFrame": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      "accuracy": "very-high"
+    },
+    {
+      "entityId": "input",
+      "massKg": 0.65,
+      "volumeM3": 0.00008,
+      "centerOfMass": [0.1, 0, 0],
+      "inertiaKgM2": [0.001, 0, 0, 0, 0.003, 0, 0, 0, 0.003],
+      "inertiaFrame": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      "accuracy": "very-high"
+    },
+    {
+      "entityId": "coupler",
+      "massKg": 0.8,
+      "volumeM3": 0.0001,
+      "centerOfMass": [0.125, 0, 0],
+      "inertiaKgM2": [0.001, 0, 0, 0, 0.005, 0, 0, 0, 0.005],
+      "inertiaFrame": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      "accuracy": "very-high"
+    },
+    {
+      "entityId": "output",
+      "massKg": 0.65,
+      "volumeM3": 0.00008,
+      "centerOfMass": [0.1, 0, 0],
+      "inertiaKgM2": [0.001, 0, 0, 0, 0.003, 0, 0, 0, 0.003],
+      "inertiaFrame": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      "accuracy": "very-high"
+    }
+  ],
+  "bom": [
+    { "componentId": "ground-component", "partNumber": "LINK-L2-GROUND", "description": "固定连杆", "material": "Steel", "quantity": 1, "occurrenceIds": ["ground"] },
+    { "componentId": "input-component", "partNumber": "LINK-L1-INPUT", "description": "输入连杆", "material": "Steel", "quantity": 1, "occurrenceIds": ["input"] },
+    { "componentId": "coupler-component", "partNumber": "LINK-L2-COUPLER", "description": "耦合连杆", "material": "Steel", "quantity": 1, "occurrenceIds": ["coupler"] },
+    { "componentId": "output-component", "partNumber": "LINK-L1-OUTPUT", "description": "输出连杆", "material": "Steel", "quantity": 1, "occurrenceIds": ["output"] }
+  ],
+  "robot": {
+    "name": "four bar",
+    "rootOccurrenceId": "ground",
+    "linkMappings": [
+      { "occurrenceId": "ground", "linkName": "ground" },
+      { "occurrenceId": "input", "linkName": "input" },
+      { "occurrenceId": "coupler", "linkName": "coupler" },
+      { "occurrenceId": "output", "linkName": "output" }
+    ],
+    "jointOverrides": []
+  }
+}

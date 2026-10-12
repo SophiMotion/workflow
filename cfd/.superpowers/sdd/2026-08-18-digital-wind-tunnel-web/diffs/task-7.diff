@@ -1,0 +1,1092 @@
+# Review package: Task 7 (changed-file current snapshots; no commits by ruling)
+
+## Files
+src/features/scene/flowSampling.ts
+src/features/scene/flowSampling.test.ts
+src/features/scene/WindTunnelGeometry.tsx
+src/features/scene/VehicleModel.tsx
+src/features/scene/FlowParticles.tsx
+src/features/scene/FieldSlice.tsx
+src/features/scene/Hotspots.tsx
+src/features/scene/hotspotTypes.ts
+src/features/scene/SceneFallback.tsx
+src/features/scene/WindTunnelScene.tsx
+src/features/scene/WindTunnelScene.test.tsx
+src/App.tsx
+src/styles/global.css
+
+## Current contents
+diff --git a/src/features/scene/flowSampling.ts b/src/features/scene/flowSampling.ts
+new file mode 100644
+index 0000000..be9ba89
+--- /dev/null
++++ b/src/features/scene/flowSampling.ts
+@@ -0,0 +1,36 @@
++type VelocityField = {
++  width: number;
++  height: number;
++  velocityX: Float32Array;
++  velocityY: Float32Array;
++};
++
++export type FlowVelocity = { x: number; y: number };
++
++function clamp01(value: number) {
++  return Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
++}
++
++function bilinear(values: Float32Array, width: number, height: number, u: number, v: number) {
++  if (width <= 0 || height <= 0 || values.length === 0) return 0;
++
++  const x = clamp01(u) * Math.max(0, width - 1);
++  const y = clamp01(v) * Math.max(0, height - 1);
++  const x0 = Math.floor(x);
++  const y0 = Math.floor(y);
++  const x1 = Math.min(width - 1, x0 + 1);
++  const y1 = Math.min(height - 1, y0 + 1);
++  const tx = x - x0;
++  const ty = y - y0;
++  const at = (column: number, row: number) => values[row * width + column] ?? 0;
++  const top = at(x0, y0) * (1 - tx) + at(x1, y0) * tx;
++  const bottom = at(x0, y1) * (1 - tx) + at(x1, y1) * tx;
++  return top * (1 - ty) + bottom * ty;
++}
++
++export function sampleFlowVelocity(frame: VelocityField, u: number, v: number): FlowVelocity {
++  return {
++    x: bilinear(frame.velocityX, frame.width, frame.height, u, v),
++    y: bilinear(frame.velocityY, frame.width, frame.height, u, v),
++  };
++}
+diff --git a/src/features/scene/flowSampling.test.ts b/src/features/scene/flowSampling.test.ts
+new file mode 100644
+index 0000000..1a579f9
+--- /dev/null
++++ b/src/features/scene/flowSampling.test.ts
+@@ -0,0 +1,23 @@
++import { sampleFlowVelocity } from "./flowSampling";
++
++it("bilinearly samples a normalized flow coordinate", () => {
++  const frame = {
++    width: 2,
++    height: 2,
++    velocityX: new Float32Array([0, 2, 4, 6]),
++    velocityY: new Float32Array([0, 0, 2, 2]),
++  };
++
++  expect(sampleFlowVelocity(frame, 0.5, 0.5)).toEqual({ x: 3, y: 1 });
++});
++
++it("clamps samples to the field boundary", () => {
++  const frame = {
++    width: 2,
++    height: 1,
++    velocityX: new Float32Array([1, 2]),
++    velocityY: new Float32Array([0, 0]),
++  };
++
++  expect(sampleFlowVelocity(frame, 9, 0).x).toBe(2);
++});
+diff --git a/src/features/scene/WindTunnelGeometry.tsx b/src/features/scene/WindTunnelGeometry.tsx
+new file mode 100644
+index 0000000..935dad1
+--- /dev/null
++++ b/src/features/scene/WindTunnelGeometry.tsx
+@@ -0,0 +1,141 @@
++import { useLayoutEffect, useMemo, useRef } from "react";
++import * as THREE from "three";
++import type { HotspotId } from "./hotspotTypes";
++
++type WindTunnelGeometryProps = {
++  selected: HotspotId | null;
++  cutaway: boolean;
++};
++
++const OFF_WHITE = "#ebe8df";
++const CHARCOAL = "#252d30";
++const RED = "#d84940";
++
++function moduleOpacity(selected: HotspotId | null, id: HotspotId) {
++  return selected && selected !== id ? 0.2 : 1;
++}
++
++function makeTaperGeometry() {
++  const geometry = new THREE.BufferGeometry();
++  const vertices = new Float32Array([
++    -0.8, -1.25, -1.35, -0.8, -1.25, 1.35, -0.8, 1.25, 1.35, -0.8, 1.25, -1.35,
++    0.8, -0.92, -1.02, 0.8, -0.92, 1.02, 0.8, 0.92, 1.02, 0.8, 0.92, -1.02,
++  ]);
++  geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
++  geometry.setIndex([
++    0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6,
++    0, 4, 5, 0, 5, 1, 3, 2, 6, 3, 6, 7,
++    1, 5, 6, 1, 6, 2, 0, 3, 7, 0, 7, 4,
++  ]);
++  geometry.computeVertexNormals();
++  return geometry;
++}
++
++function HoneycombPlane({ x, opacity }: { x: number; opacity: number }) {
++  const columns = 8;
++  const rows = 7;
++  const cells = useMemo(() => Array.from({ length: columns * rows }, (_, index) => ({
++    x: (index % columns - (columns - 1) / 2) * 0.25 + (Math.floor(index / columns) % 2) * 0.125,
++    y: (Math.floor(index / columns) - (rows - 1) / 2) * 0.27,
++  })), []);
++  const geometry = useMemo(() => new THREE.RingGeometry(0.09, 0.115, 6), []);
++  const material = useMemo(() => new THREE.MeshStandardMaterial({ color: CHARCOAL, side: THREE.DoubleSide }), []);
++  const meshRef = useRef<THREE.InstancedMesh>(null);
++
++  useLayoutEffect(() => {
++    if (!meshRef.current) return;
++    const matrix = new THREE.Matrix4();
++    cells.forEach((cell, index) => {
++      matrix.makeTranslation(cell.x, cell.y, 0);
++      meshRef.current?.setMatrixAt(index, matrix);
++    });
++    meshRef.current.instanceMatrix.needsUpdate = true;
++  }, [cells]);
++
++  return (
++    <group position={[x, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
++      <instancedMesh ref={meshRef} args={[geometry, material, cells.length]}>
++        <meshStandardMaterial color={CHARCOAL} transparent opacity={opacity} side={THREE.DoubleSide} />
++      </instancedMesh>
++      <mesh>
++        <boxGeometry args={[2.35, 2.35, 0.06]} />
++        <meshStandardMaterial color={CHARCOAL} wireframe transparent opacity={opacity} />
++      </mesh>
++    </group>
++  );
++}
++
++function StructuralHoop({ x, opacity }: { x: number; opacity: number }) {
++  return (
++    <group position={[x, 0, 0]}>
++      <mesh position={[0, 1.18, 0]}><boxGeometry args={[0.16, 0.14, 2.42]} /><meshStandardMaterial color={CHARCOAL} transparent opacity={opacity} /></mesh>
++      <mesh position={[0, -1.18, 0]}><boxGeometry args={[0.16, 0.14, 2.42]} /><meshStandardMaterial color={CHARCOAL} transparent opacity={opacity} /></mesh>
++      <mesh position={[0, 0, 1.14]}><boxGeometry args={[0.16, 2.22, 0.14]} /><meshStandardMaterial color={CHARCOAL} transparent opacity={opacity} /></mesh>
++      <mesh position={[0, 0, -1.14]}><boxGeometry args={[0.16, 2.22, 0.14]} /><meshStandardMaterial color={CHARCOAL} transparent opacity={opacity} /></mesh>
++    </group>
++  );
++}
++
++export function WindTunnelGeometry({ selected, cutaway }: WindTunnelGeometryProps) {
++  const taper = useMemo(() => makeTaperGeometry(), []);
++  const straightenerOpacity = moduleOpacity(selected, "straightener");
++  const contractionOpacity = moduleOpacity(selected, "contraction");
++  const testOpacity = moduleOpacity(selected, "test-section");
++  const fanOpacity = moduleOpacity(selected, "fan");
++
++  return (
++    <group>
++      <group>
++        <HoneycombPlane x={-5.1} opacity={straightenerOpacity} />
++        <HoneycombPlane x={-4.6} opacity={straightenerOpacity} />
++        <mesh position={[-4.86, 0, 0]}>
++          <boxGeometry args={[0.8, 2.7, 2.9]} />
++          <meshStandardMaterial color={OFF_WHITE} side={THREE.BackSide} transparent opacity={0.82 * straightenerOpacity} />
++        </mesh>
++      </group>
++
++      <group position={[-3.55, 0, 0]}>
++        <mesh geometry={taper}>
++          <meshStandardMaterial color={OFF_WHITE} transparent opacity={0.86 * contractionOpacity} side={THREE.DoubleSide} />
++        </mesh>
++        <StructuralHoop x={-0.76} opacity={contractionOpacity} />
++        <StructuralHoop x={0.76} opacity={contractionOpacity} />
++      </group>
++
++      <group>
++        <mesh position={[0, cutaway ? -0.55 : 0, 0]}>
++          <boxGeometry args={[5.2, cutaway ? 1.1 : 2.2, 2.15]} />
++          <meshPhysicalMaterial color="#b8e2df" transmission={0.42} transparent opacity={0.055 * testOpacity} roughness={0.12} thickness={0.04} depthWrite={false} side={THREE.DoubleSide} />
++        </mesh>
++        <StructuralHoop x={-2.55} opacity={testOpacity} />
++        <StructuralHoop x={0} opacity={testOpacity} />
++        <StructuralHoop x={2.55} opacity={testOpacity} />
++      </group>
++
++      <group position={[3.65, 0, 0]}>
++        <mesh geometry={taper} rotation={[0, Math.PI, 0]}>
++          <meshStandardMaterial color={OFF_WHITE} transparent opacity={0.86 * fanOpacity} side={THREE.DoubleSide} />
++        </mesh>
++      </group>
++
++      <group position={[5.15, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
++        <mesh><cylinderGeometry args={[1.33, 1.33, 0.75, 32, 1, true]} /><meshStandardMaterial color={OFF_WHITE} transparent opacity={fanOpacity} side={THREE.DoubleSide} /></mesh>
++        <mesh><cylinderGeometry args={[0.23, 0.23, 0.88, 20]} /><meshStandardMaterial color={RED} transparent opacity={fanOpacity} /></mesh>
++        {Array.from({ length: 6 }, (_, index) => (
++          <group key={index} rotation={[0, index * Math.PI / 3, 0]}>
++            <mesh position={[0.48, 0, 0]} rotation={[0, 0, 0.34]}>
++              <boxGeometry args={[0.7, 0.06, 0.22]} />
++              <meshStandardMaterial color={RED} transparent opacity={fanOpacity} />
++            </mesh>
++          </group>
++        ))}
++        <mesh position={[0, 0.42, 0]}><cylinderGeometry args={[1.25, 1.25, 0.05, 32]} /><meshStandardMaterial color={CHARCOAL} wireframe transparent opacity={fanOpacity} /></mesh>
++      </group>
++
++      <group position={[0, -1.47, 0]}>
++        <mesh><boxGeometry args={[12, 0.12, 3.2]} /><meshStandardMaterial color="#17242a" metalness={0.4} roughness={0.62} /></mesh>
++        {[-5, -2.5, 0, 2.5, 5].map((x) => <mesh key={x} position={[x, -0.16, 0]}><boxGeometry args={[0.18, 0.22, 3]} /><meshStandardMaterial color={CHARCOAL} /></mesh>)}
++      </group>
++    </group>
++  );
++}
+diff --git a/src/features/scene/VehicleModel.tsx b/src/features/scene/VehicleModel.tsx
+new file mode 100644
+index 0000000..e752e45
+--- /dev/null
++++ b/src/features/scene/VehicleModel.tsx
+@@ -0,0 +1,77 @@
++import { RoundedBox } from "@react-three/drei";
++import { useMemo } from "react";
++import * as THREE from "three";
++import type { FlowFieldFrame } from "../flow/types";
++import type { HotspotId } from "./hotspotTypes";
++
++type VehicleModelProps = {
++  frame: FlowFieldFrame | null;
++  selected: HotspotId | null;
++};
++
++function pressureColor(value: number, minimum: number, maximum: number) {
++  if (!Number.isFinite(value) || maximum <= minimum) return "#879194";
++  const t = THREE.MathUtils.clamp((value - minimum) / (maximum - minimum), 0, 1);
++  const low = new THREE.Color("#2366bc");
++  const middle = new THREE.Color("#879194");
++  const high = new THREE.Color("#d94a43");
++  return (t < 0.5 ? low.lerp(middle, t * 2) : middle.lerp(high, (t - 0.5) * 2)).getStyle();
++}
++
++export function VehicleModel({ frame, selected }: VehicleModelProps) {
++  const opacity = selected && selected !== "model-stand" && selected !== "test-section" ? 0.2 : 1;
++  const pressureBands = useMemo(() => {
++    if (!frame?.pressure.length) return ["#718083", "#879194", "#718083"];
++    let minimum = Infinity;
++    let maximum = -Infinity;
++    for (const value of frame.pressure) {
++      minimum = Math.min(minimum, value);
++      maximum = Math.max(maximum, value);
++    }
++    return [0.34, 0.5, 0.66].map((u) => {
++      const x = Math.round(u * (frame.width - 1));
++      const y = Math.round(frame.height * 0.52);
++      return pressureColor(frame.pressure[y * frame.width + x] ?? 0, minimum, maximum);
++    });
++  }, [frame]);
++
++  return (
++    <group position={[0, -0.58, 0]}>
++      <group>
++        <mesh position={[0, -0.52, 0]}><boxGeometry args={[2.35, 0.12, 1.18]} /><meshStandardMaterial color="#d84940" transparent opacity={opacity} /></mesh>
++        <mesh position={[-0.72, -0.3, 0]}><boxGeometry args={[0.12, 0.5, 0.12]} /><meshStandardMaterial color="#d84940" transparent opacity={opacity} /></mesh>
++        <mesh position={[0.72, -0.3, 0]}><boxGeometry args={[0.12, 0.5, 0.12]} /><meshStandardMaterial color="#d84940" transparent opacity={opacity} /></mesh>
++      </group>
++
++      <group scale={0.82}>
++        <RoundedBox args={[2.3, 0.48, 1.02]} radius={0.15} smoothness={3} position={[0, 0.1, 0]}>
++          <meshStandardMaterial color="#e8e5dc" emissive="#e8e5dc" emissiveIntensity={0.08} metalness={0.25} roughness={0.34} transparent opacity={opacity} />
++        </RoundedBox>
++        <mesh position={[-1.18, 0.1, 0]} rotation={[0, 0, -0.16]}>
++          <boxGeometry args={[0.36, 0.36, 0.92]} />
++          <meshStandardMaterial color="#e8e5dc" transparent opacity={opacity} />
++        </mesh>
++        <mesh position={[0.18, 0.57, 0]} rotation={[0, 0, -0.05]}>
++          <boxGeometry args={[1.18, 0.48, 0.86]} />
++          <meshStandardMaterial color="#789398" metalness={0.18} roughness={0.28} transparent opacity={0.9 * opacity} />
++        </mesh>
++        {pressureBands.map((color, index) => (
++          <mesh key={index} position={[-0.67 + index * 0.66, 0.35, 0.515]}>
++            <boxGeometry args={[0.46, 0.18, 0.025]} />
++            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.14} transparent opacity={0.78 * opacity} />
++          </mesh>
++        ))}
++        {[-0.72, 0.75].flatMap((x) => [-0.52, 0.52].map((z) => (
++          <mesh key={`${x}-${z}`} position={[x, -0.1, z]} rotation={[Math.PI / 2, 0, 0]}>
++            <cylinderGeometry args={[0.28, 0.28, 0.18, 18]} />
++            <meshStandardMaterial color="#20272a" transparent opacity={opacity} />
++          </mesh>
++        )))}
++        <group position={[0.9, 0.68, 0]}>
++          <mesh><boxGeometry args={[0.08, 0.36, 0.08]} /><meshStandardMaterial color="#d84940" transparent opacity={opacity} /></mesh>
++          <mesh position={[0, 0.18, 0]}><boxGeometry args={[0.38, 0.06, 1.12]} /><meshStandardMaterial color="#252d30" transparent opacity={opacity} /></mesh>
++        </group>
++      </group>
++    </group>
++  );
++}
+diff --git a/src/features/scene/FlowParticles.tsx b/src/features/scene/FlowParticles.tsx
+new file mode 100644
+index 0000000..6ec1212
+--- /dev/null
++++ b/src/features/scene/FlowParticles.tsx
+@@ -0,0 +1,92 @@
++import { useFrame } from "@react-three/fiber";
++import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
++import * as THREE from "three";
++import type { RunPhase } from "../experiment/model";
++import type { FlowFieldFrame } from "../flow/types";
++import { sampleFlowVelocity } from "./flowSampling";
++
++type FlowParticlesProps = {
++  frame: FlowFieldFrame | null;
++  phase: RunPhase;
++  windSpeedMps: number;
++  count?: number;
++};
++
++function seeded(index: number, salt: number) {
++  const value = Math.sin(index * 91.73 + salt * 17.11) * 43758.5453;
++  return value - Math.floor(value);
++}
++
++function createPositions(count: number) {
++  const positions = new Float32Array(count * 3);
++  for (let index = 0; index < count; index += 1) {
++    positions[index * 3] = -2.8 + seeded(index, 1) * 5.6;
++    positions[index * 3 + 1] = -0.85 + seeded(index, 2) * 1.7;
++    positions[index * 3 + 2] = -0.92 + seeded(index, 3) * 1.84;
++  }
++  return positions;
++}
++
++export function FlowParticles({ frame, phase, windSpeedMps, count = 900 }: FlowParticlesProps) {
++  const meshRef = useRef<THREE.InstancedMesh>(null);
++  const frameRef = useRef(frame);
++  const phaseRef = useRef(phase);
++  const windRef = useRef(windSpeedMps);
++  const positionsRef = useRef(createPositions(count));
++  const stalledForRef = useRef(new Float32Array(count));
++  const matrix = useMemo(() => new THREE.Matrix4(), []);
++
++  useEffect(() => { frameRef.current = frame; }, [frame]);
++  useEffect(() => { phaseRef.current = phase; }, [phase]);
++  useEffect(() => { windRef.current = windSpeedMps; }, [windSpeedMps]);
++
++  const writeMatrices = () => {
++    if (!meshRef.current) return;
++    const positions = positionsRef.current;
++    for (let index = 0; index < count; index += 1) {
++      matrix.makeTranslation(positions[index * 3] ?? 0, positions[index * 3 + 1] ?? 0, positions[index * 3 + 2] ?? 0);
++      meshRef.current.setMatrixAt(index, matrix);
++    }
++    meshRef.current.instanceMatrix.needsUpdate = true;
++  };
++
++  useLayoutEffect(writeMatrices, [count, matrix]);
++
++  useFrame((_, delta) => {
++    if (phaseRef.current === "paused") return;
++    const activeFrame = frameRef.current;
++    const positions = positionsRef.current;
++    const stalledFor = stalledForRef.current;
++    for (let index = 0; index < count; index += 1) {
++      const offset = index * 3;
++      let x = positions[offset] ?? -2.8;
++      let y = positions[offset + 1] ?? 0;
++      let z = positions[offset + 2] ?? 0;
++      const velocity = activeFrame
++        ? sampleFlowVelocity(activeFrame, (x + 2.8) / 5.6, (y + 0.9) / 1.8)
++        : { x: Math.max(0.018, windRef.current / 240), y: Math.sin(x * 1.8 + index) * 0.0012 };
++      const forwardSpeed = Math.max(0, velocity.x * 17 + windRef.current * 0.016);
++      stalledFor[index] = forwardSpeed < 0.018 ? (stalledFor[index] ?? 0) + delta : 0;
++      x += forwardSpeed * delta;
++      y += velocity.y * delta * 5;
++      z += Math.sin(index * 0.37 + x) * delta * 0.006;
++      if (x > 2.8 || x < -2.8 || Math.abs(y) > 0.92 || (stalledFor[index] ?? 0) > 1.5) {
++        x = -2.8;
++        y = -0.85 + seeded(index + Math.floor(x * 100), 4) * 1.7;
++        z = -0.92 + seeded(index, 5) * 1.84;
++        stalledFor[index] = 0;
++      }
++      positions[offset] = x;
++      positions[offset + 1] = y;
++      positions[offset + 2] = z;
++    }
++    writeMatrices();
++  });
++
++  return (
++    <instancedMesh ref={meshRef} args={[undefined, undefined, count]} frustumCulled={false}>
++      <sphereGeometry args={[0.024, 4, 4]} />
++      <meshBasicMaterial color="#55e5d3" transparent opacity={0.82} />
++    </instancedMesh>
++  );
++}
+diff --git a/src/features/scene/FieldSlice.tsx b/src/features/scene/FieldSlice.tsx
+new file mode 100644
+index 0000000..63d4176
+--- /dev/null
++++ b/src/features/scene/FieldSlice.tsx
+@@ -0,0 +1,112 @@
++import { Line } from "@react-three/drei";
++import { useEffect, useMemo } from "react";
++import * as THREE from "three";
++import type { LabState } from "../experiment/labStore";
++import type { FlowFieldFrame } from "../flow/types";
++
++type FieldMode = LabState["selectedField"];
++
++type FieldSliceProps = {
++  frame: FlowFieldFrame | null;
++  mode: FieldMode;
++  reducedMotion: boolean;
++};
++
++const TEXTURE_WIDTH = 120;
++const TEXTURE_HEIGHT = 48;
++
++function blend(a: THREE.Color, b: THREE.Color, amount: number) {
++  return a.clone().lerp(b, THREE.MathUtils.clamp(amount, 0, 1));
++}
++
++function rampColor(mode: FieldMode, normalized: number) {
++  const t = THREE.MathUtils.clamp(normalized, 0, 1);
++  if (mode === "speed") {
++    return t < 0.58
++      ? blend(new THREE.Color("#063b43"), new THREE.Color("#31d6db"), t / 0.58)
++      : blend(new THREE.Color("#31d6db"), new THREE.Color("#f0eee7"), (t - 0.58) / 0.42);
++  }
++  const low = new THREE.Color(mode === "pressure" ? "#2565b6" : "#6537a6");
++  const neutral = new THREE.Color("#80898c");
++  const high = new THREE.Color(mode === "pressure" ? "#d94b43" : "#e3a63f");
++  return t < 0.5 ? blend(low, neutral, t * 2) : blend(neutral, high, (t - 0.5) * 2);
++}
++
++function fieldValues(frame: FlowFieldFrame | null, mode: FieldMode) {
++  if (!frame) return null;
++  if (mode === "pressure") return frame.pressure;
++  if (mode === "vorticity") return frame.vorticity;
++  return frame.speed;
++}
++
++function makeTexture(frame: FlowFieldFrame | null, mode: FieldMode) {
++  const rgba = new Uint8Array(TEXTURE_WIDTH * TEXTURE_HEIGHT * 4);
++  const values = fieldValues(frame, mode);
++  let minimum = Infinity;
++  let maximum = -Infinity;
++  if (values) {
++    for (const value of values) {
++      minimum = Math.min(minimum, value);
++      maximum = Math.max(maximum, value);
++    }
++  }
++
++  for (let row = 0; row < TEXTURE_HEIGHT; row += 1) {
++    for (let column = 0; column < TEXTURE_WIDTH; column += 1) {
++      const u = column / (TEXTURE_WIDTH - 1);
++      const v = row / (TEXTURE_HEIGHT - 1);
++      let normalized = 0.25 + u * 0.6 + Math.sin(u * 11 + v * 4) * 0.04;
++      if (frame && values) {
++        const sourceX = Math.round(u * (frame.width - 1));
++        const sourceY = Math.round(v * (frame.height - 1));
++        const value = values[sourceY * frame.width + sourceX] ?? minimum;
++        normalized = maximum > minimum ? (value - minimum) / (maximum - minimum) : 0.5;
++      }
++      const color = rampColor(mode, normalized);
++      const offset = (row * TEXTURE_WIDTH + column) * 4;
++      rgba[offset] = Math.round(color.r * 255);
++      rgba[offset + 1] = Math.round(color.g * 255);
++      rgba[offset + 2] = Math.round(color.b * 255);
++      rgba[offset + 3] = mode === "streamlines" ? 0 : Math.round((frame ? 0.54 : 0.28) * 255);
++    }
++  }
++
++  const texture = new THREE.DataTexture(rgba, TEXTURE_WIDTH, TEXTURE_HEIGHT, THREE.RGBAFormat);
++  texture.colorSpace = THREE.SRGBColorSpace;
++  texture.magFilter = THREE.LinearFilter;
++  texture.minFilter = THREE.LinearFilter;
++  texture.needsUpdate = true;
++  return texture;
++}
++
++function StaticStreamlines({ muted }: { muted: boolean }) {
++  const paths = useMemo(() => Array.from({ length: 24 }, (_, row) => {
++    const baseY = -0.88 + row * (1.76 / 23);
++    return Array.from({ length: 34 }, (__, column) => {
++      const x = -2.9 + column * (5.8 / 33);
++      const vehicleWake = Math.exp(-Math.pow((x - 0.15) / 1.25, 2));
++      const side = baseY >= 0 ? 1 : -1;
++      const y = baseY + side * vehicleWake * (0.12 - Math.abs(baseY) * 0.045) + Math.sin(x * 2.2 + row) * 0.008;
++      return new THREE.Vector3(x, y, 0.08);
++    });
++  }), []);
++
++  return <>{paths.map((points, index) => <Line key={index} points={points} color="#50e3d0" transparent opacity={muted ? 0.34 : 0.76} lineWidth={0.75} />)}</>;
++}
++
++export function FieldSlice({ frame, mode, reducedMotion }: FieldSliceProps) {
++  const texture = useMemo(() => makeTexture(frame, mode), [frame, mode]);
++  useEffect(() => () => texture.dispose(), [texture]);
++
++  return (
++    <group>
++      {mode !== "streamlines" && (
++        <mesh position={[0, 0, 0.06]} renderOrder={-1}>
++          <planeGeometry args={[5.9, 1.95]} />
++          <meshBasicMaterial map={texture} transparent opacity={1} depthWrite={false} side={THREE.DoubleSide} />
++        </mesh>
++      )}
++      {(mode === "streamlines" || reducedMotion) && <StaticStreamlines muted={mode !== "streamlines"} />}
++    </group>
++  );
++}
+diff --git a/src/features/scene/Hotspots.tsx b/src/features/scene/Hotspots.tsx
+new file mode 100644
+index 0000000..d675119
+--- /dev/null
++++ b/src/features/scene/Hotspots.tsx
+@@ -0,0 +1,50 @@
++import { HOTSPOT_IDS, type HotspotId } from "./hotspotTypes";
++
++const HOTSPOT_COPY: Record<HotspotId, { title: string; detail: string }> = {
++  straightener: { title: "整流段", detail: "蜂窝格栅削弱横向扰动，让来流更均匀。" },
++  contraction: { title: "收缩段", detail: "渐缩流道平顺加速气流并降低入口湍动。" },
++  "test-section": { title: "透明测试段", detail: "观察车体周围的速度、压力与尾迹结构。" },
++  "model-stand": { title: "模型台", detail: "红色支架定位模型，并代表教学测力平台。" },
++  fan: { title: "风扇段", detail: "六叶风扇提供从 x = -6 到 x = 6 的可控来流。" },
++};
++
++type HotspotsProps = {
++  selected: HotspotId | null;
++  onSelect(id: HotspotId): void;
++};
++
++export function Hotspots({ selected, onSelect }: HotspotsProps) {
++  const active = selected ? HOTSPOT_COPY[selected] : null;
++
++  return (
++    <aside className="scene-hotspots" aria-label="风洞模块热点">
++      <div className="scene-hotspot-buttons">
++        {HOTSPOT_IDS.map((id, index) => (
++          <button
++            aria-label={`${id}：${HOTSPOT_COPY[id].title}`}
++            aria-pressed={selected === id}
++            className="scene-hotspot"
++            data-hotspot-id={id}
++            key={id}
++            onClick={() => onSelect(id)}
++            type="button"
++          >
++            <span>{String(index + 1).padStart(2, "0")}</span>
++            {HOTSPOT_COPY[id].title}
++          </button>
++        ))}
++      </div>
++      <div className="scene-hotspot-card" role="status" aria-live="polite">
++        {active ? (
++          <>
++            <strong>{active.title}</strong>
++            <span>{active.detail}</span>
++            {selected === "test-section" && <em>剖视已开启 · 车辆与中心流场保持可见</em>}
++          </>
++        ) : (
++          <span>选择模块，查看风洞构造与教学说明。</span>
++        )}
++      </div>
++    </aside>
++  );
++}
+diff --git a/src/features/scene/hotspotTypes.ts b/src/features/scene/hotspotTypes.ts
+new file mode 100644
+index 0000000..7c6aa04
+--- /dev/null
++++ b/src/features/scene/hotspotTypes.ts
+@@ -0,0 +1,3 @@
++export const HOTSPOT_IDS = ["straightener", "contraction", "test-section", "model-stand", "fan"] as const;
++
++export type HotspotId = typeof HOTSPOT_IDS[number];
+diff --git a/src/features/scene/SceneFallback.tsx b/src/features/scene/SceneFallback.tsx
+new file mode 100644
+index 0000000..ae3d16c
+--- /dev/null
++++ b/src/features/scene/SceneFallback.tsx
+@@ -0,0 +1,42 @@
++export function SceneFallback() {
++  return (
++    <div className="scene-fallback">
++      <svg
++        aria-label="模块化数字风洞示意图"
++        className="scene-fallback-diagram"
++        role="img"
++        viewBox="0 0 960 360"
++      >
++        <defs>
++          <linearGradient id="fallback-duct" x1="0" x2="1">
++            <stop offset="0" stopColor="#eeeae0" />
++            <stop offset="0.56" stopColor="#d9dfdc" stopOpacity="0.28" />
++            <stop offset="1" stopColor="#eeeae0" />
++          </linearGradient>
++          <pattern id="fallback-grid" width="34" height="34" patternUnits="userSpaceOnUse">
++            <path d="M 34 0 L 0 0 0 34" fill="none" stroke="#24414a" strokeWidth="1" />
++          </pattern>
++        </defs>
++        <rect width="960" height="360" fill="#09151a" />
++        <rect width="960" height="360" fill="url(#fallback-grid)" opacity="0.55" />
++        <g transform="translate(54 105)">
++          <path d="M0 30 H180 L275 4 H610 L710 35 H850 V190 H710 L610 222 H275 L180 196 H0 Z" fill="url(#fallback-duct)" stroke="#30383b" strokeWidth="8" />
++          <rect x="280" y="5" width="330" height="216" fill="#7ddbd2" fillOpacity="0.08" stroke="#313a3d" strokeWidth="8" />
++          <g stroke="#42d8cc" strokeWidth="2" fill="none" opacity="0.85">
++            <path d="M80 90 C260 88 360 100 520 82 S710 72 800 76" />
++            <path d="M80 116 C260 114 350 108 505 122 S700 132 800 126" />
++            <path d="M80 142 C265 142 355 128 505 150 S700 162 800 152" />
++          </g>
++          <g transform="translate(414 102)">
++            <path d="M0 32 L24 6 H116 L152 30 V58 H0 Z" fill="#eeeae0" stroke="#2b3235" strokeWidth="5" />
++            <path d="M45 7 L66 -17 H108 L126 7" fill="#a9bcbe" stroke="#2b3235" strokeWidth="5" />
++            <circle cx="33" cy="62" r="18" fill="#242a2d" /><circle cx="123" cy="62" r="18" fill="#242a2d" />
++          </g>
++          <rect x="442" y="174" width="126" height="13" rx="4" fill="#d9473f" />
++          <rect x="764" y="34" width="70" height="158" rx="8" fill="#d9473f" fillOpacity="0.75" />
++        </g>
++      </svg>
++      <p><strong>示意模式</strong>　浏览器无法初始化 WebGL，当前显示程序化风洞结构图。</p>
++    </div>
++  );
++}
+diff --git a/src/features/scene/WindTunnelScene.tsx b/src/features/scene/WindTunnelScene.tsx
+new file mode 100644
+index 0000000..5d6aae4
+--- /dev/null
++++ b/src/features/scene/WindTunnelScene.tsx
+@@ -0,0 +1,81 @@
++import { OrbitControls } from "@react-three/drei";
++import { Canvas } from "@react-three/fiber";
++import { useEffect, useState } from "react";
++import { useLabStore } from "../experiment/labStore";
++import { FieldSlice } from "./FieldSlice";
++import { FlowParticles } from "./FlowParticles";
++import { Hotspots } from "./Hotspots";
++import type { HotspotId } from "./hotspotTypes";
++import { SceneFallback } from "./SceneFallback";
++import { VehicleModel } from "./VehicleModel";
++import { WindTunnelGeometry } from "./WindTunnelGeometry";
++
++export type WindTunnelSceneProps = {
++  webglAvailable?: boolean;
++  onHotspot(id: HotspotId): void;
++};
++
++function detectWebgl() {
++  if (typeof window === "undefined" || typeof window.WebGLRenderingContext === "undefined") return false;
++  try {
++    const canvas = document.createElement("canvas");
++    return Boolean(canvas.getContext("webgl2") || canvas.getContext("webgl"));
++  } catch {
++    return false;
++  }
++}
++
++function useReducedMotion() {
++  const [reduced, setReduced] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true);
++  useEffect(() => {
++    const query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
++    if (!query) return;
++    const update = () => setReduced(query.matches);
++    query.addEventListener("change", update);
++    return () => query.removeEventListener("change", update);
++  }, []);
++  return reduced;
++}
++
++export function WindTunnelScene({ webglAvailable = detectWebgl(), onHotspot }: WindTunnelSceneProps) {
++  const [selected, setSelected] = useState<HotspotId | null>(null);
++  const frame = useLabStore((state) => state.flowField);
++  const fieldMode = useLabStore((state) => state.selectedField);
++  const phase = useLabStore((state) => state.phase);
++  const windSpeedMps = useLabStore((state) => state.telemetry.windSpeedMps);
++  const reducedMotion = useReducedMotion();
++  const selectHotspot = (id: HotspotId) => {
++    const next = selected === id ? null : id;
++    setSelected(next);
++    if (next) onHotspot(next);
++  };
++
++  return (
++    <section className="wind-tunnel-scene" aria-label="三维数字风洞工作区">
++      <div className="scene-hud">
++        <span><span>2D TEACHING CFD</span><span> / 二维教学近似</span></span>
++        <span>{webglAvailable ? `${fieldMode.toUpperCase()} / ${frame ? "实时场" : "示意流场"}` : "DIAGRAM MODE / 示意模式"}</span>
++      </div>
++      {webglAvailable && (
++        <div className="scene-canvas" aria-label="交互式三维风洞">
++          <Canvas camera={{ position: [7.8, 4.6, 10.4], fov: 38 }} dpr={[1, 1.65]} fallback={<SceneFallback />}>
++            <color attach="background" args={["#09151a"]} />
++            <fog attach="fog" args={["#09151a", 13, 24]} />
++            <ambientLight intensity={1.5} />
++            <directionalLight position={[-4, 7, 8]} intensity={3.2} color="#f8f2df" />
++            <directionalLight position={[7, 2, -4]} intensity={1.5} color="#50e3d0" />
++            <WindTunnelGeometry selected={selected} cutaway={selected === "test-section"} />
++            <FieldSlice frame={frame} mode={fieldMode} reducedMotion={reducedMotion} />
++            <VehicleModel frame={frame} selected={selected} />
++            {!reducedMotion && <FlowParticles frame={frame} phase={phase} windSpeedMps={windSpeedMps} />}
++            <gridHelper args={[18, 36, "#34505a", "#193038"]} position={[0, -1.56, 0]} />
++            <axesHelper args={[1.05]} position={[-6.1, -1.42, 1.55]} />
++            <OrbitControls makeDefault target={[0, -0.05, 0]} minDistance={7} maxDistance={18} enableDamping dampingFactor={0.08} />
++          </Canvas>
++        </div>
++      )}
++      {!webglAvailable && <SceneFallback />}
++      <Hotspots selected={selected} onSelect={selectHotspot} />
++    </section>
++  );
++}
+diff --git a/src/features/scene/WindTunnelScene.test.tsx b/src/features/scene/WindTunnelScene.test.tsx
+new file mode 100644
+index 0000000..1a53179
+--- /dev/null
++++ b/src/features/scene/WindTunnelScene.test.tsx
+@@ -0,0 +1,28 @@
++import { render, screen } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { WindTunnelScene } from "./WindTunnelScene";
++
++it("renders an explanatory fallback when WebGL is unavailable", () => {
++  render(<WindTunnelScene webglAvailable={false} onHotspot={() => undefined} />);
++
++  expect(screen.getByRole("img", { name: "模块化数字风洞示意图" })).toBeInTheDocument();
++  expect(screen.getByText(/浏览器无法初始化 WebGL/)).toBeInTheDocument();
++});
++
++it("exposes the five physical modules and records hotspot evidence", async () => {
++  const user = userEvent.setup();
++  const viewed: string[] = [];
++  render(<WindTunnelScene webglAvailable={false} onHotspot={(id) => viewed.push(id)} />);
++
++  const hotspotIds = ["straightener", "contraction", "test-section", "model-stand", "fan"];
++  for (const id of hotspotIds) {
++    expect(screen.getByRole("button", { name: new RegExp(id) })).toBeInTheDocument();
++  }
++
++  const testSection = screen.getByRole("button", { name: /test-section/ });
++  await user.click(testSection);
++
++  expect(viewed).toEqual(["test-section"]);
++  expect(testSection).toHaveAttribute("aria-pressed", "true");
++  expect(screen.getByRole("status")).toHaveTextContent("剖视已开启");
++});
+diff --git a/src/App.tsx b/src/App.tsx
+new file mode 100644
+index 0000000..a24238a
+--- /dev/null
++++ b/src/App.tsx
+@@ -0,0 +1,40 @@
++import { lazy, Suspense, useState } from "react";
++import { AppShell } from "./features/shell/AppShell";
++import { TutorialModeToggle } from "./features/tutorial/TutorialModeToggle";
++import { TutorialRail } from "./features/tutorial/TutorialRail";
++import { advanceLesson, emptyEvidence } from "./features/tutorial/tutorialProgress";
++import { LESSONS, type LessonId, type TutorialMode } from "./features/tutorial/lessonDefinitions";
++
++const LazyWindTunnelScene = lazy(() => import("./features/scene/WindTunnelScene").then((module) => ({ default: module.WindTunnelScene })));
++
++export function App() {
++  const [mode, setMode] = useState<TutorialMode>("guided");
++  const [activeLesson, setActiveLesson] = useState<LessonId>("anatomy");
++  const [evidence, setEvidence] = useState(emptyEvidence);
++
++  return (
++    <AppShell
++      headerActions={<TutorialModeToggle mode={mode} onModeChange={setMode} />}
++      left={<TutorialRail
++        activeLesson={activeLesson}
++        evidence={evidence}
++        mode={mode}
++        onLessonChange={setActiveLesson}
++        onAdvance={() => setActiveLesson((currentLesson) => {
++          if (mode === "guided") return advanceLesson(currentLesson, evidence);
++          const currentIndex = LESSONS.findIndex((lesson) => lesson.id === currentLesson);
++          return LESSONS[Math.min(currentIndex + 1, LESSONS.length - 1)]!.id;
++        })}
++      />}
++      scene={
++        <Suspense fallback={<p className="scene-loading" role="status">正在初始化数字风洞…</p>}>
++          <LazyWindTunnelScene onHotspot={(id) => setEvidence((current) => current.viewedHotspots.includes(id)
++            ? current
++            : { ...current, viewedHotspots: [...current.viewedHotspots, id] })} />
++        </Suspense>
++      }
++      right={<p>实验控制将在此处呈现。</p>}
++      bottom={<p>实验曲线将在此处呈现。</p>}
++    />
++  );
++}
+diff --git a/src/styles/global.css b/src/styles/global.css
+new file mode 100644
+index 0000000..700bb02
+--- /dev/null
++++ b/src/styles/global.css
+@@ -0,0 +1,271 @@
++:root {
++  --bg: #071014;
++  --panel: #0d181d;
++  --panel-raised: #132229;
++  --tunnel: #e9e6df;
++  --ink: #e9f2f3;
++  --muted: #8da3aa;
++  --flow: #50e3c2;
++  --warning: #f2bd4f;
++  --danger: #e44b43;
++  color: var(--ink);
++  background: var(--bg);
++  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
++}
++
++* {
++  box-sizing: border-box;
++}
++
++body {
++  margin: 0;
++  min-width: 320px;
++  min-height: 100vh;
++  background: var(--bg);
++}
++
++button,
++input,
++select,
++textarea {
++  font: inherit;
++}
++
++.app-shell {
++  display: grid;
++  grid-template-areas:
++    "header header header"
++    "left scene right"
++    "left bottom right";
++  grid-template-columns: 240px minmax(0, 1fr) 320px;
++  grid-template-rows: auto minmax(0, 1fr) 220px;
++  min-height: 100vh;
++  background: var(--bg);
++}
++
++.topbar {
++  grid-area: header;
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 1rem;
++  padding: 0.85rem 1.25rem;
++  border-bottom: 1px solid var(--panel-raised);
++  background: var(--panel);
++}
++
++.eyebrow {
++  color: var(--flow);
++  font-size: 0.7rem;
++  font-weight: 700;
++  letter-spacing: 0.12em;
++}
++
++h1 {
++  margin: 0.15rem 0 0;
++  font-size: 1.15rem;
++}
++
++.topbar-actions {
++  display: flex;
++  align-items: center;
++  gap: 0.75rem;
++}
++
++.provenance-badge {
++  color: var(--warning);
++  font-size: 0.72rem;
++  font-weight: 700;
++  letter-spacing: 0.04em;
++}
++
++.model-scope-badge {
++  color: var(--muted);
++  font-size: 0.72rem;
++  font-weight: 700;
++  letter-spacing: 0.04em;
++}
++
++.tutorial-rail,
++.control-panel,
++.chart-drawer {
++  padding: 1rem;
++  background: var(--panel);
++}
++
++.tutorial-rail {
++  grid-area: left;
++  border-right: 1px solid var(--panel-raised);
++}
++
++.scene-panel {
++  grid-area: scene;
++  min-height: 0;
++  padding: 0;
++  background: var(--panel-raised);
++  overflow: hidden;
++}
++
++.wind-tunnel-scene {
++  position: relative;
++  display: grid;
++  grid-template-rows: auto minmax(18rem, 1fr) auto;
++  width: 100%;
++  height: 100%;
++  min-height: 30rem;
++  overflow: hidden;
++  background:
++    radial-gradient(circle at 58% 28%, rgb(55 88 96 / 24%), transparent 42%),
++    #09151a;
++}
++
++.scene-hud {
++  z-index: 3;
++  display: flex;
++  justify-content: space-between;
++  gap: 1rem;
++  padding: 0.7rem 0.9rem;
++  border-bottom: 1px solid #294049;
++  color: #9db1b7;
++  background: rgb(7 16 20 / 88%);
++  font: 700 0.66rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
++  letter-spacing: 0.08em;
++}
++
++.scene-hud span:last-child {
++  color: var(--flow);
++}
++
++.scene-canvas {
++  min-height: 18rem;
++}
++
++.scene-canvas canvas {
++  display: block;
++}
++
++.scene-hotspots {
++  z-index: 3;
++  display: grid;
++  grid-template-columns: minmax(0, 1fr) minmax(13rem, 0.58fr);
++  gap: 0.75rem;
++  padding: 0.75rem;
++  border-top: 1px solid #294049;
++  background: rgb(7 16 20 / 94%);
++}
++
++.scene-hotspot-buttons {
++  display: grid;
++  grid-template-columns: repeat(5, minmax(0, 1fr));
++  gap: 0.4rem;
++}
++
++.scene-hotspot {
++  min-width: 0;
++  padding: 0.52rem 0.44rem;
++  overflow: hidden;
++  border: 1px solid #314b54;
++  color: #b9c8cb;
++  background: #0d1b20;
++  text-align: left;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++  cursor: pointer;
++}
++
++.scene-hotspot span {
++  margin-right: 0.38rem;
++  color: var(--flow);
++  font: 700 0.62rem ui-monospace, SFMono-Regular, Menlo, monospace;
++}
++
++.scene-hotspot:hover,
++.scene-hotspot:focus-visible,
++.scene-hotspot[aria-pressed="true"] {
++  border-color: var(--flow);
++  outline: none;
++  color: #f4f7f5;
++  background: #123238;
++  box-shadow: inset 0 -2px 0 var(--flow);
++}
++
++.scene-hotspot-card {
++  display: flex;
++  flex-direction: column;
++  justify-content: center;
++  min-height: 3.4rem;
++  padding-left: 0.75rem;
++  border-left: 2px solid #314b54;
++  color: #9db1b7;
++  font-size: 0.72rem;
++}
++
++.scene-hotspot-card strong {
++  color: #eef3f1;
++}
++
++.scene-hotspot-card em {
++  margin-top: 0.18rem;
++  color: var(--flow);
++  font-style: normal;
++}
++
++.scene-fallback {
++  display: grid;
++  place-items: center;
++  min-height: 18rem;
++  padding: 1rem;
++}
++
++.scene-fallback-diagram {
++  width: min(100%, 70rem);
++  height: auto;
++  border: 1px solid #294049;
++}
++
++.scene-fallback p,
++.scene-loading {
++  color: #9db1b7;
++  font-size: 0.76rem;
++}
++
++.scene-fallback strong {
++  color: var(--warning);
++}
++
++.control-panel {
++  grid-area: right;
++  border-left: 1px solid var(--panel-raised);
++}
++
++.chart-drawer {
++  grid-area: bottom;
++  border-top: 1px solid var(--panel-raised);
++}
++
++@media (max-width: 900px) {
++  .app-shell {
++    grid-template-areas:
++      "header"
++      "scene"
++      "left"
++      "right"
++      "bottom";
++    grid-template-columns: minmax(0, 1fr);
++    grid-template-rows: auto minmax(18rem, 1fr) auto auto 220px;
++  }
++
++  .tutorial-rail,
++  .control-panel {
++    border: 0;
++    border-top: 1px solid var(--panel-raised);
++  }
++
++  .scene-hotspots {
++    grid-template-columns: 1fr;
++  }
++
++  .scene-hotspot-buttons {
++    grid-template-columns: repeat(2, minmax(0, 1fr));
++  }
++}
