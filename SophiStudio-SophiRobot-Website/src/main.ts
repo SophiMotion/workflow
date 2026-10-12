@@ -1,5 +1,5 @@
 import './styles.css';
-import {studioBrand,workflowButton,bindWorkflowNavigation} from './studio-navigation';
+import {studioBrand,workflowButton,skatechassisLink,bindWorkflowNavigation} from './studio-navigation';
 import {defaults,fields,validate,parseConfig,type Params,type Tab,type Key} from './parameters';
 import {type Model,type Bounds} from './geometry';
 import {ArmControls} from './arm-controls';
@@ -22,7 +22,7 @@ const button=(id:string,label:string,ico:string,cls='')=>`<button id="${id}" cla
 
 $('#app').innerHTML=`
  <header class="header">${studioBrand()}<div class="project-title">SophiRobot</div><div class="header-actions">${button('reset','Reset','reset')}${button('import','Load configuration','upload','icon-button')}${button('save','Save configuration','save','primary')}</div></header>
- <nav class="project-navigation" aria-label="Project pages"><a href="./" aria-current="page">Configurator</a><a id="open-bom" href="./bom.html" target="_blank" rel="noopener" aria-label="Bill of materials (opens in a new window)">Bill of materials <span aria-hidden="true">↗</span></a>${workflowButton()}</nav>
+ <nav class="project-navigation" aria-label="Project pages"><a href="./" aria-current="page">Configurator</a><a id="open-bom" href="./bom.html" target="_blank" rel="noopener" aria-label="Bill of materials (opens in a new window)">Bill of materials <span aria-hidden="true">↗</span></a>${skatechassisLink()}${workflowButton()}</nav>
  <main class="workspace">
   <aside class="sidebar" aria-label="Assembly parameters"><div class="panel-heading"><h1>Parameters</h1><p>Dimensions in millimeters</p></div>
    <div class="tabs" role="tablist" aria-label="Parameter groups">${(['Base','Wheels','Body','Limbs','Head','Motors'] as Tab[]).map(t=>`<button role="tab" id="tab-${t}" aria-controls="fields" aria-selected="${t===activeTab}" data-tab="${t}">${t}</button>`).join('')}</div>

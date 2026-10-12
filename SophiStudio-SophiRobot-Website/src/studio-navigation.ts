@@ -14,6 +14,13 @@ export function workflowButton(){
  return '<button type="button" class="workflow-return" data-open-workflow><span aria-hidden="true">←</span> 返回工作流</button>';
 }
 
+export function skatechassisLink(){
+ const href=localService
+  ? 'http://127.0.0.1:4173/'
+  : new URL('../../底盘机器人/dist/index.html',appBase).href;
+ return `<a class="skatechassis-link" href="${href}" aria-label="打开 SkateChassis 机器人工作台">SkateChassis 机器人工作台 <span aria-hidden="true">→</span></a>`;
+}
+
 export function bindWorkflowNavigation(){
  document.querySelectorAll<HTMLElement>('[data-open-workflow]').forEach(control=>{
   control.addEventListener('click',event=>{

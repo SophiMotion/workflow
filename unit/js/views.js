@@ -165,17 +165,13 @@
   function renderWorkflow() {
     const engineeringOnly = window.PFX_CONFIG?.workflowScope === 'engineering';
     const projectCard = (id, title, description, href, icon, status, branch = false) => {
+      if (engineeringOnly && id === 'skatechassis') return '';
       href = window.PFX_PATHS?.moduleHref(id, href) || href;
       if (engineeringOnly) {
         const content = `
           <h3>${title}</h3>
           <img class="workflow-project-image" src="assets/workflow-previews/${id}.jpg" alt="${title}项目界面截图" width="1280" height="720" loading="lazy" decoding="async">
           <p>${description}</p>`;
-        if (id === 'sophirobot') return `
-          <article class="workflow-card workflow-project-card">
-            <a class="workflow-project-main" data-module="${id}" data-status="ready" href="${href}">${content}</a>
-            <a class="workflow-related-link" href="https://sophimotion.github.io/workflow/%E5%BA%95%E7%9B%98%E6%9C%BA%E5%99%A8%E4%BA%BA/dist/index.html">打开 SkateChassis 机器人工作台<span aria-hidden="true">→</span></a>
-          </article>`;
         return `<a class="workflow-card workflow-project-card" data-module="${id}" data-status="ready" href="${href}">${content}</a>`;
       }
       return `
@@ -190,7 +186,7 @@
         <h1>SophiStudio 工作流</h1>
         <p>${engineeringOnly ? '' : '从知识沉淀、工程研发、工程加工到内容体验，'}统一管理 SophiMotion 及相关项目的本地工具链。</p>
       </div>
-      <div class="workflow-count">${engineeringOnly ? '<strong>11</strong><span>/ 11 模块可用</span>' : '<strong>19</strong><span>/ 22 模块可用</span>'}</div>
+      <div class="workflow-count">${engineeringOnly ? '<strong>10</strong><span>/ 10 模块可用</span>' : '<strong>19</strong><span>/ 22 模块可用</span>'}</div>
     </section>
 
     ${engineeringOnly ? '' : `

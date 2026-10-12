@@ -1,8 +1,10 @@
 # SophiStudio Workflow
 
-SophiMotion 的本地工程工具集合。打开根目录 `index.html` 进入工作流，11 张项目卡片使用各应用的真实界面截图。界面采用 Google 红、黄、绿，主蓝色为克莱因蓝 `#002FA7`；项目页统一使用 SophiStudio Logo。
+SophiMotion 的本地工程工具集合。打开根目录 `index.html` 进入工作流，10 张项目卡片使用各应用的真实界面截图。界面采用 Google 红、黄、绿，主蓝色为克莱因蓝 `#002FA7`；项目页统一使用 SophiStudio Logo。
 
 导航：工作流、[SophiGo](https://sophigo.com)、[ProFabX](https://profabx.com)、[SophiMotion](https://sophicar.com)。
+
+SkateChassis 入口位于 SophiRobot 工作台的页面导航中。
 
 ## 项目入口
 
@@ -25,7 +27,7 @@ SophiMotion 的本地工程工具集合。打开根目录 `index.html` 进入工
 - GitHub Pages：[https://sophimotion.github.io/workflow/](https://sophimotion.github.io/workflow/)
 - 本地预览：[http://127.0.0.1:4173/studio/index.html](http://127.0.0.1:4173/studio/index.html)
 
-GitHub Pages 从 `main` 分支根目录自动发布；`.nojekyll` 保留各项目现有构建文件。每次修改后先构建对应子项目，再提交并推送，GitHub 会自动更新网站。线上 11 张卡片指向仓库内的静态入口，本地打开仍连接本机服务。
+GitHub Pages 从 `main` 分支根目录自动发布；`.nojekyll` 保留各项目现有构建文件。每次修改后先构建对应子项目，再提交并推送，GitHub 会自动更新网站。线上 10 张卡片指向仓库内的静态入口，本地打开仍连接本机服务。
 
 线上支持浏览器内的建模、仿真和文件导出。项目服务端协作、桌面 Fusion 联动及外部 API 仍需相应本机服务或用户自己的集成配置。
 
