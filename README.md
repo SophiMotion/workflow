@@ -24,7 +24,8 @@ SkateChassis 入口位于 SophiRobot 工作台的页面导航中。
 
 ## 在线网站与本地预览
 
-- GitHub Pages：[https://sophimotion.github.io/workflow/](https://sophimotion.github.io/workflow/)
+- 在线网站：[https://microfabs.com/](https://microfabs.com/)
+- GitHub Pages 原地址：[https://sophimotion.github.io/workflow/](https://sophimotion.github.io/workflow/)（自动跳转至新域名）
 - 本地预览：[http://127.0.0.1:4173/studio/index.html](http://127.0.0.1:4173/studio/index.html)
 
 GitHub Pages 从 `main` 分支根目录自动发布；`.nojekyll` 保留各项目现有构建文件。每次修改后先构建对应子项目，再提交并推送，GitHub 会自动更新网站。线上 10 张卡片指向仓库内的静态入口，本地打开仍连接本机服务。

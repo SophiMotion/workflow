@@ -15,7 +15,7 @@ function cards(base) {
     .map(([, id, href]) => ({ id, href: context.window.PFX_PATHS.resolve(href) }));
 }
 test('all 10 hosted cards stay under the Pages subpath and point to shipped entries', async () => {
-  for (const base of ['https://sophimotion.github.io/workflow/', 'https://example.com/tools/workflow/']) {
+  for (const base of ['https://sophimotion.github.io/workflow/', 'https://example.com/tools/workflow/', 'https://microfabs.com/']) {
     const links = cards(base);
     assert.equal(links.length, 10);
     assert.equal(links.some(({ id }) => id === 'skatechassis'), false);
