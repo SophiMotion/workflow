@@ -24,7 +24,7 @@ SkateChassis 入口位于 SophiRobot 工作台的页面导航中。
 
 ## 在线网站与本地预览
 
-- 在线网站：[https://microfabs.com/](https://microfabs.com/)
+- 在线网站：[https://sophistudio.com/](https://sophistudio.com/)
 - GitHub Pages 原地址：[https://sophimotion.github.io/workflow/](https://sophimotion.github.io/workflow/)（自动跳转至新域名）
 - 本地预览：[http://127.0.0.1:4173/studio/index.html](http://127.0.0.1:4173/studio/index.html)
 
