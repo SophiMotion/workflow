@@ -1,3 +1,4 @@
+import { randomId } from './ids.mjs';
 import { validateConfig, validateRules, freezeIssues, validTmall, prdSections, defaultConfig, defaultRules } from './domain.mjs';
 const clone = x=>structuredClone(x);
 export const at=(obj,path)=>path.split('.').reduce((o,k)=>o?.[k],obj);
@@ -25,14 +26,14 @@ export function applyOperation(project, op) {
   } else if(op.type==='comment'){
     if(typeof op.text!=='string'||!op.text.trim()||op.text.length>4000)throw Error('评论需为 1–4000 字');
     if(!prdSections.some(([id])=>id===op.section))throw Error('章节无效');
-    p.comments.push({id:crypto.randomUUID(),author:op.actor,text:op.text,section:op.section,resolved:false,at:now});
+    p.comments.push({id:randomId(),author:op.actor,text:op.text,section:op.section,resolved:false,at:now});
   } else if(op.type==='resolve'){
     const comment=p.comments.find(c=>c.id===op.id);if(!comment)throw Error('评论不存在');comment.resolved=!comment.resolved;
   } else if(['snapshot','freeze','reopen','review'].includes(op.type)){
     if(op.type==='freeze') {const issues=freezeIssues(p);if(issues.length)throw Error(issues.join('；'));if(p.prd.status!=='评审中')throw Error('请先进入评审中状态');p.prd.status='已冻结';}
     if(op.type==='review') {if(p.prd.status!=='草案')throw Error('仅草案可以发起评审');p.prd.status='评审中';}
     if(op.type==='reopen'){if(p.prd.status!=='已冻结')throw Error('当前没有冻结基线');if(!op.note?.trim())throw Error('请填写变更原因');p.prd.status='草案';p.prd.sections.changes+=`\nCR-${p.versions.length+1} | ${now.slice(0,10)} | ${op.actor} | ${op.note} | 待评审`;}
-    if(op.type!=='review')p.versions.unshift({id:crypto.randomUUID(),name:`V${p.versions.length+1}.0`,actor:op.actor,at:now,note:op.note||({snapshot:'保存设计快照',freeze:'冻结项目基线',reopen:'发起变更'}[op.type]),snapshot:{config:clone(p.config),prices:clone(p.prices),rules:clone(p.rules),prd:clone(p.prd)}});
+    if(op.type!=='review')p.versions.unshift({id:randomId(),name:`V${p.versions.length+1}.0`,actor:op.actor,at:now,note:op.note||({snapshot:'保存设计快照',freeze:'冻结项目基线',reopen:'发起变更'}[op.type]),snapshot:{config:clone(p.config),prices:clone(p.prices),rules:clone(p.rules),prd:clone(p.prd)}});
     p.versions=p.versions.slice(0,30);
   } else throw Error('未知操作');
   p.revision++;p.updatedAt=now;p.activity.unshift({actor:op.actor,at:now,type:op.type,path:op.path||'',revision:p.revision});p.activity=p.activity.slice(0,100);

@@ -1,3 +1,4 @@
+import { randomId } from '../../shared/ids.mjs';
 import { Box3, Euler, Matrix4, Quaternion, Vector3, Mesh, Group, BoxGeometry, SphereGeometry, MeshStandardMaterial, BufferAttribute } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -136,15 +137,15 @@ export function partsFromScene(scene,config){
   const parts=[...entries].map(([mesh,children],i)=>{
     if(saved&&(!mesh.isMesh||children.length>1)){
       const result=savedGroupGeometry(mesh,children),meta=mesh.userData.armorPart;
-      return {...meta,id:crypto.randomUUID(),name:String(meta.name||mesh.name||`部件 ${i+1}`).slice(0,80),...result};
+      return {...meta,id:randomId(),name:String(meta.name||mesh.name||`部件 ${i+1}`).slice(0,80),...result};
     }
     const g=mesh.geometry.clone(),meta=saved?mesh.userData.armorPart:null;
     if(!g.attributes.normal)g.computeVertexNormals();
     const materials=(Array.isArray(mesh.material)?mesh.material:[mesh.material]).map(m=>m.clone());
     const material=Array.isArray(mesh.material)?materials:materials[0];
-    if(meta)return {...meta,id:crypto.randomUUID(),name:String(meta.name||mesh.name||`部件 ${i+1}`).slice(0,80),geometry:g,material};
+    if(meta)return {...meta,id:randomId(),name:String(meta.name||mesh.name||`部件 ${i+1}`).slice(0,80),geometry:g,material};
     bakeGeometry(g,ENGINEERING_FROM_GLTF.clone().multiply(mesh.matrixWorld));
-    return {id:crypto.randomUUID(),name:mesh.name||`部件 ${i+1}`,geometry:g,material,position:[0,0,0],rotation:[0,0,0],scale:[1,1,1],binding:'',bindRest:null,visible:true};
+    return {id:randomId(),name:mesh.name||`部件 ${i+1}`,geometry:g,material,position:[0,0,0],rotation:[0,0,0],scale:[1,1,1],binding:'',bindRest:null,visible:true};
   });
   if(!saved){
     const box=partsBounds(parts),size=box.getSize(new Vector3());if(size.z<1e-8)throw Error('模型高度为零，请检查模型方向。');

@@ -1,3 +1,4 @@
+import { randomId } from '../../shared/ids.mjs';
 import { useEffect, useRef, useState } from 'react';
 import { createProject } from '../../shared/domain.mjs';
 import { applyOperation, at, put } from '../../shared/project.mjs';
@@ -6,7 +7,7 @@ const KEY='skatechassis-project-v1-'+(new URLSearchParams(location.search).get('
 function cached(){try{return JSON.parse(localStorage.getItem(KEY))||createProject();}catch{return createProject();}}
 export function useProject(){
   const [project,setProject]=useState(cached),[mode,setMode]=useState('connecting'),[notice,setNotice]=useState(''),[members,setMembers]=useState([]),[actor,setActorState]=useState(()=>localStorage.getItem('skate-actor')||'设计者');
-  const pRef=useRef(project),cred=useRef(null),queue=useRef(Promise.resolve()),pending=useRef(0),actorRef=useRef(actor),client=useRef(crypto.randomUUID());
+  const pRef=useRef(project),cred=useRef(null),queue=useRef(Promise.resolve()),pending=useRef(0),actorRef=useRef(actor),client=useRef(randomId());
   const replace=p=>{pRef.current=p;setProject(p);localStorage.setItem(KEY,JSON.stringify(p));};
   const api=async(route,opts={})=>{const r=await fetch('/api/skate/'+route,{...opts,headers:{'Content-Type':'application/json',Authorization:cred.current?`Bearer ${cred.current.token}`:'',...opts.headers}});let b;try{b=await r.json();}catch{throw Error('协作服务未连接');}if(!r.ok)throw Error(b.error||'请求失败');return b;};
   useEffect(()=>{let live=true,timer; (async()=>{
