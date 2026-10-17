@@ -1,0 +1,5 @@
+import * as THREE from 'three';
+import {BiwLineScene} from '../../src/biw-scene.js';
+import {defaultProject} from '../../src/model.js';
+const element=()=>({append(){},classList:{toggle(){}},style:{},getContext:()=>({fillRect(){},fillText(){}})});globalThis.document={createElement:element};const o={scene:new THREE.Scene(),container:{append(){},getBoundingClientRect(){return {width:1000,height:600};}},camera:new THREE.PerspectiveCamera(),controls:{target:new THREE.Vector3(),update(){}},renderer:{localClippingEnabled:false},mat:(c,r=.5,m=.3)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m})};o.mesh=(g,m,x=0,y=0,z=0,p=o.scene)=>{const a=new THREE.Mesh(g,m);a.position.set(x,y,z);p.add(a);return a;};o.box=(w,h,d,m,x,y,z,p)=>o.mesh(new THREE.BoxGeometry(w,h,d),m,x,y,z,p);o.cyl=(r,h,m,x,y,z,p)=>o.mesh(new THREE.CylinderGeometry(r,r,h,32),m,x,y,z,p);o.bolt=(x,y,z,p,r)=>o.cyl(r,.027,o.mat('#999999'),x,y,z,p);
+export function createScene(){const scene=new BiwLineScene(o),project=defaultProject();scene.setProject(project);return {scene,project};}

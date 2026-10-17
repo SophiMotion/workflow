@@ -1,0 +1,236 @@
+/* One application header; reserve the rest of the window for the scene. */
+#app{height:100dvh;display:flex;flex-direction:column;min-height:0}
+#app>.topbar,#app>.workflow-fold,#app>.statusbar{flex-shrink:0}
+#app>.topbar{height:58px;padding:0 18px;gap:16px;position:relative;z-index:8}
+.topbar .studio-logo{width:138px}
+.topbar .header-divider{display:none}
+.topbar .project-title{display:flex;gap:10px;min-width:0;flex-shrink:1}
+.project-switch{width:238px;max-width:100%;font-size:13px;font-weight:550;border:1px solid transparent;border-radius:5px;padding:8px 25px 8px 9px;color:#34455b;background-color:#f5f7fa;cursor:pointer;text-overflow:ellipsis}
+.project-switch:hover,.project-switch:focus-visible{border-color:#b5c7e4;background-color:#eef3fb}
+.topbar .file-meta{display:none}
+.topbar>.workflow-nav{height:100%;padding:0;margin:0;border:0;background:none;flex-shrink:0}
+.topbar .main-tabs{height:100%;gap:6px}
+.topbar .nav-tab{padding:0 12px;gap:6px;font-size:11px}
+.topbar .nav-tab.active:after{left:10px;right:10px;bottom:8px}
+.topbar .integration-status{display:flex;margin-left:auto;gap:5px;padding:7px 9px;border-radius:5px;font-size:10px;color:#496b9e;white-space:nowrap}
+.topbar .integration-status:hover{background:#f0f5fc}
+.topbar .integration-status>.icon{margin:0;width:14px}
+.controller-status-text{display:none}
+.topbar .top-actions{margin-left:0;gap:7px;flex-shrink:0}
+.topbar .top-actions .button{height:32px;font-size:10px;padding:0 12px}
+#app>.workspace{flex:1;min-height:0;height:auto}
+.workspace>.center-panel{position:relative;min-width:0;overflow:hidden;padding:7px 7px 55px}
+.workspace .canvas-container{height:auto;min-height:240px;flex:1 1 0}
+.center-panel>.playback{position:relative;bottom:auto;z-index:4;background:#fff;box-shadow:0 -2px 8px #253d5810}
+/* Detail drawers overlay the scene instead of reducing its working area. */
+.workflow-fold{position:relative;z-index:7;background:#fff;border-bottom:1px solid var(--line)}
+.workflow-fold>summary,.cycle-fold>summary{display:flex;align-items:center;gap:8px;list-style:none;cursor:pointer;color:#53677f;font-size:10px;min-height:28px;padding:0 15px;user-select:none}
+.workflow-fold>summary::-webkit-details-marker,.cycle-fold>summary::-webkit-details-marker,.scene-controls>summary::-webkit-details-marker{display:none}
+.workflow-fold>summary>.icon,.cycle-fold>summary>.icon{width:13px;height:13px;flex-shrink:0}
+.workflow-fold>summary>small{color:#99a3af;font-size:9px;font-weight:400}
+.workflow-fold>summary>.icon:last-child,.cycle-fold>summary>.icon:last-child{margin-left:auto;transition:transform .15s}
+.workflow-fold[open]>summary>.icon:last-child,.cycle-fold[open]>summary>.icon:last-child{transform:rotate(180deg)}
+.workflow-fold #engineeringWorkflow{position:absolute;top:100%;left:0;right:0;background:#fff;box-shadow:0 8px 18px #253d5818}
+.workflow-fold .engineering-workflow{border-bottom:1px solid var(--line)}
+.cycle-fold{position:relative;z-index:5;flex-shrink:0;background:#fff;border:1px solid var(--line);border-radius:5px;margin-bottom:7px}
+.cycle-fold>summary{min-height:30px;padding:0 12px}
+.cycle-fold>summary>span{font-size:10px;color:#8693a3;font-variant-numeric:tabular-nums}
+.cycle-fold>summary>small{font-size:10px;color:#8797ac;margin-left:auto}
+.cycle-fold>summary>.icon:last-child{margin-left:0}
+.cycle-fold[open]>summary>small{visibility:hidden}
+.cycle-fold .cycle-summary{position:absolute;top:100%;left:-1px;right:-1px;border:1px solid var(--line);margin:0;border-radius:0 0 5px 5px;box-shadow:0 8px 18px #253d5818}
+.center-panel>.bottom-panel{position:absolute;left:7px;right:7px;bottom:7px;z-index:6;margin:0;background:#fff;box-shadow:0 -5px 15px #253d5810;max-height:calc(100% - 14px)}
+.bottom-panel.is-collapsed{height:41px;min-height:41px;box-shadow:none}
+.bottom-panel.is-collapsed>.bottom-tabs{border-bottom:0}
+.bottom-tabs>.bottom-toggle{flex-shrink:0;gap:4px;color:#5f7c9f;padding:0 0 0 8px;min-width:46px;align-self:stretch;border-left:1px solid #eef1f5}
+.bottom-tabs>.bottom-toggle>.icon{width:13px;height:13px;transition:transform .15s}
+.bottom-toggle[aria-expanded="true"]>.icon{transform:rotate(180deg)}
+#bottomContent[hidden]{display:none}
+.engineering-details>summary::-webkit-details-marker{display:none}
+.engineering-details>summary{justify-content:flex-start;gap:8px}
+.engineering-details>.outcome-picker{margin:12px 0 0;border:0;padding:0}
+.strategy-inspector.engineering-details>select{margin-top:12px}
+.results-inspector.engineering-details>.property-label{margin-top:14px}
+/* Reuse the same station controls in the inspector and the dock. */
+.scene-controls{background:#f8fafd;border:1px solid #e1e8f1;border-radius:5px;margin:10px 0 15px;padding:0 8px}
+.scene-controls[hidden]{display:none!important}
+.scene-controls>summary{display:flex;align-items:center;gap:7px;min-height:32px;cursor:pointer;list-style:none;font-size:10px;color:#5d7490}
+.scene-controls>summary>b{font-weight:500}
+.scene-controls>summary>span{margin-left:auto;font-size:9px;color:#7790ad}
+.scene-controls>summary>.icon{width:13px;height:13px}
+.scene-controls[open]>summary>.icon:last-child{transform:rotate(180deg)}
+.scene-body-choice{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:4px 0 8px;font-size:9px;color:#8290a2}
+.scene-body-choice>select{max-width:175px;min-width:0;font-size:9px;padding:5px 7px;background:#fff;border:1px solid #dce5ef;border-radius:4px;color:#456787}
+#sceneControls .line-bar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;height:auto;min-height:0;margin:0 0 8px;padding:0;background:none;border:0}
+#sceneControls .line-bar.hidden{display:none!important}
+#sceneControls .line-view-actions{grid-column:1 / -1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));padding:0;gap:4px}
+#sceneControls .line-view-actions button{font-size:9px;padding:6px 2px;border:1px solid #e3eaf3;background:#fff;gap:4px}
+#sceneControls .line-view-actions button[data-action="controller-studio"]{display:none}
+#sceneControls .station-selector{display:flex;min-height:42px;gap:3px}
+#sceneControls .station-selector>button{padding:4px;gap:3px;background:#fff;border-color:#e6ecf4}
+#sceneControls .station-selector>button.active{background:#eaf2ff;border-color:#a4bfe6}
+#sceneControls .station-selector b{font-size:10px}
+#sceneControls .station-selector em{display:none}
+#sceneControls .station-selector small{font-size:8px}
+#sceneControls .loop-button{padding:4px;font-size:8px}
+#controllerDock [data-studio-scene-slot]{flex-shrink:0;max-height:230px;overflow:auto;background:#fff}
+#controllerDock .scene-controls{margin:0 10px 7px}
+#controllerDock:has(#sceneControls[open]) .studio-task-strip{display:none}
+.studio-docked .workspace,.studio-docked.contact-mode .workspace{grid-template-columns:0 minmax(0,1fr) 8px var(--controller-width,360px);gap:0}
+.studio-docked .workspace>.center-panel,.contact-mode .workspace>.center-panel,.focus-scene .workspace>.center-panel{padding-bottom:7px}
+.studio-docked .cycle-fold,.contact-mode .cycle-fold,.focus-scene .cycle-fold{display:none}
+.studio-docked .workspace .canvas-container{height:auto;min-height:240px;flex:1 1 0}
+#controllerDock .studio-titlebar{padding:10px;gap:8px}
+#controllerDock .studio-titlebar h2{font-size:13px}
+#controllerDock .studio-titlebar p{font-size:8px}
+#controllerDock .studio-main{padding:14px 12px}
+#controllerDock .studio-jog-row{gap:6px}
+@media(max-width:1200px){
+ #app>.topbar{gap:10px;padding-inline:12px}
+ .topbar .studio-logo{width:115px}
+ .project-switch{width:206px;font-size:11px}
+ .topbar .nav-tab{padding-inline:8px;font-size:10px}
+ .topbar .integration-status{padding-inline:5px}
+ .topbar .top-actions .button{padding-inline:8px}
+ .topbar .import-btn{display:none}
+}
+@media(max-width:1000px) and (min-width:641px){
+ .topbar .top-actions .button:not(.primary)>span{display:none}
+ .topbar .nav-tab .icon{display:none}
+ .project-switch{width:188px}
+ .topbar .studio-logo{width:100px}
+ .topbar .main-tabs{gap:0}
+}
+@media(max-width:920px){
+ .left-panel{top:87px}
+ .topbar .integration-status>span:not(.connection-dot){display:none}
+}
+@media(max-width:640px){
+ #app>.topbar{display:grid;grid-template-columns:100px minmax(0,1fr) auto;height:91px;grid-template-rows:48px 42px;gap:0 7px;padding:0 10px}
+ .topbar .brand{grid-column:1;grid-row:1;min-width:0}
+ .topbar .studio-logo{width:100px}
+ .topbar .project-title{grid-column:2;grid-row:1;min-width:0;display:flex}
+ .project-switch{width:100%;font-size:10px;padding:7px 14px 7px 5px}
+ .topbar>.workflow-nav{grid-column:1 / 3;grid-row:2;width:max-content;max-width:100%;height:42px}
+ .topbar .main-tabs{gap:8px}
+ .topbar .nav-tab{padding:0 5px;font-size:10px}
+ .topbar .nav-tab.active:after{bottom:3px;left:5px;right:5px}
+ .topbar .nav-tab .icon{width:13px;height:13px}
+ .topbar .top-actions{grid-column:3;grid-row:1;gap:4px}
+ .topbar .top-actions .button{padding:0;width:27px;min-width:0;height:29px}
+ .topbar .top-actions .button>span{display:none}
+ .topbar .integration-status{grid-column:3;grid-row:2;justify-self:end;display:flex;padding:6px;margin:0;gap:4px}
+ .topbar .integration-status>span:not(.connection-dot){display:none}
+ .workflow-fold>summary{min-height:25px;padding:0 10px;font-size:9px}
+ .workflow-fold>summary>small{font-size:8px}
+ .workspace>.center-panel{padding:5px 5px 49px}
+ .workspace .canvas-container{min-height:220px}
+ .cycle-fold>summary{min-height:29px;padding:0 8px;gap:5px;font-size:10px}
+ .cycle-fold>summary>span{font-size:8px}
+ .cycle-fold>summary>small{font-size:9px}
+ .center-panel>.bottom-panel{left:5px;right:5px;bottom:5px}
+ .bottom-panel.is-collapsed{height:39px;min-height:39px}
+ .bottom-tabs>div{gap:12px}
+ .bottom-tabs>.bottom-toggle{min-width:27px;padding-left:5px}
+ .bottom-toggle>span{display:none}
+ .left-panel,.right-panel{top:117px}
+ .biw-mode .process-hud{bottom:auto}
+ .studio-docked .workspace,.studio-docked.contact-mode .workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(260px,50%) minmax(0,1fr);gap:7px}
+ .studio-docked .workspace>.center-panel{padding:5px;overflow:hidden}
+ .studio-docked .workspace .canvas-container{height:auto;min-height:120px;flex:1 1 0}
+ .studio-docked #sceneControls .line-bar{display:grid!important}
+ #controllerDock .studio-titlebar{padding:7px 10px}
+ #controllerDock [data-studio-scene-slot]{max-height:200px}
+ #controllerDock .scene-controls{margin-bottom:5px}
+ #controllerDock .scene-controls>summary{min-height:27px}
+ #controllerDock .studio-titlebar h2{font-size:12px}
+ #controllerDock .studio-workspace{display:block;overflow-y:auto;overscroll-behavior:contain}
+ #controllerDock .studio-titlebar{position:sticky;top:0;z-index:6;background:#fff}
+ #controllerDock .studio-layout{display:block;min-height:220px}
+ #controllerDock .studio-main{overflow:visible}
+}
+
+/* Compact, resizable controller: all six axes remain above optional details. */
+#controllerSplitter[hidden],#controllerRestore[hidden]{display:none!important}
+#controllerSplitter{grid-column:3;grid-row:1;position:relative;cursor:col-resize;touch-action:none;outline:none;z-index:7;display:flex;align-items:center;justify-content:center}
+#controllerSplitter:before{content:"";position:absolute;inset:0 -2px}
+#controllerSplitter>span{width:3px;height:36px;border-radius:3px;background:#bccbdc;pointer-events:none}
+#controllerSplitter:hover,#controllerSplitter:focus-visible,.resizing-controller #controllerSplitter{background:#e3edfc}
+#controllerSplitter:hover>span,#controllerSplitter:focus-visible>span,.resizing-controller #controllerSplitter>span{background:#4179c1}
+.resizing-controller,.resizing-controller *{cursor:col-resize!important;user-select:none!important}
+.resizing-controller .viewport{pointer-events:none}
+.studio-docked #controllerDock{grid-column:4;grid-row:1;padding:7px 7px 7px 0}
+#controllerRestore{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:6;display:flex;align-items:center;gap:6px;padding:8px 12px;border:1px solid #b9cce6;border-radius:5px;background:#fffffff2;color:#365f96;font-size:11px;box-shadow:0 2px 8px #21375112}
+#controllerRestore .icon{width:15px;height:15px;transform:scaleX(-1)}
+.studio-docked.studio-collapsed .workspace,.studio-docked.studio-collapsed.contact-mode .workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+.studio-docked.studio-collapsed .workspace>.center-panel{grid-column:1;grid-row:1}
+#controllerDock .studio-titlebar{padding:6px 9px;gap:6px;min-height:38px;flex-shrink:0}
+#controllerDock .studio-titlebar h2{font-size:12px;white-space:nowrap}
+#controllerDock .studio-titlebar p,#controllerDock .studio-appmark{display:none}
+#controllerDock .studio-title-status{margin-left:auto}
+#controllerDock .studio-connection{max-width:61px;font-size:8px;line-height:1.25}
+#controllerDock .studio-close{width:26px;height:26px;padding:4px;margin:0;flex-shrink:0}
+#controllerDock .studio-close .icon{width:16px;height:16px}
+#controllerDock .studio-collapse{color:#3c69a4;background:#f0f5fc;border-radius:4px}
+#controllerDock .scene-controls{margin:0 8px 4px}
+#controllerDock .scene-controls>summary{min-height:27px}
+#controllerDock .studio-tabs{flex-shrink:0}
+#controllerDock .studio-tabs button{padding:8px 5px;font-size:10px}
+#controllerDock .studio-ribbon{display:grid;grid-template-columns:minmax(0,1fr) auto;padding:6px 8px;gap:4px;flex-shrink:0}
+#controllerDock .studio-ribbon-group:first-child{grid-column:1;grid-row:1}
+#controllerDock .studio-ribbon-group:nth-child(2){grid-column:1/-1;grid-row:2}
+#controllerDock .studio-recovery{grid-column:2;grid-row:1;margin:0}
+#controllerDock .studio-command-row{gap:4px}
+#controllerDock .studio-ribbon-group:nth-child(2) .studio-command-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%}
+#controllerDock .studio-command-row button{height:27px;padding:4px 6px;font-size:9px;gap:4px;justify-content:center;white-space:nowrap}
+#controllerDock .studio-command-row .icon{width:12px;height:12px}
+#controllerDock .studio-task-strip{padding:5px 8px;gap:5px}
+#controllerDock .studio-task-strip button{padding:5px;font-size:10px;gap:5px}
+#controllerDock .studio-live-strip{padding:6px 8px;gap:5px}
+#controllerDock .studio-live-strip span{gap:3px;font-size:8px}
+#controllerDock .studio-live-strip b{font-size:9px;white-space:nowrap}
+#controllerDock .studio-main{padding:9px 10px}
+#controllerDock .studio-statusbar{height:25px}
+.studio-jog-heading{display:flex;justify-content:space-between;gap:8px;align-items:center;min-height:22px}
+.studio-jog-heading h3{font-size:12px;font-weight:600;color:#3a5575;margin:0}
+.studio-jog-heading>span{font-size:9px;color:#8093aa}
+#controllerDock .studio-jog-settings{gap:10px;margin:7px 0}
+#controllerDock .studio-jog-settings label{gap:6px;font-size:10px;min-width:0}
+#controllerDock .studio-jog-settings select{height:28px;min-width:0;padding:3px 6px}
+#controllerDock .studio-jog-row{grid-template-columns:24px 32px 74px 32px minmax(0,1fr);gap:5px;padding:2px 0;min-height:34px}
+#controllerDock .studio-jog-row button{height:29px;font-size:18px}
+#controllerDock .studio-jog-row output{font-size:14px}
+#controllerDock .studio-jog-row small{font-size:9px;white-space:nowrap}
+#controllerDock [data-studio-current-tab="jog"] .studio-inline-actions{margin:8px 0;gap:5px}
+#controllerDock [data-studio-current-tab="jog"] .studio-inline-actions button{padding:5px 8px;height:28px;font-size:10px}
+.studio-jog-details{border-top:1px solid #e5ecf4;margin-top:4px}
+.studio-jog-details>summary{display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-size:10px;color:#6a83a0;min-height:28px;list-style:none}
+.studio-jog-details>summary::-webkit-details-marker{display:none}
+.studio-jog-details>summary .icon{height:12px;width:12px}
+.studio-jog-details[open]>summary .icon{transform:rotate(180deg)}
+#controllerDock .studio-jog-details .studio-panel-note{margin:4px 0;font-size:10px;line-height:1.7}
+#controllerDock .studio-jog-details .studio-feedback{margin-top:8px}
+@media(max-width:640px){
+ #controllerSplitter{display:none!important}
+ .studio-docked #controllerDock{grid-column:1;grid-row:2;padding:0 5px 5px}
+ #controllerRestore{left:auto;right:8px;top:53px;transform:none;font-size:10px;padding:7px 10px}
+ #controllerDock .studio-command-row button{font-size:9px}
+ #controllerDock .studio-jog-row{grid-template-columns:24px 32px 74px 32px minmax(0,1fr)}
+}
+/* On narrow screens, six axes use two columns; collapsing restores the full scene. */
+@media(max-width:640px){
+ .studio-docked:not(.studio-collapsed):has([data-studio-current-tab="jog"]) .workspace{grid-template-rows:minmax(140px,1fr) minmax(0,min(520px,74%))}
+ #controllerDock [data-studio-current-tab="jog"] .studio-main{padding:7px 9px}
+ #controllerDock [data-studio-current-tab="jog"] .studio-jog-rows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 10px}
+ #controllerDock [data-studio-current-tab="jog"] .studio-jog-row{grid-template-columns:17px 27px minmax(40px,1fr) 27px;gap:2px 3px;padding:3px 0;min-height:46px}
+ #controllerDock [data-studio-current-tab="jog"] .studio-jog-row button{height:27px}
+ #controllerDock [data-studio-current-tab="jog"] .studio-jog-row output{font-size:12px}
+ #controllerDock [data-studio-current-tab="jog"] .studio-jog-row small{grid-column:2/-1;font-size:8px;line-height:10px;text-align:center}
+ #controllerDock [data-studio-current-tab="jog"] .studio-jog-settings{margin:5px 0}
+ #controllerDock [data-studio-current-tab="jog"] .studio-inline-actions{margin:5px 0}
+ #controllerDock [data-studio-current-tab="jog"] .studio-ribbon{padding-block:4px}
+ #controllerDock [data-studio-current-tab="jog"] .studio-command-row button{height:24px}
+ #controllerDock [data-studio-current-tab="jog"] .studio-task-strip{padding-block:4px}
+ #controllerDock [data-studio-current-tab="jog"] .studio-task-strip button{padding-block:4px}
+ #controllerDock [data-studio-current-tab="jog"] .studio-live-strip{padding-block:5px}
+}

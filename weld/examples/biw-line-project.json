@@ -1,0 +1,146 @@
+{
+  "version": 1,
+  "scene": "biw-line",
+  "name": "白车身 · ABB 三工位点焊线",
+  "part": "钣金白车身 · Body in white",
+  "material": "Q235B",
+  "strategy": "balanced",
+  "process": "spot",
+  "outcome": "nominal",
+  "engineering": {
+    "targetJph": 60,
+    "availability": 100,
+    "loadTime": 6,
+    "clampTime": 2,
+    "unloadTime": 4,
+    "transfer": 2,
+    "approach": 0.8,
+    "retreat": 0.8,
+    "interlock": 0.2,
+    "dressTime": 12,
+    "dressEvery": 50,
+    "approachDistance": 80,
+    "clearance": 5,
+    "toolMass": 80,
+    "adapterMass": 8,
+    "payloadLimit": 120,
+    "cogX": 100,
+    "cogY": 0,
+    "cogZ": 250,
+    "inertia": 0.8,
+    "tcpX": 0,
+    "tcpY": 0,
+    "tcpZ": 300,
+    "gunStroke": 80,
+    "gunForce": 3,
+    "spotCurrent": 8,
+    "spotClose": 0.25,
+    "spotSqueeze": 0.15,
+    "spotWeld": 0.25,
+    "spotHold": 0.15,
+    "spotOpen": 0.25,
+    "laserPower": 2000,
+    "laserSpeed": 30,
+    "focalOffset": 0,
+    "gunType": "c",
+    "lineIndex": 4,
+    "lineRelease": 1.2,
+    "lineTransfer1": 2,
+    "lineTransfer2": 2.7,
+    "lineTransfer3": 1.8
+  },
+  "weave": "straight",
+  "gas": "mix",
+  "params": {
+    "current": 220,
+    "voltage": 24,
+    "speed": 8,
+    "efficiency": 0.85,
+    "thickness": 1.2,
+    "preheat": 20,
+    "cooling": 3,
+    "torchDistance": 15,
+    "gasFlow": 18,
+    "preflow": 0.7,
+    "postflow": 3,
+    "coolDuration": 90,
+    "poolTemp": 1550
+  },
+  "seams": [
+    {
+      "id": "W01",
+      "name": "前门槛 · 前点",
+      "length": 1,
+      "enabled": true
+    },
+    {
+      "id": "W02",
+      "name": "前门槛 · 后点",
+      "length": 1,
+      "enabled": true
+    },
+    {
+      "id": "W03",
+      "name": "前舱侧梁 · 前点",
+      "length": 1,
+      "enabled": true
+    },
+    {
+      "id": "W04",
+      "name": "前舱侧梁 · 后点",
+      "length": 1,
+      "enabled": true
+    },
+    {
+      "id": "W05",
+      "name": "顶边梁 · 前点",
+      "length": 1,
+      "enabled": true
+    },
+    {
+      "id": "W06",
+      "name": "顶边梁 · 后点",
+      "length": 1,
+      "enabled": true
+    },
+    {
+      "id": "W07",
+      "name": "B 柱 · 下点",
+      "length": 1,
+      "enabled": true
+    },
+    {
+      "id": "W08",
+      "name": "B 柱 · 上点",
+      "length": 1,
+      "enabled": true
+    },
+    {
+      "id": "W09",
+      "name": "后门槛 · 前点",
+      "length": 1,
+      "enabled": true
+    },
+    {
+      "id": "W10",
+      "name": "后门槛 · 后点",
+      "length": 1,
+      "enabled": true
+    },
+    {
+      "id": "W11",
+      "name": "后舱侧梁 · 前点",
+      "length": 1,
+      "enabled": true
+    },
+    {
+      "id": "W12",
+      "name": "后舱侧梁 · 后点",
+      "length": 1,
+      "enabled": true
+    }
+  ],
+  "activeStation": "OP10",
+  "robotModel": "abb-irb6700",
+  "bodyModel": "sheet-metal"
+}

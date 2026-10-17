@@ -17,12 +17,23 @@ export class RobotRig {
   // Articulated corrugated dress pack: reusable small rings on a smooth cable curve.
   this.dress=new THREE.InstancedMesh(new THREE.SphereGeometry(.042,8,6),m.rubber,65);this.dress.instanceMatrix.setUsage(THREE.DynamicDrawUsage);parent.add(this.dress);this.dress.frustumCulled=false;
   this.temp=new THREE.Object3D();
+  this.spotTool=new THREE.Group();this.tool.add(this.spotTool);
+  this.gunBack=owner.box(.065,.60,.07,owner.mat('#343b42'),.42,.15,0,this.spotTool);
+  this.gunUpper=owner.box(.42,.065,.07,m.metal,.21,.40,0,this.spotTool);
+  this.gunLower=owner.box(.42,.065,.07,m.metal,.21,-.14,0,this.spotTool);
+  this.fixedTip=owner.cyl(.022,.065,owner.mat('#bd8c56',.3,.8),0,-.1075,0,this.spotTool);
+  this.movingTip=owner.cyl(.022,.12,owner.mat('#bd8c56',.3,.8),0,.06,0,this.spotTool);
+  this.actuator=owner.cyl(.047,.16,m.dark,0,.32,0,this.spotTool);
+  this.laserBeam=owner.mesh(new THREE.CylinderGeometry(.002,.002,1,8),new THREE.MeshBasicMaterial({color:0xff713f,transparent:true,opacity:.8}),0,0,0,this.tool);
  }
  link(length,r1,r2){const o=this.o,m=o.materials,g=new THREE.Group();this.parent.add(g);const shell=o.mesh(new THREE.CapsuleGeometry(r1,length-2*r1,6,14),m.white,0,0,0,g);shell.scale.z=.88;o.box(r1*1.45,length*.67,r2*.82,m.white,0,0,r1*.30,g);for(const dy of [-length*.28,length*.28]){const bolt=o.cyl(.025,.012,m.metal,0,dy,r1*.94,g);bolt.rotation.x=Math.PI/2;}return g;}
  joint(radius,width){const g=new THREE.Group(),o=this.o,m=o.materials;this.parent.add(g);for(const [r,h,z,mat] of [[radius,width,0,m.dark],[radius*.92,.045,width/2+.014,m.white],[radius*.52,.05,width/2+.045,m.metal]]){const c=o.cyl(r,h,mat,0,0,z,g);c.rotation.x=Math.PI/2;}for(let i=0;i<6;i++){const a=i*Math.PI/3;const c=o.cyl(.015,.017,m.dark,Math.cos(a)*radius*.71,Math.sin(a)*radius*.71,width/2+.048,g);c.rotation.x=Math.PI/2;}return g;}
  segment(object,a,b){object.position.copy(a).add(b).multiplyScalar(.5);object.quaternion.setFromUnitVectors(up,b.clone().sub(a).normalize());}
  rod(object,a,b){this.segment(object,a,b);object.scale.y=a.distanceTo(b);}
  update(pose){const p=pose;this.segment(this.upper,p.shoulder,p.elbow);this.segment(this.lower,p.elbow,p.wrist);this.shoulder.position.copy(p.shoulder);this.elbow.position.copy(p.elbow);this.wrist.position.copy(p.wrist);this.wrist.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),p.normal);this.rod(this.housing,p.wrist,p.neck);this.rod(this.neck,p.neck,p.nozzle);this.nozzle.position.copy(p.nozzle).addScaledVector(p.normal,.047);this.nozzle.quaternion.setFromUnitVectors(up,p.normal);this.rod(this.wire,p.nozzle,p.tip);
+  const spot=p.process==='spot',laser=p.process==='laser';this.spotTool.visible=spot;this.neck.visible=!spot;this.nozzle.visible=!spot;this.wire.visible=!spot&&!laser;this.laserBeam.visible=laser&&p.energized;
+  if(laser)this.rod(this.laserBeam,p.nozzle,p.root);
+  if(spot){this.spotTool.position.copy(p.root);this.spotTool.rotation.y=p.id&&['W03','W04'].includes(p.id)?-Math.PI/2:Math.PI/2;const opening=p.gunOpening||0;this.movingTip.position.y=.06+opening*.16;const xType=this.o.project?.engineering.gunType==='x';this.gunUpper.rotation.z=xType?-opening*.35:0;this.gunLower.rotation.z=xType?opening*.35:0;this.gunBack.material.color.set(xType?'#536581':'#343b42');}
   const curve=new THREE.CatmullRomCurve3([p.shoulder.clone().add(new THREE.Vector3(-.15,0,-.2)),p.elbow.clone().add(new THREE.Vector3(-.15,.28,-.18)),p.elbow.clone().lerp(p.wrist,.6).add(new THREE.Vector3(0,.24,-.22)),p.wrist.clone().addScaledVector(p.normal,.15),p.neck]);const a=this.cableGeometry.attributes.position;for(let i=0;i<a.count;i++){const q=curve.getPoint(i/(a.count-1));a.setXYZ(i,q.x,q.y,q.z);}a.needsUpdate=true;for(let i=0;i<65;i++){this.temp.position.copy(curve.getPoint(i/64));this.temp.updateMatrix();this.dress.setMatrixAt(i,this.temp.matrix);}this.dress.instanceMatrix.needsUpdate=true;
  }
 }

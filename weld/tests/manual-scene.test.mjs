@@ -1,0 +1,15 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {build} from 'esbuild';import {mkdtemp,writeFile,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import {pathToFileURL} from 'node:url';
+test('manual axes update actual meshes, preserve other stations, reject collisions and keep live contact interlocks',async()=>{
+ const temp=await mkdtemp(tmpdir()+'/weld-control-');try{const bundle=await build({entryPoints:['tests/fixtures/line-scene-harness.js'],bundle:true,platform:'node',format:'esm',write:false,loader:{'.stl':'binary'}}),file=temp+'/scene.mjs';await writeFile(file,bundle.outputFiles[0].text);const {createScene}=await import(pathToFileURL(file));const {scene,project}=createScene();
+ const initial=scene.getState(),q=initial.q,other=initial.stations[1].q;
+ for(let axis=0;axis<6;axis++){scene.clearManual();assert.equal(scene.manualCommand('OP10',{axis,delta:.1}).ok,true);const state=scene.getState();assert.ok(Math.abs(state.q[axis]-q[axis]-.1*Math.PI/180)<1e-10);assert.deepEqual(state.stations[1].q,other);assert.equal(state.manual,true);assert.equal(state.energized,false);assert.ok(state.collisionCheck.pairs>100);}
+ scene.clearManual();assert.deepEqual(scene.getState().q,q);assert.equal(scene.manualCommand('OP10',{axis:0,delta:6}).ok,false);
+ // At a weld point a closed manual gun still has pressure, but no welding current.
+ const st=scene.line.stations[0],t=st.tasks[0].start+.1;scene.update(t);const ready=scene.getState();assert.equal(ready.contact.current,8);assert.equal(scene.manualCommand('OP10',{opening:0}).ok,true);assert.equal(scene.getState().contact.seated,true);assert.equal(scene.getState().contact.force,3);assert.equal(scene.getState().contact.current,0);
+ scene.clearManual();project.controlFrames={OP10:{tcp:[0,0,0,0,0,0],work:[10,0,0,0,0,0]}};scene.reconfigureFrames();scene.update(t);assert.equal(scene.getState().contact.aligned,false);assert.equal(scene.getState().contact.current,0);assert.equal(scene.cells[0].realRig.servoGun.currentHalo.visible,false);scene.update(st.tasks[0].end+.1);assert.ok(!scene.getState().done.includes(st.tasks[0].id));assert.equal(scene.bodies[1].dots.W01.rim.visible,false);
+ project.controlFrames={};project.bodyModel='zeekr-001';scene.setProject(project);
+ for(let time=0;time<scene.line.duration;time+=.1){scene.update(time);assert.equal(scene.collision.hits.length,0,JSON.stringify({time,hits:scene.collision.hits}));assert.ok(scene.states.every(s=>s.reachable));}
+ for(const station of scene.line.stations)for(const task of station.tasks){scene.update(task.start+.1);const pose=scene.states.find(x=>x.station===station.id);assert.equal(pose.contact.current,8,task.id);}
+ scene.update(0);let blocked=false;for(let i=0;i<80;i++){const before=scene.getState().q;const result=scene.manualCommand('OP10',{axis:1,delta:5});if(!result.ok){assert.deepEqual(scene.getState().q,before);blocked=true;assert.match(result.message,/碰撞|限位/);break;}}assert.ok(blocked,'manual travel must stop at a collision or a joint limit');
+ }finally{await rm(temp,{recursive:true,force:true});}
+});

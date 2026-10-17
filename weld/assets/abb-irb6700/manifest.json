@@ -1,0 +1,121 @@
+{
+  "repository": "ros-industrial/abb",
+  "revision": "45f4769d826cf3ac62a65495f2db67b78b0c81df",
+  "model": "IRB 6700-235/2.65",
+  "files": [
+    {
+      "file": "visual/base_link.stl",
+      "source": "https://raw.githubusercontent.com/ros-industrial/abb/45f4769d826cf3ac62a65495f2db67b78b0c81df/abb_irb6700_support/meshes/irb6700/visual/base_link.stl",
+      "bytes": 514684,
+      "sha256": "d63e1e4e0c086d4aa15e29efe8c2ebf510577eeb63370715051ebed8e7bdd5a6"
+    },
+    {
+      "file": "collision/base_link.stl",
+      "source": "https://raw.githubusercontent.com/ros-industrial/abb/45f4769d826cf3ac62a65495f2db67b78b0c81df/abb_irb6700_support/meshes/irb6700/collision/base_link.stl",
+      "bytes": 10884,
+      "sha256": "88a71d75e0b8aa6c8f7ee72c496bcbdf86d362e11766ffab12f4136775f0c5b3"
+    },
+    {
+      "file": "visual/link_1.stl",
+      "source": "https://raw.githubusercontent.com/ros-industrial/abb/45f4769d826cf3ac62a65495f2db67b78b0c81df/abb_irb6700_support/meshes/irb6700/visual/link_1.stl",
+      "bytes": 746534,
+      "sha256": "77c48b23dfeb93d1cca574dd9b3c30f2195c134b2684175cfc4e16e211e25766"
+    },
+    {
+      "file": "collision/link_1.stl",
+      "source": "https://raw.githubusercontent.com/ros-industrial/abb/45f4769d826cf3ac62a65495f2db67b78b0c81df/abb_irb6700_support/meshes/irb6700/collision/link_1.stl",
+      "bytes": 17684,
+      "sha256": "bab121607ef98f35e402dc29b461f44b8e0527d822c3dbba9590985ed870e25a"
+    },
+    {
+      "file": "visual/cylinder.stl",
+      "source": "https://raw.githubusercontent.com/ros-industrial/abb/45f4769d826cf3ac62a65495f2db67b78b0c81df/abb_irb6700_support/meshes/irb6700/visual/cylinder.stl",
+      "bytes": 113384,
+      "sha256": "ab59e02de09beae97313e40550631fee978119a88ef5f3cec3b8c6f27ab95dba"
+    },
+    {
+      "file": "collision/cylinder.stl",
+      "source": "https://raw.githubusercontent.com/ros-industrial/abb/45f4769d826cf3ac62a65495f2db67b78b0c81df/abb_irb6700_support/meshes/irb6700/collision/cylinder.stl",
+      "bytes": 24284,
+      "sha256": "bb4a12d7e0d610bfb025e4fc6d2559f0eb2c0cc9792877ae5d1f7e3bcb8c3c41"
+    },
+    {
+      "file": "visual/piston.stl",
+      "source": "https://raw.githubusercontent.com/ros-industrial/abb/45f4769d826cf3ac62a65495f2db67b78b0c81df/abb_irb6700_support/meshes/irb6700/visual/piston.stl",
+      "bytes": 62284,
+      "sha256": "8be60c11d2f2f9160c5fec9c6c475e5a84b5f37d9ebd3c292a418b39ae6aad3b"
+    },
+    {
+      "file": "collision/piston.stl",
+      "source": "https://raw.githubusercontent.com/ros-industrial/abb/45f4769d826cf3ac62a65495f2db67b78b0c81df/abb_irb6700_support/meshes/irb6700/collision/piston.stl",
+      "bytes": 18184,
+      "sha256": "cb7e023c0f70fc0d97e9b67e228964ee29d3e607a9a2ca25010240e5af36c87d"
+    },
+    {
+      "file": "visual/link_2.stl",
+      "source": "https://raw.githubusercontent.com/ros-industrial/abb/45f4769d826cf3ac62a65495f2db67b78b0c81df/abb_irb6700_support/meshes/irb6700_235_265/visual/link_2.stl",
+      "bytes": 446984,
+      "sha256": "6ec5f29a5ad20ab30cea26d364402b79a362d60a598521f74228b629f9f6dd7a"
+    },
+    {
+      "file": "collision/link_2.stl",
+      "source": "https://raw.githubusercontent.com/ros-industrial/abb/45f4769d826cf3ac62a65495f2db67b78b0c81df/abb_irb6700_support/meshes/irb6700_235_265/collision/link_2.stl",
+      "bytes": 49884,
+      "sha256": "a22834062c3c0d021a22c95984b434305176cd9c9b3b8b3a6e41baa26e8a653d"
+    },
+    {
+      "file": "visual/link_3.stl",
+      "source": "https://raw.githubusercontent.com/ros-industrial/abb/45f4769d826cf3ac62a65495f2db67b78b0c81df/abb_irb6700_support/meshes/irb6700_235_265/visual/link_3.stl",
+      "bytes": 402384,
+      "sha256": "8c7821ea9df62bcc26fe7dbe273248d40cdcf966086221ddcc56a8dacedba145"
+    },
+    {
+      "file": "collision/link_3.stl",
+      "source": "https://raw.githubusercontent.com/ros-industrial/abb/45f4769d826cf3ac62a65495f2db67b78b0c81df/abb_irb6700_support/meshes/irb6700_235_265/collision/link_3.stl",
+      "bytes": 39884,
+      "sha256": "1959203c67887925fe4f397d570cab3398bee2ad2d653bee9cd933ea92c97395"
+    },
+    {
+      "file": "visual/link_4.stl",
+      "source": "https://raw.githubusercontent.com/ros-industrial/abb/45f4769d826cf3ac62a65495f2db67b78b0c81df/abb_irb6700_support/meshes/irb6700_235_265/visual/link_4.stl",
+      "bytes": 507384,
+      "sha256": "b2bc0680e52da0a512784e3ec7570d9a8da4f5810130e00a90e668e0871d6690"
+    },
+    {
+      "file": "collision/link_4.stl",
+      "source": "https://raw.githubusercontent.com/ros-industrial/abb/45f4769d826cf3ac62a65495f2db67b78b0c81df/abb_irb6700_support/meshes/irb6700_235_265/collision/link_4.stl",
+      "bytes": 60884,
+      "sha256": "19f0d9e9941d07047c5440a7d715a31ff132b95605a8423a674f6e6e40f93412"
+    },
+    {
+      "file": "visual/link_5.stl",
+      "source": "https://raw.githubusercontent.com/ros-industrial/abb/45f4769d826cf3ac62a65495f2db67b78b0c81df/abb_irb6700_support/meshes/irb6700/visual/link_5.stl",
+      "bytes": 150484,
+      "sha256": "e84754f411bfb2219a2df94b392c59bd4bbc671ed90a524cbc89cde85fc12360"
+    },
+    {
+      "file": "collision/link_5.stl",
+      "source": "https://raw.githubusercontent.com/ros-industrial/abb/45f4769d826cf3ac62a65495f2db67b78b0c81df/abb_irb6700_support/meshes/irb6700/collision/link_5.stl",
+      "bytes": 27284,
+      "sha256": "23e7fb01e30a67ed56bdabcfdc95b3188da54fae3d20f643c5ad11fcb2489967"
+    },
+    {
+      "file": "visual/link_6.stl",
+      "source": "https://raw.githubusercontent.com/ros-industrial/abb/45f4769d826cf3ac62a65495f2db67b78b0c81df/abb_irb6700_support/meshes/irb6700/visual/link_6.stl",
+      "bytes": 116784,
+      "sha256": "6a81e3aedc13d4efd63e5d6a9607039518a234750e155aaff4e6afb594eb7cef"
+    },
+    {
+      "file": "collision/link_6.stl",
+      "source": "https://raw.githubusercontent.com/ros-industrial/abb/45f4769d826cf3ac62a65495f2db67b78b0c81df/abb_irb6700_support/meshes/irb6700/collision/link_6.stl",
+      "bytes": 22284,
+      "sha256": "b8101564ab6dee23e131384a8e8c8b7d370aa82a99c441b0a2975209559bf961"
+    },
+    {
+      "file": "package.xml",
+      "source": "https://raw.githubusercontent.com/ros-industrial/abb/45f4769d826cf3ac62a65495f2db67b78b0c81df/abb_irb6700_support/package.xml",
+      "bytes": 2125,
+      "sha256": "d9c037953105121e80fc897dede8da82e408b116dd71c307f67e4128020f5dc9"
+    }
+  ]
+}

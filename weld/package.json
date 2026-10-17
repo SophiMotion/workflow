@@ -7,8 +7,15 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "start": "python3 -m http.server 8765 --bind 127.0.0.1",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "check:build": "node scripts/build.mjs --check"
   },
-  "dependencies": { "three": "0.180.0", "lucide": "0.468.0" },
-  "devDependencies": { "esbuild": "0.25.10" }
+  "dependencies": {
+    "lucide": "0.468.0",
+    "three": "0.180.0",
+    "three-mesh-bvh": "0.9.2"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10"
+  }
 }

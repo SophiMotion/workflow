@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {defaultProject,validateProject,schedule,simulate} from '../src/model.js';
+import {bracketProject as defaultProject,validateProject,schedule,simulate} from '../src/model.js';
 import {beadProfile,assessRisks,thermalCycle,processState} from '../src/process.js';
 import {robotPose,collisionReport,SEAMS} from '../src/motion.js';
 test('legacy v1 projects receive new defaults without losing parameters',()=>{const p=defaultProject();delete p.process;delete p.weave;delete p.gas;delete p.params.torchDistance;assert.equal(validateProject(p).params.torchDistance,15);});
