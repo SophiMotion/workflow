@@ -1,0 +1,15 @@
+{
+  "description": "Published standalone HIL build; original application preserved without changes.",
+  "syncedOn": "2026-10-19",
+  "localPreview": "http://127.0.0.1:8247/hil.html",
+  "files": {
+    "hil.html": {
+      "bytes": 19133017,
+      "sha256": "ae8a81942dd651529434a45f5f3e30abdbfb5250e41801eb50fc0bc308d34bbf"
+    },
+    "THIRD-PARTY-NOTICES.txt": {
+      "bytes": 3149,
+      "sha256": "90224d340c0f773f5d294490a5ce79ad810b758836934821e5ad91a47a80c4e4"
+    }
+  }
+}

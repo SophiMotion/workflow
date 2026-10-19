@@ -186,7 +186,7 @@
         <h1>SophiStudio 工作流</h1>
         <p>${engineeringOnly ? '' : '从知识沉淀、工程研发、工程加工到内容体验，'}统一管理 SophiMotion 及相关项目的本地工具链。</p>
       </div>
-      <div class="workflow-count">${engineeringOnly ? '<strong>11</strong><span>/ 11 模块可用</span>' : '<strong>20</strong><span>/ 23 模块可用</span>'}</div>
+      <div class="workflow-count">${engineeringOnly ? '<strong>12</strong><span>/ 12 模块可用</span>' : '<strong>21</strong><span>/ 24 模块可用</span>'}</div>
     </section>
 
     ${engineeringOnly ? '' : `
@@ -249,6 +249,7 @@ ${engineeringOnly ? `
         </a>`}
         ${projectCard("ae", "AE · Auto Engineering", "机器人需求梳理、硬件选型、接线与程序设计，提供三维预览和部署流程体验。", "ae/?project=public-sophicore-wave", "account_tree", "公开体验版")}
         ${projectCard("sophicarv2", "SophiCar V2", "底盘设计与仿真基础。", "sophicarv2/index.html", "directions_car", "可直接使用")}
+        ${projectCard("hil", "HIL 车辆硬件在环检测", "车辆动力学仿真、实验室三维预览、试验任务与实时遥测分析。", "http://127.0.0.1:8247/hil.html", "speed", "浏览器仿真 · 本地工具桥接")}
         ${engineeringOnly ? '' : `
         <article class="workflow-card" data-module="sophicar-stl-f3d" data-status="planned">
           <div class="wf-icon"><span class="ms">view_in_ar</span></div>

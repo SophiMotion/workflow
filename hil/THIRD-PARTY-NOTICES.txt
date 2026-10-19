@@ -1,0 +1,52 @@
+THIRD PARTY NOTICES
+
+Three.js r180 / MIT
+Copyright © 2010-2025 three.js authors
+https://github.com/mrdoob/three.js/blob/r180/LICENSE
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+Spark 2.3.1 / MIT
+Copyright © 2025 WORLD LABS TECHNOLOGIES, INC.
+https://github.com/sparkjsdev/spark/blob/v2.3.1/LICENSE
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+Roadster 2020 / CC BY 4.0 / metarex.4d
+https://sketchfab.com/3d-models/tesla-roadster-2020-1fbf29e297bd4a17ac39a00a378441d8
+Public asset mirror: https://github.com/gwesseling/Tesla-app/blob/dev/assets/test4.glb
+Model 3 Highland / CC BY 4.0 / RBLXSupercars (asset metadata), brandonleong28 (download page)
+https://sketchfab.com/3d-models/2024-tesla-model-3-fd22be415215453693d67e33aa7812d0
+Public asset mirror: https://github.com/erictfree/Carbon-Footprint-AI-Visualizer/blob/af4bef33ca371b24c1f043486f09a13571f4919b/models/tesla-model-3-2024/source/2024_tesla_model_3.glb
+Model license: https://creativecommons.org/licenses/by/4.0/
+Changes: Klein blue paint, scale normalization, floating point quantization,
+wheel animation groups, embedded compression, live telemetry on display.
+Models are not OEM CAD. Authors do not endorse this application.

@@ -1,9 +1,9 @@
-name: AE static integration checks
+name: Workflow static integration checks
 on:
   push:
-    paths: ['ae/**', 'assets/workflow-previews/ae.jpg', 'unit/js/views.js', 'unit/js/config.js', 'tests/ae-pages.test.mjs', 'tests/workflow-pages.test.mjs', '.github/workflows/ae-check.yml']
+    paths: ['ae/**', 'hil/**', 'assets/workflow-previews/ae.jpg', 'assets/workflow-previews/hil.jpg', 'unit/js/views.js', 'unit/js/config.js', 'tests/ae-pages.test.mjs', 'tests/workflow-pages.test.mjs', '.github/workflows/ae-check.yml']
   pull_request:
-    paths: ['ae/**', 'assets/workflow-previews/ae.jpg', 'unit/js/views.js', 'unit/js/config.js', 'tests/ae-pages.test.mjs', 'tests/workflow-pages.test.mjs', '.github/workflows/ae-check.yml']
+    paths: ['ae/**', 'hil/**', 'assets/workflow-previews/ae.jpg', 'assets/workflow-previews/hil.jpg', 'unit/js/views.js', 'unit/js/config.js', 'tests/ae-pages.test.mjs', 'tests/workflow-pages.test.mjs', '.github/workflows/ae-check.yml']
 permissions:
   contents: read
 jobs:
