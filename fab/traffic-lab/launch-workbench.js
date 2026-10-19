@@ -6,8 +6,8 @@
    document.querySelector('.private').textContent='本地直开 · 无需启动服务';
    message('正在从本机载入校园与车辆…');
    await script('assets/offline/manifest.js');
-   await script('../fab/traffic-lab/workbench.bundle.js?v=20261019-1');
-  }else await script('../fab/traffic-lab/workbench.bundle.js?v=20261019-1');
+   await script('../fab/traffic-lab/workbench.bundle.js?v=20261020-1');
+  }else await script('../fab/traffic-lab/workbench.bundle.js?v=20261020-1');
  }
  start().catch(error=>{message('预览未能启动：'+error.message+'。请保留完整项目文件夹。');console.error('Preview startup:',error);});
  setTimeout(()=>{if(!window.workbenchReady)message('仍在载入三维资源。请确认 assets 文件夹完整，并检查浏览器的图形加速设置。');},60000);

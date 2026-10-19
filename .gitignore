@@ -98,3 +98,6 @@ boss/**/执行结果*.html
 
 # Public AE example download shipped with the static application.
 !/ae/foldbot-example.zip
+
+# Public Fab teaching download
+!fab/课件/Fab科技学习-课程包V2.5.zip

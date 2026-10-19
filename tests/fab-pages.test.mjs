@@ -8,7 +8,14 @@ import { resolve } from 'node:path';
 const root = fileURLToPath(new URL('../', import.meta.url));
 
 test('Fab pages and the student scene have no missing local links or localhost dependencies', async () => {
-  const pages = (await readdir(resolve(root, 'fab'))).filter(name => name.endsWith('.html')).map(name => `fab/${name}`);
+  async function htmlPages(directory) {
+    const entries = await readdir(resolve(root, directory), { withFileTypes: true });
+    const pages = await Promise.all(entries.map(entry => entry.isDirectory()
+      ? htmlPages(`${directory}/${entry.name}`)
+      : entry.name.endsWith('.html') ? [`${directory}/${entry.name}`] : []));
+    return pages.flat();
+  }
+  const pages = await htmlPages('fab');
   pages.push('worldlabstest/fab-embed.html');
   for (const page of pages) {
     const html = await readFile(resolve(root, page), 'utf8');
@@ -17,6 +24,12 @@ test('Fab pages and the student scene have no missing local links or localhost d
       if (href.startsWith('#') || /^(?:https?:|data:|mailto:)/.test(href)) continue;
       const url = new URL(href, `https://example.com/workflow/${page}`);
       assert.ok(url.pathname.startsWith('/workflow/'), `${page}: ${href} leaves the Pages subpath`);
+      await access(resolve(root, decodeURIComponent(url.pathname.slice('/workflow/'.length))));
+    }
+    // Script bodies may contain template links; script sources must still be deployed.
+    for (const [, src] of html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)) {
+      if (/^https?:/.test(src)) continue;
+      const url = new URL(src, `https://example.com/workflow/${page}`);
       await access(resolve(root, decodeURIComponent(url.pathname.slice('/workflow/'.length))));
     }
   }

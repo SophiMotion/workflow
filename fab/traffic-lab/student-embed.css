@@ -15,3 +15,28 @@ html.student-embed,html.student-embed body{height:100%;width:100%;overflow:hidde
 .student-embed #toast{font-size:11px;bottom:70px;padding:8px 12px;max-width:90%}
 .student-embed #loading{z-index:5;font-size:12px;max-width:90%}
 @media(max-width:360px){.student-embed .view-switch select{width:132px;max-width:132px;font-size:10px}.student-embed .motion-hud{left:8px;bottom:8px;gap:8px}.student-embed .motion-hud button{font-size:10px}}
+
+/* Embedded campus: a shared fleet dock, with real per-object controls. */
+.student-embed .motion-hud{display:none!important}
+.student-fleet{display:none}
+.student-embed .student-fleet{display:block;position:absolute;left:12px;right:12px;bottom:12px;z-index:4;padding:12px;border:1px solid #dbe2ee;border-radius:16px;background:#ffffffed;box-shadow:0 6px 28px #182b4f13;backdrop-filter:blur(12px);color:#202124}
+.fleet-command-row{display:flex;gap:8px;align-items:center}
+.fleet-command{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-height:51px;padding:9px 14px!important;border:1px solid #dbe2ee!important;border-radius:10px!important;background:#fff!important;color:#002fa7!important;transition:transform .16s,box-shadow .16s}
+.fleet-command strong{font-size:12px}.fleet-command span{font-size:10px;color:#7a8496}
+.fleet-command.primary{background:#002fa7!important;border-color:#002fa7!important;color:#fff!important}.fleet-command.primary span{color:#dce5ff}
+.student-fleet-summary{display:flex;flex-direction:column;gap:4px;padding-left:7px;font-size:12px}.student-fleet-summary span{font-size:10px;color:#7b8596}
+#studentFleetExpand{margin-left:auto;flex-shrink:0;font-size:11px;padding:10px;border-radius:9px;color:#536481;border:1px solid transparent;background:transparent}
+.student-fleet-cards{display:flex;overflow-x:auto;gap:8px;padding:10px 1px 5px;scrollbar-width:thin;scrollbar-color:#b3c2e3 transparent;overscroll-behavior-inline:contain;scroll-snap-type:x proximity}
+.student-fleet-cards[hidden]{display:none}
+.fleet-vehicle-card{position:relative;flex:0 0 185px;min-width:0;border:1px solid #dce3ed;border-radius:11px;background:#fff;scroll-snap-align:start;display:grid;grid-template-columns:1fr auto;gap:4px;padding:9px 10px;transition:border-color .16s,box-shadow .16s,transform .16s}
+.fleet-vehicle-card.selected{border-color:#002fa7;box-shadow:inset 0 0 0 1px #002fa7;background:#f5f8ff}
+.fleet-vehicle-focus{grid-column:1/-1;display:grid;grid-template-columns:25px 1fr;align-items:center;gap:2px 7px;text-align:left;border:0!important;background:transparent!important;padding:0 0 5px!important;width:100%;color:#202124}
+.fleet-vehicle-symbol{grid-row:1/3;display:grid;place-items:center;border-radius:6px;background:#eef3ff;color:#002fa7;font-size:21px;height:28px}
+.fleet-vehicle-focus strong{font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vehicle-route{font-size:9px;color:#78849a;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.vehicle-state{font-size:9px;color:#536481;align-self:center;white-space:nowrap;font-variant-numeric:tabular-nums}
+.vehicle-toggle{font-size:9px!important;border:1px solid #d8e2f5!important;border-radius:6px!important;padding:4px 7px!important;color:#002fa7!important;background:#f4f7ff!important}
+.student-fleet button:hover:not(:disabled){box-shadow:0 3px 8px #002fa714;transform:translateY(-1px)}.student-fleet button:active:not(:disabled){transform:translateY(0)}
+.student-fleet button:focus-visible{outline:3px solid #fbbc05;outline-offset:2px}.student-fleet button:disabled{opacity:.5;cursor:wait}.student-fleet button{cursor:pointer}
+.student-embed #toast{bottom:196px;max-width:80%;pointer-events:none}
+@media(max-width:600px){.student-embed .student-fleet{left:8px;right:8px;bottom:8px;padding:8px;border-radius:12px}.fleet-command-row{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:6px}.fleet-command{padding:8px!important;min-height:48px}.fleet-command strong{font-size:11px}.fleet-command span{font-size:8px}.student-fleet-summary{grid-column:1/3;display:flex;flex-direction:row;align-items:center;padding:4px 0 0;font-size:10px;gap:5px}.student-fleet-summary span{font-size:8px}#studentFleetExpand{font-size:10px;padding:5px 0}.fleet-vehicle-card{flex-basis:169px}.student-fleet-cards{padding-top:6px}.student-embed #toast{bottom:212px;font-size:10px}.student-embed .view-switch select{max-width:145px}}
+@media(prefers-reduced-motion:reduce){.student-fleet *{transition:none!important}}
