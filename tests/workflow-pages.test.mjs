@@ -15,10 +15,10 @@ function cards(base) {
   return [...context.window.PFXViews.renderWorkflow().matchAll(/data-module="([^"]+)"[^>]+href="([^"]+)"/g)]
     .map(([, id, href]) => ({ id, href: context.window.PFX_PATHS.resolve(href) }));
 }
-test('all 12 hosted cards stay under the Pages subpath and point to shipped entries', async () => {
+test('all 13 hosted cards stay under the Pages subpath and point to shipped entries', async () => {
   for (const base of ['https://sophimotion.github.io/workflow/', 'https://example.com/tools/workflow/', 'https://sophistudio.com/']) {
     const links = cards(base);
-    assert.equal(links.length, 12);
+    assert.equal(links.length, 13);
     assert.equal(links.some(({ id }) => id === 'skatechassis'), false);
     for (const { id, href } of links) {
       assert.ok(href.startsWith(base), `${id} escapes the hosted site: ${href}`);

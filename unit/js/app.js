@@ -62,6 +62,22 @@
       btn.addEventListener('click', () => dshDemo(btn.dataset.dshDemo, btn.dataset.route));
     });
 
+    if (route === 'workflow') {
+      const filters = [...viewEl().querySelectorAll('[data-workflow-filter]')];
+      const cards = [...viewEl().querySelectorAll('.workflow-project-card')];
+      filters.forEach(button => button.addEventListener('click', () => {
+        const selected = button.dataset.workflowFilter;
+        filters.forEach(filter => filter.setAttribute('aria-pressed', String(filter === button)));
+        let shown = 0;
+        cards.forEach(card => {
+          card.hidden = selected !== 'all' && card.dataset.category !== selected;
+          if (!card.hidden) shown++;
+        });
+        const label = selected === 'all' ? '全部' : button.childNodes[0].textContent.trim();
+        document.getElementById('workflow-filter-status').textContent = `显示${label} ${shown} 个项目`;
+      }));
+    }
+
     if (route === 'collab') bindCollab();
     if (route === 'profabx') bindQuote();
     if (route === 'log') loadReadme();

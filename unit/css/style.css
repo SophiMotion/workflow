@@ -443,6 +443,19 @@ body[data-workflow-scope="engineering"] {
   padding: 16px 20px 20px; color: var(--text-muted); font-size: 13px; line-height: 1.7;
 }
 .workflow-project-card:focus-visible { outline-color: rgba(0, 47, 167, .4); }
+.workflow-project-card[hidden] { display: none; }
+.workflow-filters { display: flex; flex-wrap: wrap; gap: 10px; padding: 4px 0 12px; }
+.workflow-filters button {
+  display: inline-flex; align-items: center; gap: 9px; min-height: 42px;
+  padding: 9px 15px; border: 1px solid var(--border); border-radius: 24px;
+  background: var(--surface); color: var(--text-muted); font: inherit; font-size: 14px; cursor: pointer;
+}
+.workflow-filters button:hover { border-color: var(--c-blue); color: var(--c-blue); }
+.workflow-filters button[aria-pressed="true"] { background: var(--c-blue); border-color: var(--c-blue); color: #fff; }
+.workflow-filters button:focus-visible { outline: 3px solid rgba(0, 47, 167, .3); outline-offset: 3px; }
+.workflow-filters button span { font-size: 12px; opacity: .8; }
+.workflow-filter-status { margin: 0 0 12px; font-size: 13px; color: var(--text-muted); }
+
 body[data-workflow-scope="engineering"] .tabs a[href="https://sophigo.com"]:hover { color: var(--c-blue); }
 body[data-workflow-scope="engineering"] .tabs a[href="https://profabx.com"]:hover { color: var(--c-red); }
 body[data-workflow-scope="engineering"] .tabs a[href="https://sophicar.com"]:hover { color: var(--c-green); }

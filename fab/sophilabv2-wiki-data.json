@@ -1,0 +1,182 @@
+[
+  {
+    "id": "unnc2025",
+    "name": "UNNC FabLab · 2025",
+    "short": "UNNC · 2025",
+    "year": "2025",
+    "url": "https://sophigo.com/docs/courses/fab-course/class/fab-2025-UNNC.html",
+    "intro": "从嵌入式开发、电子与CAD，到数字制造、智能载具测试和综合项目展示。",
+    "note": "公开班级页面提供课程进度，未列出个人作品名册。可从课程档案继续了解学习过程。",
+    "teams": []
+  },
+  {
+    "id": "zwu2024",
+    "name": "ZWU · 2024",
+    "short": "ZWU · 2024",
+    "year": "2024",
+    "url": "https://sophigo.com/docs/courses/fab-course/class/fab-2024-zwu-Interactivesystem.html",
+    "intro": "以交互系统为主线，连接项目管理、Arduino、界面、材料、CAD与数字制造。",
+    "note": "公开班级档案以团队为单位收录作品；这里保留原团队名称与入口。",
+    "teams": [
+      {
+        "id": "24-0",
+        "name": "SZPJNF",
+        "url": "https://nexmaker-fab.github.io/2024ZWU-IS-1/#/",
+        "students": []
+      },
+      {
+        "id": "24-1",
+        "name": "Ecobloom",
+        "url": "https://nexmaker-fab.github.io/2024ZWU-IS-2-Ecobloom/#/",
+        "students": []
+      },
+      {
+        "id": "24-2",
+        "name": "Yes or Yes",
+        "url": "https://nexmaker-fab.github.io/2024ZWU-IS-3-Yes-or-yes/#/",
+        "students": []
+      },
+      {
+        "id": "24-3",
+        "name": "watermelon sugar",
+        "url": "https://nexmaker-fab.github.io/2024ZWU-IS-4/#/",
+        "students": []
+      },
+      {
+        "id": "24-4",
+        "name": "BCZG",
+        "url": "https://nexmaker-fab.github.io/2024ZWU-IS-5/#/",
+        "students": []
+      },
+      {
+        "id": "24-5",
+        "name": "None group",
+        "url": "https://nexmaker-fab.github.io/2024ZWU-IS-6/#/",
+        "students": []
+      }
+    ]
+  },
+  {
+    "id": "zwu2026",
+    "name": "ZWU · 2026",
+    "short": "ZWU · 2026",
+    "year": "2026",
+    "url": "https://sophigo.com/docs/courses/fab-course/class/FAB-2026-ZWU-01.html",
+    "intro": "从网页记录、开源硬件与交互程序，走向数字制造和综合项目。",
+    "note": "班级与团队来源已核对。学生使用原站公开姓名或昵称，个人页面保留在作者原站。",
+    "teams": [
+      {
+        "id": "26-0",
+        "name": "这是啥组",
+        "url": "https://nexmaker-fab.github.io/zwu2026-1-001/",
+        "students": [
+          {
+            "id": "s26-0-0",
+            "name": "陈过",
+            "url": "https://clare9901.github.io/Clare111111111new/"
+          },
+          {
+            "id": "s26-0-1",
+            "name": "蔡奥秘",
+            "url": "https://mtttttt12.github.io/Cai-aomi/"
+          },
+          {
+            "id": "s26-0-2",
+            "name": "蔡仪彤",
+            "url": "https://2024014735caiyitong.github.io/Cai-Yitong/"
+          },
+          {
+            "id": "s26-0-3",
+            "name": "王昱涵",
+            "url": "https://2024014747.github.io/wyh-web/"
+          }
+        ]
+      },
+      {
+        "id": "26-1",
+        "name": "Jowywlz",
+        "url": "https://nexmaker-fab.github.io/zwu-2026-1-002/",
+        "students": [
+          {
+            "id": "s26-1-0",
+            "name": "Ulia",
+            "url": "https://wangyilu662040-cpu.github.io/loulou/index.html"
+          },
+          {
+            "id": "s26-1-1",
+            "name": "Yerin",
+            "url": "https://yerin313.github.io/helloYerin/"
+          },
+          {
+            "id": "s26-1-2",
+            "name": "Cherry",
+            "url": "https://whisper-yyy.github.io/yangshuhui-personal-website/"
+          },
+          {
+            "id": "s26-1-3",
+            "name": "Ella",
+            "url": "https://ella-cc.github.io/Ella/"
+          },
+          {
+            "id": "s26-1-4",
+            "name": "Kay",
+            "url": "https://wxykaye.github.io/kaye-protfolio/"
+          },
+          {
+            "id": "s26-1-5",
+            "name": "Leah",
+            "url": "https://leah1224.github.io/Leah-Zhu-JIngqin/"
+          }
+        ]
+      },
+      {
+        "id": "26-2",
+        "name": "003",
+        "url": "https://nexmaker-fab.github.io/zwu-2026-1-003/",
+        "students": []
+      },
+      {
+        "id": "26-3",
+        "name": "AETHER STUDIO",
+        "url": "https://nexmaker-fab.github.io/zwu2026-1-004/",
+        "students": [
+          {
+            "id": "s26-3-0",
+            "name": "陈梓琦",
+            "url": "https://cziqi9307-byte.github.io/chenziqi-portfolio/"
+          },
+          {
+            "id": "s26-3-1",
+            "name": "王琦琦",
+            "url": "https://babeecat7.github.io/wqqd/"
+          },
+          {
+            "id": "s26-3-2",
+            "name": "李琳",
+            "url": "https://nexmaker-fab.github.io/zwu2026-1-004/li.html"
+          },
+          {
+            "id": "s26-3-3",
+            "name": "章悦",
+            "url": "https://elefish410.github.io/11/"
+          },
+          {
+            "id": "s26-3-4",
+            "name": "朱诗瑶",
+            "url": "https://cynthiavo-o7.github.io/zsy/"
+          },
+          {
+            "id": "s26-3-5",
+            "name": "何昱璇",
+            "url": "https://xuan-jiji.github.io/-.github.io/"
+          },
+          {
+            "id": "s26-3-6",
+            "name": "徐思瑜",
+            "url": "https://4rain426.github.io/"
+          }
+        ]
+      }
+    ]
+  }
+]

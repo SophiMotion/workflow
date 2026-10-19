@@ -1,0 +1,22 @@
+{
+  "sourceProject": "Fab科技学习 V2",
+  "syncedOn": "2026-10-19",
+  "sourceFiles": {
+    "sophilabv2.html": "fbbbf287e8fc396761986d5869fb37620071985577acfbc72ad782358150f269",
+    "sophilabv2-courses.html": "bb4b1b9d3a172f750c8954b72012067c6211d5406df925bfe218f7368d68fd6d",
+    "sophilabv2-wiki.html": "e2328abfe199be919e0198c4f62e94dddcff057df67df290955fc048ffcd6bc9",
+    "sophilabv2-competition.html": "079dd9ad9c44a61b8747a1d6ec76b0204994b667756690b7184064566fe4246a",
+    "sophilabv2.css": "31b948d9cf1f19a9c5d8e2de3d7e8be234c7af325d5843df1b7313802dc98e19",
+    "sophilabv2-wiki-data.json": "2166caf086379228dd5fac77384ce1a703b8f927d52faab15d998c87b2e892b2",
+    "系统方案V2-阅读版.html": "11ef4067d9f9ada55a219e5765469dccdcaa7e0a3dc877c543c41892935f923f",
+    "Fab科技学习-系统方案V2.md": "d9fd48e4f218898dd9db17e36c594944d53b1ac6235e22f44dd0505b1d45d684",
+    "试点启动清单V2.md": "c8dac2a0c08508933e8fbfdefe5acfe3e5c08fa1fee85c7a6cf96a566ea9479b",
+    "traffic-lab/workbench.bundle.js": "b016040cd81fc24c2ce77f2f0446a96e3b9f0b099b230168228a7815ac9776aa",
+    "traffic-lab/student-embed.css": "e78435161af3831f2e4e74ae9fa99f1eda8130e3954c277427c67bc548634223"
+  },
+  "adaptations": [
+    "Use sibling SophiStudio project links instead of localhost or external AE links.",
+    "Reuse tracked worldlabstest assets through fab-embed.html; preserve separate Fab scene storage.",
+    "Provide a secure-random UUID fallback for HTTP previews."
+  ]
+}

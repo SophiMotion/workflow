@@ -164,6 +164,15 @@
    * ====================================================================== */
   function renderWorkflow() {
     const engineeringOnly = window.PFX_CONFIG?.workflowScope === 'engineering';
+    const categories = [
+      { id: 'learning', title: '教育课程', modules: ['fab'] },
+      { id: 'robotics', title: '机器人设计', modules: ['sophirobot', 'ae', 'sophicarv2'] },
+      { id: 'simulation', title: '仿真验证', modules: ['hil', 'cfd', 'traffic-scene-lab'] },
+      { id: 'manufacturing', title: '工程制造', modules: ['sophicar-formate', 'stlquote', 'weld', 'mooncake'] },
+      { id: 'creative', title: '创作体验', modules: ['santi', 'drone-formation'] }
+    ];
+    const categoryFor = id => categories.find(category => category.modules.includes(id))?.id || '';
+    const moduleCount = categories.reduce((total, category) => total + category.modules.length, 0);
     const projectCard = (id, title, description, href, icon, status, branch = false) => {
       if (engineeringOnly && id === 'skatechassis') return '';
       href = window.PFX_PATHS?.moduleHref(id, href) || href;
@@ -172,7 +181,7 @@
           <h3>${title}</h3>
           <img class="workflow-project-image" src="assets/workflow-previews/${id}.jpg" alt="${title}项目界面截图" width="1280" height="720" loading="lazy" decoding="async">
           <p>${description}</p>`;
-        return `<a class="workflow-card workflow-project-card" data-module="${id}" data-status="ready" href="${href}">${content}</a>`;
+        return `<a class="workflow-card workflow-project-card" data-module="${id}" data-category="${categoryFor(id)}" data-status="ready" href="${href}">${content}</a>`;
       }
       return `
         <a class="workflow-card${branch ? ' workflow-branch' : ''}" data-module="${id}" data-status="ready" href="${href}">
@@ -186,8 +195,15 @@
         <h1>SophiStudio 工作流</h1>
         <p>${engineeringOnly ? '' : '从知识沉淀、工程研发、工程加工到内容体验，'}统一管理 SophiMotion 及相关项目的本地工具链。</p>
       </div>
-      <div class="workflow-count">${engineeringOnly ? '<strong>12</strong><span>/ 12 模块可用</span>' : '<strong>21</strong><span>/ 24 模块可用</span>'}</div>
+      <div class="workflow-count">${engineeringOnly ? `<strong>${moduleCount}</strong><span>/ ${moduleCount} 模块可用</span>` : '<strong>22</strong><span>/ 25 模块可用</span>'}</div>
     </section>
+
+    ${engineeringOnly ? `
+    <nav class="workflow-filters" aria-label="项目分类">
+      <button type="button" data-workflow-filter="all" aria-pressed="true">全部 <span>${moduleCount}</span></button>
+      ${categories.map(category => `<button type="button" data-workflow-filter="${category.id}" aria-pressed="false">${category.title} <span>${category.modules.length}</span></button>`).join('')}
+    </nav>
+    <p class="workflow-filter-status" id="workflow-filter-status" role="status">显示全部 ${moduleCount} 个项目</p>` : ''}
 
     ${engineeringOnly ? '' : `
     <section class="workflow-group knowledge" data-workflow="knowledge" aria-labelledby="knowledge-title">
@@ -240,6 +256,7 @@ ${engineeringOnly ? `
       </header>
       <div class="workflow-rail engineering-rail">
     `}
+        ${projectCard("fab", "Fab 科技学习", "校园问题驱动的科学探究，连接 20 周课程、数字制造、历届作品与建模竞赛。", "fab/", "school", "课程与项目实践")}
         ${projectCard("skatechassis", "SkateChassis 机器人工作台", "参数设计、BOM 核价、报价、协作 PRD 与 ROS / Fusion 工程导出。", "http://127.0.0.1:4173/", "smart_toy", "点击自动启动本机服务")}
         ${projectCard("sophirobot", "SophiRobot 三维机器人工作台", "机器人尺寸配置、关节动作预览、BOM 清单与 STEP 导出。", "http://127.0.0.1:4189/", "precision_manufacturing", "后台自动运行 · 打开即可使用")}
         ${engineeringOnly ? '' : `

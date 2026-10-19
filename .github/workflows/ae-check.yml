@@ -1,9 +1,9 @@
 name: Workflow static integration checks
 on:
   push:
-    paths: ['ae/**', 'hil/**', 'assets/workflow-previews/ae.jpg', 'assets/workflow-previews/hil.jpg', 'unit/js/views.js', 'unit/js/config.js', 'tests/ae-pages.test.mjs', 'tests/workflow-pages.test.mjs', '.github/workflows/ae-check.yml']
+    paths: ['ae/**', 'hil/**', 'fab/**', 'worldlabstest/fab-embed.html', 'assets/workflow-previews/fab.jpg', 'unit/css/style.css', 'unit/js/app.js', 'tests/fab-pages.test.mjs', 'assets/workflow-previews/ae.jpg', 'assets/workflow-previews/hil.jpg', 'unit/js/views.js', 'unit/js/config.js', 'tests/ae-pages.test.mjs', 'tests/workflow-pages.test.mjs', '.github/workflows/ae-check.yml']
   pull_request:
-    paths: ['ae/**', 'hil/**', 'assets/workflow-previews/ae.jpg', 'assets/workflow-previews/hil.jpg', 'unit/js/views.js', 'unit/js/config.js', 'tests/ae-pages.test.mjs', 'tests/workflow-pages.test.mjs', '.github/workflows/ae-check.yml']
+    paths: ['ae/**', 'hil/**', 'fab/**', 'worldlabstest/fab-embed.html', 'assets/workflow-previews/fab.jpg', 'unit/css/style.css', 'unit/js/app.js', 'tests/fab-pages.test.mjs', 'assets/workflow-previews/ae.jpg', 'assets/workflow-previews/hil.jpg', 'unit/js/views.js', 'unit/js/config.js', 'tests/ae-pages.test.mjs', 'tests/workflow-pages.test.mjs', '.github/workflows/ae-check.yml']
 permissions:
   contents: read
 jobs:
@@ -14,4 +14,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test tests/ae-pages.test.mjs tests/workflow-pages.test.mjs
+      - run: node --test tests/ae-pages.test.mjs tests/workflow-pages.test.mjs tests/fab-pages.test.mjs

@@ -1,0 +1,17 @@
+/* Optional compact viewport for student briefs. Full workbench remains unchanged. */
+html.student-embed,html.student-embed body{height:100%;width:100%;overflow:hidden;background:#eef1f4}
+.student-embed .top,.student-embed .titlebar,.student-embed .leftpanel,.student-embed .rightpanel,.student-embed .fleetbar,.student-embed .timeline,.student-embed footer,.student-embed .view-top,.student-embed .compass,.student-embed #modeBadge,.student-embed #show3d,.student-embed #showOriginal,.student-embed #showReference,.student-embed #toggleGrid{display:none!important}
+.student-embed .workspace{height:100%;width:100%;display:block;padding:0;margin:0}
+.student-embed .middle{height:100%;width:100%;display:block}
+.student-embed .viewport{height:100%;min-height:0;width:100%;border:0;border-radius:0}
+.student-embed .view-switch{top:12px;left:12px;max-width:calc(100% - 65px)}
+.student-embed .view-switch select{width:155px;max-width:155px;height:34px;font-size:11px;background:#fffffff2;box-shadow:0 2px 12px #2021240b}
+.student-embed .view-tools{right:12px;top:12px}
+.student-embed .view-tools button{width:34px;height:34px;font-size:18px}
+.student-embed .view-help{display:none}
+.student-embed .motion-hud{left:12px;bottom:12px;max-width:calc(100% - 24px);padding:7px 9px;gap:10px}
+.student-embed .motion-hud strong{font-size:10px}.student-embed .motion-hud span{font-size:9px}
+.student-embed #motionSurface{display:none}.student-embed .motion-hud button{font-size:11px;padding:8px 11px}
+.student-embed #toast{font-size:11px;bottom:70px;padding:8px 12px;max-width:90%}
+.student-embed #loading{z-index:5;font-size:12px;max-width:90%}
+@media(max-width:360px){.student-embed .view-switch select{width:132px;max-width:132px;font-size:10px}.student-embed .motion-hud{left:8px;bottom:8px;gap:8px}.student-embed .motion-hud button{font-size:10px}}
