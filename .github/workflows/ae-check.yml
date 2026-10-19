@@ -1,0 +1,17 @@
+name: AE static integration checks
+on:
+  push:
+    paths: ['ae/**', 'assets/workflow-previews/ae.jpg', 'unit/js/views.js', 'unit/js/config.js', 'tests/ae-pages.test.mjs', 'tests/workflow-pages.test.mjs', '.github/workflows/ae-check.yml']
+  pull_request:
+    paths: ['ae/**', 'assets/workflow-previews/ae.jpg', 'unit/js/views.js', 'unit/js/config.js', 'tests/ae-pages.test.mjs', 'tests/workflow-pages.test.mjs', '.github/workflows/ae-check.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/ae-pages.test.mjs tests/workflow-pages.test.mjs

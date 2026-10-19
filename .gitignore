@@ -95,3 +95,6 @@ boss/**/执行结果*.html
 !/sophicar-formate/fixtures/generated/four-bar.sophicad.zip
 !/sophicar-formate/web/public/four-bar.sophicad.zip
 !/sophicar-formate/web/dist/four-bar.sophicad.zip
+
+# Public AE example download shipped with the static application.
+!/ae/foldbot-example.zip

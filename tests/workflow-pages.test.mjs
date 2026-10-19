@@ -14,14 +14,14 @@ function cards(base) {
   return [...context.window.PFXViews.renderWorkflow().matchAll(/data-module="([^"]+)"[^>]+href="([^"]+)"/g)]
     .map(([, id, href]) => ({ id, href: context.window.PFX_PATHS.resolve(href) }));
 }
-test('all 10 hosted cards stay under the Pages subpath and point to shipped entries', async () => {
+test('all 11 hosted cards stay under the Pages subpath and point to shipped entries', async () => {
   for (const base of ['https://sophimotion.github.io/workflow/', 'https://example.com/tools/workflow/', 'https://sophistudio.com/']) {
     const links = cards(base);
-    assert.equal(links.length, 10);
+    assert.equal(links.length, 11);
     assert.equal(links.some(({ id }) => id === 'skatechassis'), false);
     for (const { id, href } of links) {
       assert.ok(href.startsWith(base), `${id} escapes the hosted site: ${href}`);
-      await access(resolve(root, decodeURIComponent(href.slice(base.length))));
+      await access(resolve(root, decodeURIComponent(new URL(href).pathname.slice(new URL(base).pathname.length))));
     }
   }
 });
@@ -34,5 +34,12 @@ test('local file and HTTP previews preserve the three existing service URLs', ()
   for (const base of ['file:///example/workflow/', 'http://127.0.0.1:4173/studio/', 'http://localhost:8080/workflow/']) {
     const byId = Object.fromEntries(cards(base).map(({ id, href }) => [id, href]));
     for (const [id, href] of Object.entries(expected)) assert.equal(byId[id], href);
+  }
+});
+
+test('AE card preserves its project query at hosted and local entries', () => {
+  for (const base of ['https://sophistudio.com/', 'https://sophimotion.github.io/workflow/', 'http://127.0.0.1:4187/']) {
+    const ae = cards(base).find(({ id }) => id === 'ae');
+    assert.equal(ae.href, `${base}ae/?project=public-sophicore-wave`);
   }
 });
