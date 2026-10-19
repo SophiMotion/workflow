@@ -4,7 +4,7 @@
 
 ## 三维场景资源
 
-首页嵌入 `../worldlabstest/fab-embed.html?embed=student`。该入口与原项目的学生视图一致，复用仓库已有 `worldlabstest/assets`、`data` 和 `vendor` 资源，避免重复发布约 350 MB 的同一套模型。Fab 专用脚本、学生视图样式和独立场景保存键保留在 `traffic-lab/`。没有修改现有交通工作台页面。
+首页嵌入 `../worldlabstest/fab-embed.html?embed=student`。“更多”和交通实验室链接使用同一入口的完整视图（不带 embed 参数）。该入口与原项目的学生视图一致，复用仓库已有 `worldlabstest/assets`、`data` 和 `vendor` 资源，避免重复发布约 350 MB 的同一套模型。Fab 专用脚本、学生视图样式和独立场景保存键保留在 `traffic-lab/`。没有修改现有交通工作台页面。
 
 `traffic-lab/http-compat.js` 仅在浏览器缺少 `crypto.randomUUID` 时使用 `crypto.getRandomValues` 生成 UUID，兼容 HTTP 网站。原三维脚本和第三方许可保留在 bundle 与共享模型目录中。
 

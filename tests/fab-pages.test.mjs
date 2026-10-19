@@ -31,6 +31,8 @@ test('Fab preserves its source scene bundle and shared model manifests', async (
   await access(resolve(root, 'worldlabstest/assets/offline/manifest.js'));
   const entry = await readFile(resolve(root, 'worldlabstest/fab-embed.html'), 'utf8');
   assert.ok(entry.indexOf('http-compat.js') < entry.indexOf('launch-workbench.js'));
+  const homepage = await readFile(resolve(root, 'fab/sophilabv2.html'), 'utf8');
+  assert.match(homepage, /href="\.\.\/worldlabstest\/fab-embed.html"/);
 });
 
 test('Fab HTTP scene IDs are distinct UUIDs and preserve native implementations', async () => {
