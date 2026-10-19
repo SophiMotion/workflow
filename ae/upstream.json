@@ -100,5 +100,19 @@
     "three.core.js": "eb077d2417f61d3e6d9264c317cabc4ea35769ed6b0ab533067292a550784c20",
     "three.module.js": "c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a",
     "viewer.js": "12c45df93384cdf2db1b2294387f92449f23014fe8d5bba79ca91a5bfc30f523"
+  },
+  "deployment_overrides": {
+    "index.html": {
+      "sha256": "1418af9d54329572ae18f4f6b500bf3aa3de384053322eb95ffe000a57d5a788",
+      "reason": "Load HTTP UUID and SHA-256 compatibility before the unchanged upstream application."
+    }
+  },
+  "deployment_dependencies": {
+    "js-sha256": {
+      "version": "0.11.1",
+      "source": "https://registry.npmjs.org/js-sha256/-/js-sha256-0.11.1.tgz",
+      "archive_sha256": "2456e5d3a9089f1333d6ad162af7700508d0d84d1b3ecf2ce1448d58d5e83112",
+      "license": "vendor/js-sha256-LICENSE.txt"
+    }
   }
 }
