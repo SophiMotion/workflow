@@ -179,7 +179,7 @@
       if (engineeringOnly) {
         const content = `
           <h3>${title}</h3>
-          <img class="workflow-project-image" src="assets/workflow-previews/${id}.jpg" alt="${title}项目界面截图" width="1280" height="720" loading="lazy" decoding="async">
+          <img class="workflow-project-image" src="assets/workflow-previews/${id}.jpg${id === 'sophirobot' ? '?v=20261023-1' : ''}" alt="${title}项目界面截图" width="1280" height="720" loading="lazy" decoding="async">
           <p>${description}</p>`;
         return `<a class="workflow-card workflow-project-card" data-module="${id}" data-category="${categoryFor(id)}" data-status="ready" href="${href}">${content}</a>`;
       }
@@ -258,7 +258,7 @@ ${engineeringOnly ? `
     `}
         ${projectCard("fab", "Fab 科技学习", "校园问题驱动的科学探究，连接 20 周课程、数字制造、历届作品与建模竞赛。", "fab/", "school", "课程与项目实践")}
         ${projectCard("skatechassis", "SkateChassis 机器人工作台", "参数设计、BOM 核价、报价、协作 PRD 与 ROS / Fusion 工程导出。", "http://127.0.0.1:4173/", "smart_toy", "点击自动启动本机服务")}
-        ${projectCard("sophirobot", "SophiRobot 三维机器人工作台", "机器人尺寸配置、关节动作预览、BOM 清单与 STEP 导出。", "http://127.0.0.1:4189/", "precision_manufacturing", "后台自动运行 · 打开即可使用")}
+        ${projectCard("sophirobot", "SophiRobot V2 三维机器人工作台", "机器人参数与外观配置、关节动作预览、BOM 报价及 STEP 模型导出。", "https://sophimotion.github.io/sophirobotv2/", "precision_manufacturing", "在线工作台")}
         ${engineeringOnly ? '' : `
         <a class="workflow-card" data-module="prd" data-status="ready" href="prd/prd.html">
           <div class="wf-icon"><span class="ms">assignment</span></div>

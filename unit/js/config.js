@@ -19,7 +19,6 @@
   const workflowRoot = new URL('../../', document.currentScript.src);
   const staticModules = {
     skatechassis: '底盘机器人/dist/index.html',
-    sophirobot: 'SophiStudio-SophiRobot-Website/dist/index.html',
     hil: 'hil/hil.html',
     'sophicar-formate': 'sophicar-formate/web/dist/index.html',
     'drone-formation': 'drone-formation/index.html'
