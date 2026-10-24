@@ -67,14 +67,15 @@ test('workflow assigns every published project to one of five categories with co
   vm.runInNewContext(await readFile(resolve(root, 'unit/js/views.js'), 'utf8'), context);
   const html = context.window.PFXViews.renderWorkflow();
   const projects = [...html.matchAll(/data-module="([^"]+)" data-category="([^"]+)"/g)].map(([, id, category]) => ({ id, category }));
-  assert.equal(projects.length, 13);
-  assert.equal(new Set(projects.map(({ id }) => id)).size, 13);
-  const counts = { learning: 1, robotics: 3, simulation: 3, manufacturing: 4, creative: 2 };
+  assert.equal(projects.length, 14);
+  assert.equal(new Set(projects.map(({ id }) => id)).size, 14);
+  const counts = { learning: 1, robotics: 4, simulation: 3, manufacturing: 4, creative: 2 };
   for (const [category, count] of Object.entries(counts)) {
     assert.equal(projects.filter(project => project.category === category).length, count);
     assert.match(html, new RegExp(`data-workflow-filter="${category}"[^>]*>[^<]*<span>${count}</span>`));
   }
   assert.equal(projects.find(project => project.id === 'fab').category, 'learning');
   assert.equal(projects.find(project => project.id === 'hil').category, 'simulation');
+  assert.equal(projects.find(project => project.id === 'tanyuan').category, 'robotics');
   for (const { id } of projects) await access(resolve(root, `assets/workflow-previews/${id}.jpg`));
 });

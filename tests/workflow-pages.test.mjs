@@ -15,14 +15,18 @@ function cards(base) {
   return [...context.window.PFXViews.renderWorkflow().matchAll(/data-module="([^"]+)"[^>]+href="([^"]+)"/g)]
     .map(([, id, href]) => ({ id, href: context.window.PFX_PATHS.resolve(href) }));
 }
-test('hosted cards use shipped entries and the designated SophiRobot V2 site', async () => {
+test('hosted cards use shipped entries and the designated external project sites', async () => {
   for (const base of ['https://sophimotion.github.io/workflow/', 'https://example.com/tools/workflow/', 'https://sophistudio.com/']) {
     const links = cards(base);
-    assert.equal(links.length, 13);
+    assert.equal(links.length, 14);
     assert.equal(links.some(({ id }) => id === 'skatechassis'), false);
     for (const { id, href } of links) {
-      if (id === 'sophirobot') {
-        assert.equal(href, 'https://sophimotion.github.io/sophirobotv2/');
+      const externalProjects = {
+        sophirobot: 'https://sophimotion.github.io/sophirobotv2/',
+        tanyuan: 'https://sophimotion.github.io/tanyuan/?v=20261020-camera-v3'
+      };
+      if (externalProjects[id]) {
+        assert.equal(href, externalProjects[id]);
         continue;
       }
       assert.ok(href.startsWith(base), `${id} escapes the hosted site: ${href}`);
@@ -33,6 +37,7 @@ test('hosted cards use shipped entries and the designated SophiRobot V2 site', a
 test('local file and HTTP previews preserve local service URLs including the HIL bridge', () => {
   const expected = {
     sophirobot: 'https://sophimotion.github.io/sophirobotv2/',
+    tanyuan: 'https://sophimotion.github.io/tanyuan/?v=20261020-camera-v3',
     hil: 'http://127.0.0.1:8247/hil.html',
     'sophicar-formate': 'http://127.0.0.1:4173/studio/sophicar-formate/web/dist/index.html',
     'drone-formation': 'http://127.0.0.1:4188/'

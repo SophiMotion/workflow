@@ -166,7 +166,7 @@
     const engineeringOnly = window.PFX_CONFIG?.workflowScope === 'engineering';
     const categories = [
       { id: 'learning', title: '教育课程', modules: ['fab'] },
-      { id: 'robotics', title: '机器人设计', modules: ['sophirobot', 'ae', 'sophicarv2'] },
+      { id: 'robotics', title: '机器人设计', modules: ['sophirobot', 'tanyuan', 'ae', 'sophicarv2'] },
       { id: 'simulation', title: '仿真验证', modules: ['hil', 'cfd', 'traffic-scene-lab'] },
       { id: 'manufacturing', title: '工程制造', modules: ['sophicar-formate', 'stlquote', 'weld', 'mooncake'] },
       { id: 'creative', title: '创作体验', modules: ['santi', 'drone-formation'] }
@@ -195,7 +195,7 @@
         <h1>SophiStudio 工作流</h1>
         <p>${engineeringOnly ? '' : '从知识沉淀、工程研发、工程加工到内容体验，'}统一管理 SophiMotion 及相关项目的本地工具链。</p>
       </div>
-      <div class="workflow-count">${engineeringOnly ? `<strong>${moduleCount}</strong><span>/ ${moduleCount} 模块可用</span>` : '<strong>22</strong><span>/ 25 模块可用</span>'}</div>
+      <div class="workflow-count">${engineeringOnly ? `<strong>${moduleCount}</strong><span>/ ${moduleCount} 模块可用</span>` : '<strong>23</strong><span>/ 26 模块可用</span>'}</div>
     </section>
 
     ${engineeringOnly ? `
@@ -259,6 +259,7 @@ ${engineeringOnly ? `
         ${projectCard("fab", "Fab 科技学习", "校园问题驱动的科学探究，连接 20 周课程、数字制造、历届作品与建模竞赛。", "fab/", "school", "课程与项目实践")}
         ${projectCard("skatechassis", "SkateChassis 机器人工作台", "参数设计、BOM 核价、报价、协作 PRD 与 ROS / Fusion 工程导出。", "http://127.0.0.1:4173/", "smart_toy", "点击自动启动本机服务")}
         ${projectCard("sophirobot", "SophiRobot V2 三维机器人工作台", "机器人参数与外观配置、关节动作预览、BOM 报价及 STEP 模型导出。", "https://sophimotion.github.io/sophirobotv2/", "precision_manufacturing", "在线工作台")}
+        ${projectCard("tanyuan", "FoldBot 折叠机器人模拟控制台", "履带底盘驱动、双板折叠与六轴机械臂姿态模拟，支持三维预览和离线体验。", "https://sophimotion.github.io/tanyuan/?v=20261020-camera-v3", "smart_toy", "浏览器模拟 · 无需连接实物")}
         ${engineeringOnly ? '' : `
         <a class="workflow-card" data-module="prd" data-status="ready" href="prd/prd.html">
           <div class="wf-icon"><span class="ms">assignment</span></div>
